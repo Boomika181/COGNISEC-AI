@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BITS Pilani Academic Portal — Protected by COGNISEC AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #0f172a; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    @keyframes fadeInScale {
+      from { opacity: 0; transform: scale(0.95) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeInScale 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .course-card {
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .course-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 30px -10px rgba(14, 165, 233, 0.15);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-sky-500/20 selection:text-sky-900">
+  
+  <!-- TOP COGNISEC AI ACADEMIC SECURITY BANNER -->
+  <div class="bg-slate-950 text-white border-b border-slate-800 px-6 py-2.5 flex items-center justify-between text-xs font-mono shadow-md">
+    <div class="flex items-center gap-3">
+      <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span class="text-sky-400 font-bold">COGNISEC AI ACADEMIC GUARD (INDIA):</span>
+      <span class="text-slate-300">DigiLocker &amp; Exam Proxy Defense Active</span>
+    </div>
+    <div class="flex items-center gap-4 text-slate-400">
+      <span class="hidden sm:inline">SSO Session: Encrypted (TLS 1.3)</span>
+      <a href="index.html" class="px-3 py-1 rounded bg-sky-500 text-black font-bold hover:bg-sky-400 transition-all text-[11px] uppercase tracking-wider">
+        ← Back to Platform
+      </a>
+    </div>
+  </div>
+
+  <!-- WHITE ACADEMIC PORTAL HEADER -->
+  <header class="bg-white border-b border-slate-200 px-6 sm:px-10 py-5 flex items-center justify-between shadow-sm sticky top-0 z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-600 font-bold text-xl">
+        🎓
+      </div>
+      <div>
+        <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">BITS PILANI ACADEMIC PORTAL</h1>
+        <p class="text-xs font-mono text-sky-700 font-bold">Department of Computer Science &bull; Pilani &bull; Goa &bull; Hyderabad</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="student-header-info" class="text-right font-mono text-xs hidden md:block">
+        <span id="student-status-label" class="text-slate-500 block">Student Roll No: 2021BCE0492</span>
+        <strong id="student-name-label" class="text-slate-900 font-bold">Boomika Ram (CGPA: 9.42 / 10)</strong>
+      </div>
+
+      <!-- Sign Out Button -->
+      <button id="btn-header-signout" onclick="handleStudentSignOut()"
+        class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
+        <span>Sign Out</span>
+        <svg class="w-3.5 h-3.5 text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+      </button>
+
+      <!-- Sign In Button -->
+      <button id="btn-header-signin" onclick="openStudentSignInModal()"
+        class="hidden px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-md">
+        <span>Sign In</span>
+        <svg class="w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
+      </button>
+
+      <button onclick="openStudentModal()" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center gap-2 cursor-pointer">
+        <span>DigiLocker Verified</span>
+        <span id="student-status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN HERO & CONTROLS -->
+  <main class="max-w-6xl mx-auto px-6 py-10 flex-1 w-full space-y-8">
+    
+    <!-- LIGHT HERO BANNER -->
+    <div class="p-8 rounded-3xl bg-white border border-slate-200 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
+      <div class="space-y-4 max-w-xl relative z-10">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 border border-sky-200 text-sky-800 text-xs font-mono font-bold">
+            <span class="w-2 h-2 rounded-full bg-sky-500 animate-ping"></span>
+            AI EXAM PROCTORING ACTIVE
+          </span>
+          <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-mono font-bold">
+            ✓ Aadhaar ID Authenticated
+          </span>
+        </div>
+        <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
+          Anti-Proxy &amp; Integrity Exam Shield
+        </h2>
+        <p class="text-sm text-slate-600 leading-relaxed">
+          Continuous motor gesture analytics ensure proxy test takers are automatically detected during mid-semesters, end-semesters, and lab gradebook updates.
+        </p>
+      </div>
+
+      <!-- LIVE SECURITY TELEMETRY CARD -->
+      <div class="p-6 rounded-2xl bg-slate-900 text-white font-mono text-xs space-y-3.5 w-full md:w-80 shadow-2xl shrink-0 border border-slate-800">
+        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+          <span class="text-slate-400">Semester:</span>
+          <strong class="text-sky-400 font-bold">7th Semester (B.Tech)</strong>
+        </div>
+        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+          <span class="text-slate-400">Proctor Score:</span>
+          <strong class="text-emerald-400 font-bold">ACTIVE (100% Genuine)</strong>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">DigiLocker Status:</span>
+          <strong class="text-sky-400 font-bold">Verified</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- FRONTEND SEARCH & COURSE FILTERS -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+      <div class="relative w-full sm:w-80">
+        <input 
+          id="course-search-input" 
+          type="text" 
+          placeholder="Search courses or topics..." 
+          oninput="filterCourses()"
+          class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-sky-500"
+        />
+        <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">🔍</span>
+      </div>
+
+      <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto text-xs font-mono">
+        <button onclick="setCourseFilter('all')" id="course-all" class="px-3.5 py-2 rounded-xl bg-sky-600 text-white font-bold cursor-pointer">All Courses</button>
+        <button onclick="setCourseFilter('cs')" id="course-cs" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Computer Science</button>
+        <button onclick="setCourseFilter('ai')" id="course-ai" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Artificial Intelligence</button>
+      </div>
+    </div>
+
+    <!-- COURSES CONTAINER -->
+    <div id="courses-grid-container" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <!-- Dynamically Rendered Courses -->
+    </div>
+  </main>
+
+  <!-- INTERACTIVE EXAM PROCTORING MODAL -->
+  <div id="exam-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="text-sky-600 text-lg">🎓</span>
+          <strong class="text-base font-extrabold font-sans">Cognisec AI Proctored Examination</strong>
+        </div>
+        <button onclick="closeExamModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1">✕</button>
+      </div>
+
+      <div id="exam-step-init" class="space-y-4">
+        <div class="p-4 rounded-2xl bg-sky-50 border border-sky-200 space-y-1.5 text-xs">
+          <span class="text-slate-500">Course Selected:</span>
+          <strong id="exam-course-name" class="text-slate-900 block font-bold text-sm">CS F301 - Data Structures &amp; Algorithms</strong>
+          <span class="text-sky-800 font-bold block pt-1">Student: Boomika Ram (2021BCE0492)</span>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-slate-900 text-white space-y-2 text-xs">
+          <span class="text-sky-400 font-bold">Continuous Behavioral Verification:</span>
+          <p class="text-slate-300 text-[11px] leading-relaxed">Webcam biometric feed and keystroke flight rhythm will monitor session integrity in real-time.</p>
+        </div>
+
+        <button onclick="startExamSession()" class="w-full py-3.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+          Start Proctored Test Session →
+        </button>
+      </div>
+
+      <div id="exam-step-active" class="hidden text-center py-6 space-y-4">
+        <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
+          ✓
+        </div>
+        <div>
+          <h4 class="font-extrabold text-xl text-slate-900 font-sans">Exam Session Active &amp; Verified!</h4>
+          <p class="text-xs text-slate-500 mt-1">Session Token: <strong id="token-id" class="text-slate-900">#BITS-2026-8401</strong></p>
+        </div>
+        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800">
+          Proctor Score: 99.98% Confidence &bull; Anti-Proxy Shield Lock ACTIVE
+        </div>
+        <button onclick="closeExamModal()" class="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase">
+          Return to Portal
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERACTIVE STUDENT SIGN IN MODAL -->
+  <div id="student-signin-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative animate-fade-in">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="p-2 rounded-xl bg-sky-50 border border-sky-200 text-sky-600 font-bold text-lg">🎓</div>
+          <div>
+            <h4 class="font-extrabold text-base text-slate-900 font-sans">Sign In to BITS Academic Portal</h4>
+            <p class="text-[11px] text-sky-800 font-bold">DigiLocker &amp; Cognisec Anti-Proxy Shield</p>
+          </div>
+        </div>
+        <button onclick="closeStudentSignInModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1 cursor-pointer">✕</button>
+      </div>
+
+      <form onsubmit="handleStudentSignInSubmit(event)" class="space-y-4">
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-slate-700 uppercase">Student Roll No / Email</label>
+          <input id="student-signin-email" type="text" value="2021bce0492@bits-pilani.ac.in" required
+            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-sky-500" />
+        </div>
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-slate-700 uppercase">Password</label>
+          <input id="student-signin-pass" type="password" value="••••••••••••" required
+            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-sky-500" />
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-sky-50 border border-sky-200 text-xs text-sky-900 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Aadhaar ID &amp; Anti-Proxy Guard</span>
+          </div>
+          <span class="font-bold text-[10px] bg-sky-200 text-sky-900 px-2 py-0.5 rounded">Exam Proctor Active</span>
+        </div>
+
+        <button type="submit" id="btn-submit-student-signin"
+          class="w-full py-3.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+          Sign In &amp; Authorize Academic Portal →
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION TOAST CONTAINER -->
+  <div id="auth-toast" class="fixed top-16 right-6 z-50 hidden p-4 rounded-2xl bg-slate-900 text-white shadow-2xl border border-slate-700 font-mono text-xs max-w-sm animate-fade-in">
+    <div class="flex items-center gap-3">
+      <div id="toast-icon" class="text-lg">🟢</div>
+      <div class="space-y-0.5">
+        <h5 id="toast-title" class="font-bold text-white font-sans">Cognisec Academic Shield</h5>
+        <p id="toast-desc" class="text-[11px] text-slate-300">Identity state updated successfully.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIGHT FOOTER -->
+  <footer class="bg-white border-t border-slate-200 px-8 py-6 text-center text-xs font-mono text-slate-500">
+    BITS Pilani Academic Portal &bull; Protected continuously by COGNISEC AI Anti-Proxy Proctoring Shield.
+  </footer>
+
+  <!-- FRONTEND WORKING SCRIPT -->
+  <script src="cognisec-client.js"></script>
+  <script>
+    if (window.cognisec) window.cognisec.setApplication('college');
+    let isStudentLoggedIn = true;
+
+    function showToast(title, desc, icon = "🟢") {
+      const toast = document.getElementById('auth-toast');
+      document.getElementById('toast-title').textContent = title;
+      document.getElementById('toast-desc').textContent = desc;
+      document.getElementById('toast-icon').textContent = icon;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3500);
+    }
+
+    function openStudentSignInModal() {
+      document.getElementById('student-signin-modal').classList.remove('hidden');
+    }
+
+    function closeStudentSignInModal() {
+      document.getElementById('student-signin-modal').classList.add('hidden');
+    }
+
+    async function handleStudentSignInSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-submit-student-signin');
+      btn.innerHTML = `<span>Authenticating DigiLocker Biometrics...</span>`;
+
+      const emailInput = document.getElementById('student-email-input');
+      const email = emailInput ? emailInput.value : 'student.alex@veritas.edu';
+      if (window.cognisec) {
+        await window.cognisec.login(email, 'Student@123', 'college');
+      }
+
+      setTimeout(() => {
+        isStudentLoggedIn = true;
+        btn.innerHTML = `<span>Sign In &amp; Authorize Academic Portal →</span>`;
+        closeStudentSignInModal();
+
+        // Update Header UI
+        document.getElementById('student-status-label').textContent = 'Student Roll No: 2021BCE0492';
+        document.getElementById('student-name-label').textContent = 'Boomika Ram (CGPA: 9.42 / 10)';
+        document.getElementById('btn-header-signout').classList.remove('hidden');
+        document.getElementById('btn-header-signin').classList.add('hidden');
+        document.getElementById('student-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+
+        showToast("Student Authenticated", "Welcome back, Boomika Ram. DigiLocker Academic ID verified.", "🎓");
+      }, 700);
+    }
+
+    function syncPortalAuthState() {
+      const isAuth = window.cognisec ? window.cognisec.isAuthenticated() : false;
+      const user = window.cognisec ? window.cognisec.getUser() : null;
+      isStudentLoggedIn = isAuth;
+
+      if (isAuth && user) {
+        document.getElementById('student-status-label').textContent = 'Student Roll No: 2021BCE0492';
+        document.getElementById('student-name-label').textContent = `${user.name} (CGPA: 9.42 / 10)`;
+        document.getElementById('btn-header-signout').classList.remove('hidden');
+        document.getElementById('btn-header-signin').classList.add('hidden');
+        document.getElementById('student-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+      } else {
+        document.getElementById('student-status-label').textContent = 'Guest Student';
+        document.getElementById('student-name-label').textContent = 'Not Authenticated';
+        document.getElementById('btn-header-signout').classList.add('hidden');
+        document.getElementById('btn-header-signin').classList.remove('hidden');
+        document.getElementById('student-status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
+      }
+    }
+
+    window.addEventListener('cognisec:auth_change', syncPortalAuthState);
+    document.addEventListener('DOMContentLoaded', syncPortalAuthState);
+    setTimeout(syncPortalAuthState, 150);
+
+    async function handleStudentSignOut() {
+      if (window.cognisec) await window.cognisec.logout();
+      syncPortalAuthState();
+      showToast("Academic Session Terminated", "Signed out. Exam proctoring session locked.", "🚪");
+    }
+
+    // Auto-check URL parameters for ?signin=true
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('signin') === 'true' || urlParams.get('login') === 'true') {
+        openStudentSignInModal();
+      }
+    });
+
+    const COURSES = [
+      { id: 1, code: "CS F301", name: "Data Structures & Algorithms", cat: "cs", grade: "A (10/10)", prof: "Prof. K. R. Sharma", desc: "Advanced graph theory, dynamic programming, B-trees, hashing algorithms, and time complexity analysis." },
+      { id: 2, code: "CS F402", name: "AI Security & Behavioral Biometrics", cat: "ai", grade: "A (10/10)", prof: "Dr. Anita Deshmukh", desc: "Passive keystroke dynamics, deep neural risk scoring, and zero-trust authentication protocols." },
+      { id: 3, code: "CS F360", name: "Distributed Operating Systems", cat: "cs", grade: "A- (9/10)", prof: "Prof. S. R. Iyengar", desc: "Distributed shared memory, RPC primitives, vector clocks, and Byzantine fault tolerance." },
+      { id: 4, code: "AI F420", name: "Deep Neural Reinforcement Learning", cat: "ai", grade: "A (10/10)", prof: "Dr. Vikram Sethi", desc: "Policy gradient methods, Q-learning, deep Q-networks (DQN), and agentic autonomous systems." }
+    ];
+
+    let currentCourseCat = 'all';
+    let courseSearchQuery = '';
+
+    function renderCourses() {
+      const container = document.getElementById('courses-grid-container');
+      if (!container) return;
+
+      const filtered = COURSES.filter(c => {
+        const matchCat = (currentCourseCat === 'all' || c.cat === currentCourseCat);
+        const matchSearch = c.name.toLowerCase().includes(courseSearchQuery.toLowerCase()) || 
+                            c.code.toLowerCase().includes(courseSearchQuery.toLowerCase()) ||
+                            c.desc.toLowerCase().includes(courseSearchQuery.toLowerCase());
+        return matchCat && matchSearch;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="col-span-2 text-center py-12 font-mono text-slate-400">No courses found matching your filter.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(c => `
+        <div class="p-7 rounded-2xl bg-white border border-slate-200 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all space-y-5 flex flex-col justify-between">
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <span class="px-3 py-1 rounded-lg bg-sky-50 text-sky-700 text-xs font-mono font-bold border border-sky-200">${c.code}</span>
+              <span class="text-xs font-mono text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">✓ Grade: ${c.grade}</span>
+            </div>
+            <div>
+              <h4 class="font-bold text-slate-900 text-2xl">${c.name}</h4>
+              <p class="text-xs text-slate-600 mt-2 leading-relaxed">${c.desc}</p>
+            </div>
+          </div>
+          <div class="pt-4 border-t border-slate-100 flex justify-between items-center text-xs font-mono">
+            <span class="text-slate-500">Instructor: ${c.prof}</span>
+            <button onclick="launchExam('${c.code} - ${c.name}')" class="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold transition-all shadow-sm cursor-pointer">
+              Launch Online Exam →
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function setCourseFilter(cat) {
+      currentCourseCat = cat;
+      ['all', 'cs', 'ai'].forEach(c => {
+        const btn = document.getElementById(`course-${c}`);
+        if (btn) {
+          if (c === cat) {
+            btn.className = 'px-3.5 py-2 rounded-xl bg-sky-600 text-white font-bold cursor-pointer';
+          } else {
+            btn.className = 'px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer';
+          }
+        }
+      });
+      renderCourses();
+    }
+
+    function filterCourses() {
+      courseSearchQuery = document.getElementById('course-search-input')?.value || '';
+      renderCourses();
+    }
+
+    function launchExam(courseName) {
+      if (!isStudentLoggedIn) {
+        showToast("Student Authentication Required", "Please sign in to launch online exams.", "🔒");
+        openStudentSignInModal();
+        return;
+      }
+      document.getElementById('exam-course-name').textContent = courseName;
+      document.getElementById('exam-step-init').classList.remove('hidden');
+      document.getElementById('exam-step-active').classList.add('hidden');
+      document.getElementById('exam-modal').classList.remove('hidden');
+    }
+
+    function openStudentModal() {
+      if (!isStudentLoggedIn) {
+        showToast("Student Authentication Required", "Please sign in to access DigiLocker credentials.", "🔒");
+        openStudentSignInModal();
+        return;
+      }
+      launchExam('DigiLocker Student Verification');
+    }
+
+    function closeExamModal() {
+      document.getElementById('exam-modal').classList.add('hidden');
+    }
+
+    function startExamSession() {
+      const initStep = document.getElementById('exam-step-init');
+      initStep.innerHTML = `
+        <div class="text-center py-8 space-y-3">
+          <div class="w-10 h-10 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p class="text-xs font-bold text-slate-800">Verifying Aadhaar Biometrics &amp; Launching Test Terminal...</p>
+        </div>
+      `;
+      setTimeout(() => {
+        document.getElementById('token-id').textContent = '#BITS-2026-' + Math.floor(1000 + Math.random() * 9000);
+        initStep.classList.add('hidden');
+        document.getElementById('exam-step-active').classList.remove('hidden');
+      }, 1400);
+    }
+
+    // Initialize
+    renderCourses();
+  </script>
+</body>
+</html>

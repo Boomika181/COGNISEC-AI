@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AyuSync MedCare Network — Protected by COGNISEC AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #0f172a; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    @keyframes fadeInScale {
+      from { opacity: 0; transform: scale(0.95) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeInScale 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .patient-card {
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .patient-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 30px -10px rgba(16, 185, 129, 0.15);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-emerald-500/20 selection:text-emerald-900">
+  
+  <!-- TOP COGNISEC AI CLINICAL SECURITY BANNER -->
+  <div class="bg-slate-950 text-white border-b border-slate-800 px-6 py-2.5 flex items-center justify-between text-xs font-mono shadow-md">
+    <div class="flex items-center gap-3">
+      <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span class="text-emerald-400 font-bold">COGNISEC AI CLINICAL GUARD:</span>
+      <span class="text-slate-300">ABDM Ayushman Bharat &amp; HIPAA Proximity Active</span>
+    </div>
+    <div class="flex items-center gap-4 text-slate-400">
+      <span class="hidden sm:inline">EHR Terminal: Locked &amp; Protected</span>
+      <a href="index.html" class="px-3 py-1 rounded bg-emerald-500 text-black font-bold hover:bg-emerald-400 transition-all text-[11px] uppercase tracking-wider">
+        ← Back to Platform
+      </a>
+    </div>
+  </div>
+
+  <!-- WHITE HEADER (UNIQUE BRAND: AYUSYNC MEDCARE NETWORK) -->
+  <header class="bg-white border-b border-slate-200 px-6 sm:px-10 py-5 flex items-center justify-between shadow-sm sticky top-0 z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 font-bold text-xl">
+        🩺
+      </div>
+      <div>
+        <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">AYUSYNC MEDCARE NETWORK</h1>
+        <p class="text-xs font-mono text-emerald-700 font-bold">Bengaluru &bull; Delhi &bull; Hyderabad &bull; ABDM Compliant</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="doctor-header-info" class="text-right font-mono text-xs hidden md:block">
+        <span id="doctor-status-label" class="text-slate-500 block">Doctor Reg No: KMC #84920</span>
+        <strong id="doctor-name-label" class="text-slate-900 font-bold">Dr. Boomika Ram, M.D. (Cardiology)</strong>
+      </div>
+
+      <!-- Sign Out Button -->
+      <button id="btn-header-signout" onclick="handleDoctorSignOut()"
+        class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
+        <span>Sign Out</span>
+        <svg class="w-3.5 h-3.5 text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+      </button>
+
+      <!-- Sign In Button -->
+      <button id="btn-header-signin" onclick="openDoctorSignInModal()"
+        class="hidden px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-md">
+        <span>Sign In</span>
+        <svg class="w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
+      </button>
+
+      <button onclick="openDoctorModal()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center gap-2 cursor-pointer">
+        <span>ABHA Health ID Shield</span>
+        <span id="doctor-status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN HERO & CLINICAL RECORDS -->
+  <main class="max-w-6xl mx-auto px-6 py-10 flex-1 w-full space-y-8">
+    
+    <!-- LIGHT HERO BANNER -->
+    <div class="p-8 rounded-3xl bg-white border border-slate-200 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
+      <div class="space-y-4 max-w-xl relative z-10">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono font-bold">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            WORKSTATION PROXIMITY GUARD ACTIVE
+          </span>
+          <span class="px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-[11px] font-mono font-bold">
+            ✓ ABHA Health Card Verified
+          </span>
+        </div>
+        <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
+          Passive Doctor Identity &amp; PHI Patient Shield
+        </h2>
+        <p class="text-sm text-slate-600 leading-relaxed">
+          Integrated with Ayushman Bharat Digital Mission (ABDM). If an attending physician steps away from the OPD terminal, Cognisec AI instantly detects motor anomaly and locks medical records in sub-seconds.
+        </p>
+      </div>
+
+      <!-- LIVE SECURITY TELEMETRY CARD -->
+      <div class="p-6 rounded-2xl bg-slate-900 text-white font-mono text-xs space-y-3.5 w-full md:w-80 shadow-2xl shrink-0 border border-slate-800">
+        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+          <span class="text-slate-400">ABHA Health ID:</span>
+          <strong class="text-emerald-400 font-bold">91-8829-4019-12</strong>
+        </div>
+        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+          <span class="text-slate-400">HIPAA Compliance:</span>
+          <strong class="text-emerald-400 font-bold">100% Compliant</strong>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Hospital OPD:</span>
+          <strong class="text-emerald-400 font-bold">Indiranagar, Bengaluru</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- FRONTEND SEARCH & DEPARTMENT FILTERS -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+      <div class="relative w-full sm:w-80">
+        <input 
+          id="patient-search-input" 
+          type="text" 
+          placeholder="Search patient name, ABHA ID or diagnosis..." 
+          oninput="filterPatients()"
+          class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-emerald-500"
+        />
+        <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">🔍</span>
+      </div>
+
+      <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto text-xs font-mono">
+        <button onclick="setDeptFilter('all')" id="dept-all" class="px-3.5 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer">All Units</button>
+        <button onclick="setDeptFilter('cardiology')" id="dept-cardiology" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Cardiology ICU</button>
+        <button onclick="setDeptFilter('neurology')" id="dept-neurology" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Neurology OPD</button>
+        <button onclick="setDeptFilter('oncology')" id="dept-oncology" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Oncology Ward</button>
+      </div>
+    </div>
+
+    <!-- PATIENT EHR LIST CONTAINER -->
+    <div id="patient-list-container" class="space-y-4">
+      <!-- Dynamically Rendered Patients -->
+    </div>
+  </main>
+
+  <!-- INTERACTIVE EHR PATIENT MODAL -->
+  <div id="ehr-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="text-emerald-600 text-lg">🏥</span>
+          <strong class="text-base font-extrabold font-sans">Cognisec AI Sealed EHR Record</strong>
+        </div>
+        <button onclick="closeEhrModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1">✕</button>
+      </div>
+
+      <div id="ehr-step-init" class="space-y-4">
+        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-1.5 text-xs">
+          <span class="text-slate-500">Patient File:</span>
+          <strong id="ehr-patient-name" class="text-slate-900 block font-bold text-sm">Rajesh Kumar (Age 52)</strong>
+          <span class="text-emerald-800 font-bold block pt-1">ABHA ID: <span id="ehr-abha-id">91-0982-1249-92</span></span>
+          <span id="ehr-diagnosis" class="text-slate-600 block text-[11px] pt-1">Diagnosis: Post-Op Coronary Angioplasty</span>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-slate-900 text-white space-y-2 text-xs">
+          <span class="text-emerald-400 font-bold">Workstation Doctor Proximity:</span>
+          <p class="text-slate-300 text-[11px] leading-relaxed">Verified Doctor: Dr. Boomika Ram (KMC #84920). Instant authorization granted without token card swipe.</p>
+        </div>
+
+        <button onclick="unlockEhrRecord()" class="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+          Unlock Sealed Patient Record →
+        </button>
+      </div>
+
+      <div id="ehr-step-active" class="hidden text-center py-6 space-y-4">
+        <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
+          ✓
+        </div>
+        <div>
+          <h4 class="font-extrabold text-xl text-slate-900 font-sans">EHR Clinical Records Unlocked!</h4>
+          <p class="text-xs text-slate-500 mt-1">Audit Log Entry: <strong id="audit-log-id" class="text-slate-900">#ABDM-2026-94812</strong></p>
+        </div>
+        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800">
+          Ayushman Bharat Compliant &bull; HIPAA Sealed &bull; Doctor Rhythm Match 99.98%
+        </div>
+        <button onclick="closeEhrModal()" class="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase">
+          Lock Record &amp; Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERACTIVE DOCTOR SIGN IN MODAL -->
+  <div id="doctor-signin-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative animate-fade-in">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 font-bold text-lg">🩺</div>
+          <div>
+            <h4 class="font-extrabold text-base text-slate-900 font-sans">Sign In to AyuSync Medcare</h4>
+            <p class="text-[11px] text-emerald-800 font-bold">ABDM &amp; HIPAA Zero Trust Network</p>
+          </div>
+        </div>
+        <button onclick="closeDoctorSignInModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1 cursor-pointer">✕</button>
+      </div>
+
+      <form onsubmit="handleDoctorSignInSubmit(event)" class="space-y-4">
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-slate-700 uppercase">Doctor Registration No / Email</label>
+          <input id="doctor-signin-email" type="text" value="dr.boomika@ayusync.med.in" required
+            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500" />
+        </div>
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-slate-700 uppercase">Password</label>
+          <input id="doctor-signin-pass" type="password" value="••••••••••••" required
+            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500" />
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>ABHA Workstation Shield</span>
+          </div>
+          <span class="font-bold text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">Proximity Guard Active</span>
+        </div>
+
+        <button type="submit" id="btn-submit-doctor-signin"
+          class="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+          Sign In &amp; Authorize EHR Workstation →
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION TOAST CONTAINER -->
+  <div id="auth-toast" class="fixed top-16 right-6 z-50 hidden p-4 rounded-2xl bg-slate-900 text-white shadow-2xl border border-slate-700 font-mono text-xs max-w-sm animate-fade-in">
+    <div class="flex items-center gap-3">
+      <div id="toast-icon" class="text-lg">🟢</div>
+      <div class="space-y-0.5">
+        <h5 id="toast-title" class="font-bold text-white font-sans">Cognisec Medical Security</h5>
+        <p id="toast-desc" class="text-[11px] text-slate-300">Identity state updated successfully.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIGHT FOOTER -->
+  <footer class="bg-white border-t border-slate-200 px-8 py-6 text-center text-xs font-mono text-slate-500">
+    AyuSync Medcare Network &bull; Protected continuously by COGNISEC AI Proximity &amp; PHI Shield.
+  </footer>
+
+  <!-- FRONTEND WORKING SCRIPT -->
+  <script src="cognisec-client.js"></script>
+  <script>
+    if (window.cognisec) window.cognisec.setApplication('healthcare');
+    let isDoctorLoggedIn = true;
+
+    function showToast(title, desc, icon = "🟢") {
+      const toast = document.getElementById('auth-toast');
+      document.getElementById('toast-title').textContent = title;
+      document.getElementById('toast-desc').textContent = desc;
+      document.getElementById('toast-icon').textContent = icon;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3500);
+    }
+
+    function openDoctorSignInModal() {
+      document.getElementById('doctor-signin-modal').classList.remove('hidden');
+    }
+
+    function closeDoctorSignInModal() {
+      document.getElementById('doctor-signin-modal').classList.add('hidden');
+    }
+
+    async function handleDoctorSignInSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-submit-doctor-signin');
+      btn.innerHTML = `<span>Authenticating ABHA Proximity Shield...</span>`;
+
+      const emailInput = document.getElementById('doctor-signin-email');
+      const email = emailInput ? emailInput.value : 'dr.boomika@ayusync.med.in';
+      if (window.cognisec) {
+        await window.cognisec.login(email, 'Doctor@123', 'healthcare');
+      }
+
+      setTimeout(() => {
+        isDoctorLoggedIn = true;
+        btn.innerHTML = `<span>Sign In &amp; Authorize EHR Workstation →</span>`;
+        closeDoctorSignInModal();
+
+        // Update Header UI
+        document.getElementById('doctor-status-label').textContent = 'Doctor Reg No: KMC #84920';
+        document.getElementById('doctor-name-label').textContent = 'Dr. Boomika Ram, M.D. (Cardiology)';
+        document.getElementById('btn-header-signout').classList.remove('hidden');
+        document.getElementById('btn-header-signin').classList.add('hidden');
+        document.getElementById('doctor-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+
+        showToast("Workstation Authenticated", "Welcome back, Dr. Boomika Ram. ABHA Proximity Shield Active.", "🩺");
+      }, 700);
+    }
+
+    function syncHealthcareAuthState() {
+      const isAuth = window.cognisec ? window.cognisec.isAuthenticated() : false;
+      const user = window.cognisec ? window.cognisec.getUser() : null;
+      isDoctorLoggedIn = isAuth;
+
+      if (isAuth && user) {
+        document.getElementById('doctor-status-label').textContent = 'Doctor Reg No: KMC #84920';
+        document.getElementById('doctor-name-label').textContent = `Dr. ${user.name} (Cardiology)`;
+        document.getElementById('btn-header-signout').classList.remove('hidden');
+        document.getElementById('btn-header-signin').classList.add('hidden');
+        document.getElementById('doctor-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+      } else {
+        document.getElementById('doctor-status-label').textContent = 'Guest Medical Officer';
+        document.getElementById('doctor-name-label').textContent = 'Not Signed In';
+        document.getElementById('btn-header-signout').classList.add('hidden');
+        document.getElementById('btn-header-signin').classList.remove('hidden');
+        document.getElementById('doctor-status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
+      }
+    }
+
+    window.addEventListener('cognisec:auth_change', syncHealthcareAuthState);
+    document.addEventListener('DOMContentLoaded', syncHealthcareAuthState);
+    setTimeout(syncHealthcareAuthState, 150);
+
+    async function handleDoctorSignOut() {
+      if (window.cognisec) await window.cognisec.logout();
+      syncHealthcareAuthState();
+      showToast("Clinical Workstation Locked", "Doctor session signed out. EHR records locked.", "🚪");
+    }
+
+    // Auto-check URL parameters for ?signin=true
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('signin') === 'true' || urlParams.get('login') === 'true') {
+        openDoctorSignInModal();
+      }
+    });
+
+    const PATIENTS = [
+      { id: 1, name: "Rajesh Kumar (Age 52)", dept: "cardiology", abha: "91-0982-1249-92", unit: "ICU Bay 4, Bengaluru", status: "ECG Rhythm Stable", diagnosis: "Post-Op Coronary Angioplasty", icon: "🫀" },
+      { id: 2, name: "Sunita Sharma (Age 45)", dept: "neurology", abha: "91-4820-9182-40", unit: "OPD Clinic, Bengaluru", status: "Telehealth Authorized", diagnosis: "EKG Neural Diagnostic Evaluation", icon: "🧠" },
+      { id: 3, name: "Arjun Venkat (Age 61)", dept: "cardiology", abha: "91-8840-1928-11", unit: "ICU Bay 1, Bengaluru", status: "Vitals Monitored", diagnosis: "Myocardial Infarction Recovery", icon: "🫀" },
+      { id: 4, name: "Priya Nair (Age 34)", dept: "oncology", abha: "91-7712-4091-88", unit: "Oncology Ward 3", status: "Chemo Protocol Active", diagnosis: "Targeted Immunotherapy Protocol", icon: "🔬" }
+    ];
+
+    let currentDept = 'all';
+    let patientSearchQuery = '';
+
+    function renderPatients() {
+      const container = document.getElementById('patient-list-container');
+      if (!container) return;
+
+      const filtered = PATIENTS.filter(p => {
+        const matchDept = (currentDept === 'all' || p.dept === currentDept);
+        const matchSearch = p.name.toLowerCase().includes(patientSearchQuery.toLowerCase()) || 
+                            p.abha.includes(patientSearchQuery) || 
+                            p.diagnosis.toLowerCase().includes(patientSearchQuery.toLowerCase());
+        return matchDept && matchSearch;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="text-center py-12 font-mono text-slate-400">No patient records found matching your query.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(p => `
+        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-md hover:shadow-lg transition-all flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs">
+          <div class="flex items-center gap-4">
+            <span class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center text-xl font-bold">${p.icon}</span>
+            <div>
+              <strong class="text-slate-900 text-base block font-sans">${p.name}</strong>
+              <span class="text-slate-500 text-xs">ABHA ID: ${p.abha} &bull; ${p.unit} &bull; ${p.status}</span>
+            </div>
+          </div>
+          <button onclick="viewEhr('${p.name}', '${p.abha}', '${p.diagnosis}')" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all shadow-sm shrink-0 cursor-pointer">
+            View Sealed EHR →
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function setDeptFilter(dept) {
+      currentDept = dept;
+      ['all', 'cardiology', 'neurology', 'oncology'].forEach(d => {
+        const btn = document.getElementById(`dept-${d}`);
+        if (btn) {
+          if (d === dept) {
+            btn.className = 'px-3.5 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer';
+          } else {
+            btn.className = 'px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer';
+          }
+        }
+      });
+      renderPatients();
+    }
+
+    function filterPatients() {
+      patientSearchQuery = document.getElementById('patient-search-input')?.value || '';
+      renderPatients();
+    }
+
+    function viewEhr(name, abha, diag) {
+      if (!isDoctorLoggedIn) {
+        showToast("Doctor Authentication Required", "Please sign in to view confidential PHI EHR records.", "🔒");
+        openDoctorSignInModal();
+        return;
+      }
+      document.getElementById('ehr-patient-name').textContent = name;
+      document.getElementById('ehr-abha-id').textContent = abha;
+      document.getElementById('ehr-diagnosis').textContent = 'Diagnosis: ' + diag;
+      document.getElementById('ehr-step-init').classList.remove('hidden');
+      document.getElementById('ehr-step-active').classList.add('hidden');
+      document.getElementById('ehr-modal').classList.remove('hidden');
+    }
+
+    function openDoctorModal() {
+      if (!isDoctorLoggedIn) {
+        showToast("Doctor Authentication Required", "Please sign in to access ABHA Health ID Shield.", "🔒");
+        openDoctorSignInModal();
+        return;
+      }
+      viewEhr('Rajesh Kumar (Age 52)', '91-0982-1249-92', 'ABHA Doctor Authorization');
+    }
+
+    function closeEhrModal() {
+      document.getElementById('ehr-modal').classList.add('hidden');
+    }
+
+    function unlockEhrRecord() {
+      const initStep = document.getElementById('ehr-step-init');
+      initStep.innerHTML = `
+        <div class="text-center py-8 space-y-3">
+          <div class="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p class="text-xs font-bold text-slate-800">Authenticating Doctor Biometrics &amp; Unlocking ABDM EHR...</p>
+        </div>
+      `;
+      setTimeout(() => {
+        document.getElementById('audit-log-id').textContent = '#ABDM-' + Math.floor(10000 + Math.random() * 90000);
+        initStep.classList.add('hidden');
+        document.getElementById('ehr-step-active').classList.remove('hidden');
+      }, 1400);
+    }
+
+    // Initialize
+    renderPatients();
+  </script>
+</body>
+</html>

@@ -1,0 +1,2376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cognisec AI - Autonomous Cognitive Identity Platform</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+            heading: ['Outfit', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-[#030305] text-slate-100 font-sans selection:bg-red-600 selection:text-white">
+
+  <!-- Preloader overlay -->
+  <div id="loader" class="loader-overlay">
+    <div class="loader-spinner"></div>
+    <div class="loader-progress" id="loader-text">Loading 0%</div>
+  </div>
+
+  <!-- Fullscreen Edge-to-Edge Fixed Canvas Background -->
+  <canvas id="hero-canvas"></canvas>
+
+  <!-- Enterprise Header Overlay -->
+  <header class="fixed top-0 left-0 right-0 z-40 w-full px-6 lg:px-12 py-5 max-w-7xl mx-auto flex items-center justify-between border-b border-red-950/30 backdrop-blur-md bg-[#030305]/60">
+    <!-- Brand Logo -->
+    <div class="flex items-center gap-3 group cursor-pointer" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+      <div class="relative w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 via-red-800 to-black p-[1px] shadow-[0_4px_20px_rgba(220,38,38,0.25)] group-hover:shadow-[0_6px_30px_rgba(239,68,68,0.5)] transition-all duration-500">
+        <div class="w-full h-full bg-[#08050b] rounded-[11px] flex items-center justify-center relative overflow-hidden">
+          <div class="absolute inset-0 bg-red-600/10 group-hover:bg-red-600/20 transition-colors"></div>
+          <svg class="w-5 h-5 text-red-500 relative z-10 group-hover:scale-105 transition-transform duration-300" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+          <div class="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full shadow-[0_0_8px_#ef4444]"></div>
+        </div>
+      </div>
+
+      <div class="flex flex-col">
+        <div class="flex items-center gap-2">
+          <span class="font-heading font-extrabold text-xl tracking-wider text-white">
+            COGNISEC <span class="text-red-500">AI</span>
+          </span>
+        </div>
+        <span class="text-[10px] font-mono text-slate-400 tracking-widest uppercase -mt-0.5 hidden sm:block">
+          Cognitive Identity Protection
+        </span>
+      </div>
+    </div>
+
+    <!-- Navigation Links -->
+    <nav class="hidden lg:flex items-center gap-8 relative">
+      <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="relative py-1 text-xs font-mono tracking-widest uppercase text-white font-semibold cursor-pointer">
+        <span>Platform</span>
+        <span class="absolute bottom-0 left-0 h-[2px] w-full bg-gradient-to-r from-red-600 to-red-400 shadow-[0_0_8px_#ef4444]"></span>
+      </button>
+      <button onclick="document.getElementById('workflow').scrollIntoView({behavior: 'smooth'})" class="relative py-1 text-xs font-mono tracking-widest uppercase text-slate-400 hover:text-slate-200 transition-colors cursor-pointer">
+        <span>Workflow</span>
+      </button>
+      <button onclick="document.getElementById('technology').scrollIntoView({behavior: 'smooth'})" class="relative py-1 text-xs font-mono tracking-widest uppercase text-slate-400 hover:text-slate-200 transition-colors cursor-pointer">
+        <span>Technology</span>
+      </button>
+      <button onclick="scrollToSection('user-profile-section')" class="relative py-1 text-xs font-mono tracking-widest uppercase text-slate-400 hover:text-slate-200 transition-colors cursor-pointer">
+        <span>Dashboard</span>
+      </button>
+      <button onclick="document.getElementById('plain-black-applications-section').scrollIntoView({behavior: 'smooth'})" class="relative py-1 text-xs font-mono tracking-widest uppercase text-slate-400 hover:text-slate-200 transition-colors cursor-pointer">
+        <span>Applications</span>
+      </button>
+    </nav>
+
+    <!-- Action Buttons -->
+    <div class="flex items-center gap-3">
+      <!-- Notification Center Bell Button -->
+      <button 
+        id="notif-bell-btn"
+        onclick="toggleNotificationCenter()" 
+        class="relative p-2.5 rounded-lg bg-black/60 border border-red-900/60 hover:border-red-500 text-slate-300 hover:text-white transition-all cursor-pointer"
+        title="Security Notification Center"
+      >
+        <svg class="w-4 h-4 text-amber-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span id="notif-badge" class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-mono font-bold flex items-center justify-center border border-black shadow-[0_0_10px_#ef4444] animate-pulse">1</span>
+      </button>
+
+      <button id="navbar-signin-btn" onclick="handleNavbarAuthClick()" class="px-4 py-2.5 text-xs font-mono tracking-wider text-slate-300 hover:text-white border border-red-900/60 hover:border-red-500/80 rounded-lg bg-black/40 hover:bg-red-950/30 transition-all cursor-pointer flex items-center gap-2 font-medium">
+        <svg class="w-3.5 h-3.5 text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span id="navbar-signin-text">Sign In</span>
+      </button>
+
+      <button id="navbar-logout-btn" onclick="handleLogout()" class="hidden px-3.5 py-2.5 text-xs font-mono tracking-wider text-red-300 hover:text-white border border-red-900/70 hover:border-red-500 rounded-lg bg-red-950/40 hover:bg-red-900/60 transition-all cursor-pointer items-center gap-1.5 font-medium" title="Sign Out">
+        <span>🚪 Logout</span>
+      </button>
+
+      <button onclick="handleLaunchConsoleClick()" class="group relative inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-semibold tracking-wider text-white uppercase bg-gradient-to-r from-red-600 via-red-700 to-red-800 rounded-lg shadow-[0_4px_25px_rgba(220,38,38,0.35)] hover:shadow-[0_6px_35px_rgba(239,68,68,0.6)] transition-all duration-300 overflow-hidden cursor-pointer border border-red-500/30">
+        <div class="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-12 -translate-x-full group-hover:translate-x-[300%] transition-transform duration-1000"></div>
+        <svg class="w-3.5 h-3.5 text-red-200 group-hover:rotate-12 transition-transform" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span class="font-heading">Launch Console</span>
+        <svg class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN SCROLL TRACK CONTAINER -->
+  <div id="scroll-track" class="relative z-10">
+    <main class="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 pt-28 pb-16 space-y-28">
+
+      <!-- ================= SECTION 1: OVER FIRST ANIMATION (RED SEQUENCE) ================= -->
+      <div id="section-1-group" class="space-y-28">
+        
+        <!-- HERO SECTION (LEFT COPY + RIGHT 3D HOLOGRAPHIC CORE HUD) -->
+        <section id="hero" class="min-h-[85vh] flex flex-col justify-center">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-10 items-center">
+            
+            <!-- Left Hero Content -->
+            <div class="lg:col-span-6 flex flex-col justify-center space-y-7 lg:space-y-9">
+              <div class="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-red-950/60 border border-red-500/40 shadow-[0_0_20px_rgba(220,38,38,0.3)] backdrop-blur-xl self-start group cursor-pointer hover:border-red-500/70 transition-all duration-300">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-pulse absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500 shadow-[0_0_8px_#ef4444]"></span>
+                </span>
+                <span class="text-xs font-mono font-medium tracking-widest text-red-200 uppercase flex items-center gap-2">
+                  <svg class="w-3.5 h-3.5 text-red-400 animate-pulse" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+                  AI-POWERED ZERO TRUST
+                </span>
+              </div>
+
+              <div class="space-y-3">
+                <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-[4.8rem] xl:text-[5.2rem] font-extrabold tracking-tight text-white font-heading leading-[0.98]">
+                  NEVER TRUST. <br />
+                  <span class="red-gradient-text drop-shadow-[0_0_50px_rgba(239,68,68,0.65)]">
+                    CONTINUOUSLY VERIFY.
+                  </span>
+                </h1>
+                <p class="text-xs font-mono text-red-400/90 tracking-[0.25em] uppercase flex items-center gap-2.5 pt-1">
+                  <span class="w-10 h-px bg-red-600/70"></span>
+                  Autonomous Cognitive Identity Platform
+                </p>
+              </div>
+
+              <p class="text-sm sm:text-base text-slate-300/90 leading-relaxed font-sans font-normal max-w-md">
+                Continuous AI-powered identity verification using
+                <span class="text-white font-medium underline decoration-red-500/50 underline-offset-4">behavioral biometrics</span>,
+                <span class="text-white font-medium underline decoration-red-500/50 underline-offset-4">cognitive authentication</span>, and
+                <span class="text-white font-medium underline decoration-red-500/50 underline-offset-4">adaptive risk intelligence</span>.
+              </p>
+
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2">
+                <button onclick="scrollToSection('user-profile-section')" class="group relative inline-flex items-center justify-center gap-3 px-7 py-3.5 text-xs font-heading font-bold tracking-widest text-white uppercase bg-gradient-to-r from-red-600 via-red-700 to-red-800 rounded-xl shadow-[0_0_35px_rgba(220,38,38,0.6)] hover:shadow-[0_0_55px_rgba(239,68,68,0.9)] transition-all duration-300 overflow-hidden cursor-pointer border border-red-500/50">
+                  <div class="absolute inset-0 w-1/3 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-12 -translate-x-full group-hover:translate-x-[400%] transition-transform duration-1000"></div>
+                  <svg class="w-4 h-4 text-red-200 group-hover:rotate-12 transition-transform" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <span>Launch Dashboard</span>
+                  <svg class="w-4 h-4 text-red-200 group-hover:translate-x-1.5 transition-transform" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </button>
+
+                <button onclick="openModal('liveDemo')" class="group inline-flex items-center justify-center gap-3 px-7 py-3.5 text-xs font-heading font-semibold tracking-widest text-slate-200 hover:text-white bg-red-950/30 hover:bg-red-900/40 border border-red-800/40 hover:border-red-500/80 rounded-xl backdrop-blur-xl transition-all duration-300 shadow-[0_0_20px_rgba(0,0,0,0.6)] cursor-pointer uppercase">
+                  <div class="w-5 h-5 rounded-full bg-red-600/20 flex items-center justify-center border border-red-500/40 group-hover:bg-red-600 group-hover:text-white transition-colors">
+                    <svg class="w-2.5 h-2.5 text-red-400 group-hover:text-white fill-current translate-x-0.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                  </div>
+                  <span>Live Demo</span>
+                </button>
+              </div>
+
+              <!-- Trust Strip & 3 Glass Cards -->
+              <div class="pt-6 border-t border-red-950/60 space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444] animate-pulse"></span>
+                    <span class="text-[10px] font-mono font-medium tracking-[0.18em] text-red-200 uppercase">
+                      Trusted for Continuous Identity Protection
+                    </span>
+                  </div>
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono text-emerald-400 bg-emerald-950/50 border border-emerald-800/40 uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.15)]">
+                    <svg class="w-3 h-3 text-emerald-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                    Zero Password Reliance
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                  <div class="glass-panel p-3.5 rounded-xl border border-red-900/40 bg-black/50 backdrop-blur-md flex flex-col justify-between hover:border-red-600/60 transition-all duration-300 group">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xl sm:text-2xl font-extrabold text-white font-heading tracking-tight group-hover:text-red-400 transition-colors">99.2%</span>
+                      <svg class="w-4 h-4 text-red-500/80 group-hover:text-red-400 transition-colors" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+                    </div>
+                    <div class="flex items-end gap-1 my-1.5 h-3">
+                      <div class="w-1 rounded-full bg-red-600/60 h-2 animate-pulse"></div>
+                      <div class="w-1 rounded-full bg-red-500/80 h-3 animate-pulse"></div>
+                      <div class="w-1 rounded-full bg-emerald-400 h-3.5 animate-pulse"></div>
+                      <div class="w-1 rounded-full bg-emerald-400 h-3 animate-pulse"></div>
+                      <div class="w-1 rounded-full bg-red-500/80 h-2 animate-pulse"></div>
+                    </div>
+                    <span class="text-[9px] font-mono text-slate-400 uppercase tracking-wider">Behavioral Accuracy</span>
+                  </div>
+
+                  <div class="glass-panel p-3.5 rounded-xl border border-red-900/40 bg-black/50 backdrop-blur-md flex flex-col justify-between hover:border-red-600/60 transition-all duration-300 group">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xl sm:text-2xl font-extrabold text-white font-heading tracking-tight group-hover:text-red-400 transition-colors">&lt;40ms</span>
+                      <svg class="w-4 h-4 text-red-500/80 group-hover:text-red-400 transition-colors" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    </div>
+                    <div class="space-y-1 my-1.5">
+                      <div class="w-full h-1 rounded-full bg-black/60 overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-red-500 w-[94%] rounded-full"></div>
+                      </div>
+                    </div>
+                    <span class="text-[9px] font-mono text-slate-400 uppercase tracking-wider">Decision Latency</span>
+                  </div>
+
+                  <div class="glass-panel p-3.5 rounded-xl border border-red-900/40 bg-black/50 backdrop-blur-md flex flex-col justify-between hover:border-red-600/60 transition-all duration-300 group">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xl sm:text-2xl font-extrabold text-white font-heading tracking-tight group-hover:text-red-400 transition-colors">24/7</span>
+                      <svg class="w-4 h-4 text-emerald-400 animate-pulse" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    </div>
+                    <div class="flex items-center gap-1.5 my-1.5">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                      <span class="text-[8px] font-mono text-emerald-300 font-bold tracking-wider">ACTIVE</span>
+                    </div>
+                    <span class="text-[9px] font-mono text-slate-400 uppercase tracking-wider">Continuous</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Hero Holographic 3D Nucleus HUD -->
+            <div class="lg:col-span-6 flex items-center justify-center relative my-4">
+              <div class="relative w-full aspect-square max-w-[540px] flex items-center justify-center select-none">
+                <div class="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[220px] bg-gradient-to-r from-transparent via-red-600/15 to-transparent blur-3xl pointer-events-none"></div>
+                <div class="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-gradient-to-b from-transparent via-red-500/80 to-transparent shadow-[0_0_25px_#ef4444] pointer-events-none"></div>
+                
+                <div class="relative w-[56%] h-[56%] rounded-full bg-[#07040a]/92 border-2 border-red-500/80 shadow-[0_0_70px_rgba(220,38,38,0.7)] flex items-center justify-center overflow-hidden transition-all duration-500 group backdrop-blur-2xl">
+                  <div class="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent shadow-[0_0_20px_#ef4444] animate-laser pointer-events-none z-20"></div>
+                  
+                  <div id="hud-core-content" class="flex flex-col items-center justify-center space-y-2 relative z-10">
+                    <div class="relative">
+                      <svg class="w-20 h-20 text-red-500 drop-shadow-[0_0_35px_rgba(239,68,68,0.95)] animate-pulse" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+                      <svg class="w-8 h-8 text-white absolute inset-0 m-auto drop-shadow-[0_0_15px_#ffffff]" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </div>
+                    <div class="text-center">
+                      <span class="block text-xs font-mono font-bold text-white tracking-widest uppercase">ZERO TRUST NUCLEUS</span>
+                      <span id="hud-status-text" class="text-[10px] font-mono text-red-400/90 font-semibold">CONTINUOUS BEHAVIORAL LOCK</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="absolute -top-4 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1 rounded-xl bg-[#08040d]/90 border border-red-700/50 shadow-[0_10px_35px_rgba(0,0,0,0.9)] backdrop-blur-xl z-30">
+                  <button onclick="setHudMode('core')" id="hud-btn-core" class="px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.7)] cursor-pointer">CORE</button>
+                  <button onclick="setHudMode('biometric')" id="hud-btn-biometric" class="px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all text-slate-400 hover:text-white cursor-pointer">BIOMETRIC</button>
+                  <button onclick="setHudMode('neural')" id="hud-btn-neural" class="px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all text-slate-400 hover:text-white cursor-pointer">NEURAL</button>
+                  <button onclick="setHudMode('stream')" id="hud-btn-stream" class="px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all text-slate-400 hover:text-white cursor-pointer">STREAM</button>
+                </div>
+
+                <div class="absolute bottom-2 left-0 p-3.5 rounded-xl glass-panel border border-red-800/40 hover:border-red-500/70 transition-all z-30 shadow-[0_10px_30px_rgba(0,0,0,0.6)] space-y-2.5">
+                  <div class="flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]"></span>
+                      <span class="text-xs font-mono font-bold text-white tracking-wider">NODE #892-ALPHA</span>
+                    </div>
+                    <span id="scan-progress-text" class="text-[10px] font-mono text-emerald-400 font-semibold">99.94% FIDELITY</span>
+                  </div>
+
+                  <button onclick="triggerThreatSimulation()" id="threat-sim-btn" class="w-full py-1.5 px-3 rounded-lg text-[10px] font-mono font-bold tracking-wider uppercase transition-all flex items-center justify-center gap-2 border bg-red-950/70 hover:bg-red-900 text-red-200 border-red-700/60 hover:border-red-500 cursor-pointer">
+                    <svg class="w-3.5 h-3.5 text-amber-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                    <span id="threat-btn-text">Simulate Threat Attack</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKFLOW SECTION (STAGGERED 5-CARD TIMELINE WITH CENTRAL LASER LINE) -->
+        <section id="workflow" class="py-12 relative overflow-hidden">
+          <div class="text-center space-y-4 max-w-3xl mx-auto relative z-10 mb-16 sm:mb-20">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-950/70 border border-red-800/60 text-[11px] font-mono text-red-300 shadow-[0_0_20px_rgba(220,38,38,0.3)]">
+              <svg class="w-4 h-4 text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+              <span class="uppercase tracking-widest font-bold">AUTHENTICATION PIPELINE</span>
+            </div>
+
+            <h2 class="text-3xl sm:text-4xl lg:text-5xl font-heading font-extrabold text-white tracking-wide leading-tight">
+              How Continuous Authentication Works
+            </h2>
+
+            <p class="text-xs sm:text-sm font-sans text-slate-300 leading-relaxed max-w-2xl mx-auto">
+              COGNISEC AI continuously verifies identity throughout the session using behavioral biometrics, cognitive authentication, and AI-driven risk analysis without interrupting the user.
+            </p>
+          </div>
+
+          <div class="relative z-10 max-w-5xl mx-auto">
+            <div class="hidden md:block absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-0.5 bg-gradient-to-b from-red-600/10 via-red-500/80 to-red-600/10 shadow-[0_0_15px_rgba(220,38,38,0.7)] z-0"></div>
+            <div class="md:hidden absolute top-0 bottom-0 left-6 w-0.5 bg-gradient-to-b from-red-600/10 via-red-500/80 to-red-600/10 shadow-[0_0_15px_rgba(220,38,38,0.7)] z-0"></div>
+
+            <div class="space-y-12 sm:space-y-16">
+              <!-- Card 01 (Left) -->
+              <div class="reveal-left relative grid grid-cols-1 md:grid-cols-12 items-center gap-6 md:gap-0" style="transition-delay: 0ms;">
+                <div class="absolute left-6 md:left-1/2 -translate-x-1/2 z-20 flex items-center justify-center">
+                  <div class="w-10 h-10 rounded-xl bg-black border border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.9)] flex items-center justify-center text-white font-mono text-xs font-extrabold animate-pulse">01</div>
+                </div>
+                <div class="pl-16 md:pl-0 md:col-span-6 md:col-start-1 md:pr-10 md:text-right">
+                  <div class="group relative p-6 sm:p-7 rounded-2xl bg-[#0a0512]/80 backdrop-blur-xl border border-red-900/40 hover:border-red-500/80 shadow-[0_15px_35px_rgba(0,0,0,0.8)] hover:shadow-[0_0_40px_rgba(220,38,38,0.35)] hover:-translate-y-1.5 transition-all duration-500 flex flex-col space-y-4">
+                    <div class="flex items-center gap-3 flex-row md:flex-row-reverse">
+                      <div class="p-3 rounded-xl bg-red-950/80 border border-red-800/60 text-red-400 group-hover:text-white group-hover:bg-red-600 group-hover:border-red-400 transition-all shadow-[0_0_15px_rgba(220,38,38,0.2)] group-hover:scale-110">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                      </div>
+                      <div class="space-y-0.5">
+                        <span class="text-[10px] font-mono text-red-400 uppercase tracking-widest font-extrabold block">PHASE 01 • INGESTION</span>
+                        <h3 class="text-xl font-heading font-extrabold text-white group-hover:text-red-300 transition-colors">Behavior Captured</h3>
+                      </div>
+                    </div>
+                    <p class="text-xs sm:text-sm font-sans text-slate-300 leading-relaxed">
+                      Typing rhythm, mouse movement, touch gestures, and interaction patterns are collected naturally during user activity.
+                    </p>
+                    <div class="pt-3 border-t border-red-950/80 flex items-center justify-between gap-2 text-[10px] font-mono flex-row md:flex-row-reverse">
+                      <span class="px-2.5 py-1 rounded-lg bg-black/60 border border-red-900/40 text-slate-400">PASSIVE BEHAVIORAL SENSORS</span>
+                      <span class="text-emerald-400 font-bold flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>1,000+ Interactions/Sec</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 02 (Right) -->
+              <div class="reveal-right relative grid grid-cols-1 md:grid-cols-12 items-center gap-6 md:gap-0" style="transition-delay: 150ms;">
+                <div class="absolute left-6 md:left-1/2 -translate-x-1/2 z-20 flex items-center justify-center">
+                  <div class="w-10 h-10 rounded-xl bg-black border border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.9)] flex items-center justify-center text-white font-mono text-xs font-extrabold animate-pulse">02</div>
+                </div>
+                <div class="pl-16 md:pl-0 md:col-span-6 md:col-start-7 md:pl-10">
+                  <div class="group relative p-6 sm:p-7 rounded-2xl bg-[#0a0512]/80 backdrop-blur-xl border border-red-900/40 hover:border-red-500/80 shadow-[0_15px_35px_rgba(0,0,0,0.8)] hover:shadow-[0_0_40px_rgba(220,38,38,0.35)] hover:-translate-y-1.5 transition-all duration-500 flex flex-col space-y-4">
+                    <div class="flex items-center gap-3 flex-row">
+                      <div class="p-3 rounded-xl bg-red-950/80 border border-red-800/60 text-red-400 group-hover:text-white group-hover:bg-red-600 group-hover:border-red-400 transition-all shadow-[0_0_15px_rgba(220,38,38,0.2)] group-hover:scale-110">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+                      </div>
+                      <div class="space-y-0.5">
+                        <span class="text-[10px] font-mono text-red-400 uppercase tracking-widest font-extrabold block">PHASE 02 • SYNTHESIS</span>
+                        <h3 class="text-xl font-heading font-extrabold text-white group-hover:text-red-300 transition-colors">Identity Profile</h3>
+                      </div>
+                    </div>
+                    <p class="text-xs sm:text-sm font-sans text-slate-300 leading-relaxed">
+                      Behavioral biometrics generate a unique identity profile for every authenticated session.
+                    </p>
+                    <div class="pt-3 border-t border-red-950/80 flex items-center justify-between gap-2 text-[10px] font-mono flex-row">
+                      <span class="px-2.5 py-1 rounded-lg bg-black/60 border border-red-900/40 text-slate-400">NEURAL SIGNATURE VECTOR</span>
+                      <span class="text-emerald-400 font-bold flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>99.98% Profile Match</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 03 (Left) -->
+              <div class="reveal-left relative grid grid-cols-1 md:grid-cols-12 items-center gap-6 md:gap-0" style="transition-delay: 300ms;">
+                <div class="absolute left-6 md:left-1/2 -translate-x-1/2 z-20 flex items-center justify-center">
+                  <div class="w-10 h-10 rounded-xl bg-black border border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.9)] flex items-center justify-center text-white font-mono text-xs font-extrabold animate-pulse">03</div>
+                </div>
+                <div class="pl-16 md:pl-0 md:col-span-6 md:col-start-1 md:pr-10 md:text-right">
+                  <div class="group relative p-6 sm:p-7 rounded-2xl bg-[#0a0512]/80 backdrop-blur-xl border border-red-900/40 hover:border-red-500/80 shadow-[0_15px_35px_rgba(0,0,0,0.8)] hover:shadow-[0_0_40px_rgba(220,38,38,0.35)] hover:-translate-y-1.5 transition-all duration-500 flex flex-col space-y-4">
+                    <div class="flex items-center gap-3 flex-row md:flex-row-reverse">
+                      <div class="p-3 rounded-xl bg-red-950/80 border border-red-800/60 text-red-400 group-hover:text-white group-hover:bg-red-600 group-hover:border-red-400 transition-all shadow-[0_0_15px_rgba(220,38,38,0.2)] group-hover:scale-110">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44L2.04 15.5A2.5 2.5 0 0 1 2 14.5v-5a2.5 2.5 0 0 1 2.04-2.44l5.04-4.5A2.48 2.48 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44l5.04-4.44A2.5 2.5 0 0 0 22 14.5v-5a2.5 2.5 0 0 0-2.04-2.44l-5.04-4.5A2.48 2.48 0 0 0 14.5 2Z"/></svg>
+                      </div>
+                      <div class="space-y-0.5">
+                        <span class="text-[10px] font-mono text-red-400 uppercase tracking-widest font-extrabold block">PHASE 03 • EVALUATION</span>
+                        <h3 class="text-xl font-heading font-extrabold text-white group-hover:text-red-300 transition-colors">AI Risk Analysis</h3>
+                      </div>
+                    </div>
+                    <p class="text-xs sm:text-sm font-sans text-slate-300 leading-relaxed">
+                      Agentic AI continuously evaluates behavioral changes and calculates dynamic trust in real time.
+                    </p>
+                    <div class="pt-3 border-t border-red-950/80 flex items-center justify-between gap-2 text-[10px] font-mono flex-row md:flex-row-reverse">
+                      <span class="px-2.5 py-1 rounded-lg bg-black/60 border border-red-900/40 text-slate-400">AGENTIC RISK ENGINE</span>
+                      <span class="text-emerald-400 font-bold flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>&lt; 0.8ms Inference Speed</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 04 (Right) -->
+              <div class="reveal-right relative grid grid-cols-1 md:grid-cols-12 items-center gap-6 md:gap-0" style="transition-delay: 450ms;">
+                <div class="absolute left-6 md:left-1/2 -translate-x-1/2 z-20 flex items-center justify-center">
+                  <div class="w-10 h-10 rounded-xl bg-black border border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.9)] flex items-center justify-center text-white font-mono text-xs font-extrabold animate-pulse">04</div>
+                </div>
+                <div class="pl-16 md:pl-0 md:col-span-6 md:col-start-7 md:pl-10">
+                  <div class="group relative p-6 sm:p-7 rounded-2xl bg-[#0a0512]/80 backdrop-blur-xl border border-red-900/40 hover:border-red-500/80 shadow-[0_15px_35px_rgba(0,0,0,0.8)] hover:shadow-[0_0_40px_rgba(220,38,38,0.35)] hover:-translate-y-1.5 transition-all duration-500 flex flex-col space-y-4">
+                    <div class="flex items-center gap-3 flex-row">
+                      <div class="p-3 rounded-xl bg-red-950/80 border border-red-800/60 text-red-400 group-hover:text-white group-hover:bg-red-600 group-hover:border-red-400 transition-all shadow-[0_0_15px_rgba(220,38,38,0.2)] group-hover:scale-110">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      </div>
+                      <div class="space-y-0.5">
+                        <span class="text-[10px] font-mono text-red-400 uppercase tracking-widest font-extrabold block">PHASE 04 • PERSISTENCE</span>
+                        <h3 class="text-xl font-heading font-extrabold text-white group-hover:text-red-300 transition-colors">Continuous Verification</h3>
+                      </div>
+                    </div>
+                    <p class="text-xs sm:text-sm font-sans text-slate-300 leading-relaxed">
+                      Authentication continues silently throughout the session instead of relying only on the initial login.
+                    </p>
+                    <div class="pt-3 border-t border-red-950/80 flex items-center justify-between gap-2 text-[10px] font-mono flex-row">
+                      <span class="px-2.5 py-1 rounded-lg bg-black/60 border border-red-900/40 text-slate-400">ALWAYS-ON ZERO TRUST LOOP</span>
+                      <span class="text-emerald-400 font-bold flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>24/7 Session Shield</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 05 (Left) -->
+              <div class="reveal-left relative grid grid-cols-1 md:grid-cols-12 items-center gap-6 md:gap-0" style="transition-delay: 600ms;">
+                <div class="absolute left-6 md:left-1/2 -translate-x-1/2 z-20 flex items-center justify-center">
+                  <div class="w-10 h-10 rounded-xl bg-black border border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.9)] flex items-center justify-center text-white font-mono text-xs font-extrabold animate-pulse">05</div>
+                </div>
+                <div class="pl-16 md:pl-0 md:col-span-6 md:col-start-1 md:pr-10 md:text-right">
+                  <div class="group relative p-6 sm:p-7 rounded-2xl bg-[#0a0512]/80 backdrop-blur-xl border border-red-900/40 hover:border-red-500/80 shadow-[0_15px_35px_rgba(0,0,0,0.8)] hover:shadow-[0_0_40px_rgba(220,38,38,0.35)] hover:-translate-y-1.5 transition-all duration-500 flex flex-col space-y-4">
+                    <div class="flex items-center gap-3 flex-row md:flex-row-reverse">
+                      <div class="p-3 rounded-xl bg-red-950/80 border border-red-800/60 text-red-400 group-hover:text-white group-hover:bg-red-600 group-hover:border-red-400 transition-all shadow-[0_0_15px_rgba(220,38,38,0.2)] group-hover:scale-110">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                      </div>
+                      <div class="space-y-0.5">
+                        <span class="text-[10px] font-mono text-red-400 uppercase tracking-widest font-extrabold block">PHASE 05 • ENFORCEMENT</span>
+                        <h3 class="text-xl font-heading font-extrabold text-white group-hover:text-red-300 transition-colors">Adaptive Protection</h3>
+                      </div>
+                    </div>
+                    <p class="text-xs sm:text-sm font-sans text-slate-300 leading-relaxed">
+                      If unusual behavior is detected, the system automatically requests additional verification before allowing sensitive actions.
+                    </p>
+                    <div class="pt-3 border-t border-red-950/80 flex items-center justify-between gap-2 text-[10px] font-mono flex-row md:flex-row-reverse">
+                      <span class="px-2.5 py-1 rounded-lg bg-black/60 border border-red-900/40 text-slate-400">AUTOMATED STEP-UP INTERCEPT</span>
+                      <span class="text-emerald-400 font-bold flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Sub-second Intercept</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ZERO TRUST ARCHITECTURE VISUALIZER -->
+        <section class="p-6 sm:p-8 rounded-3xl border border-red-900/40 bg-gradient-to-b from-[#0e0814]/90 via-[#09050d]/90 to-[#060308]/90 shadow-[0_15px_50px_rgba(0,0,0,0.85)] relative overflow-hidden">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-red-950/80 relative z-10">
+            <div class="space-y-1">
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/80 border border-red-800/60 text-[10px] font-mono text-red-300">
+                <span>VISUAL ARCHITECTURE PIPELINE</span>
+              </div>
+              <h3 class="text-xl sm:text-2xl font-heading font-extrabold text-white tracking-wide">
+                Autonomous Zero-Trust Cognitive Mesh
+              </h3>
+              <p class="text-xs font-mono text-slate-400">
+                Real-time visual processing nodes continuously verifying identity entropy.
+              </p>
+            </div>
+            <button onclick="runPipelineDemo()" class="px-4 py-2.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-gradient-to-r from-red-600 to-red-800 text-white shadow-[0_0_20px_rgba(220,38,38,0.5)] hover:shadow-[0_0_30px_rgba(239,68,68,0.8)] border border-red-500/50 transition-all flex items-center gap-2 cursor-pointer">
+              <svg class="w-4 h-4 text-amber-300" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span id="demo-btn-text">Run Pipeline Demo</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 relative z-10">
+            <div id="pipe-node-1" class="p-5 rounded-2xl border border-emerald-500 bg-emerald-950/30 shadow-[0_0_30px_rgba(16,185,129,0.35)] transition-all duration-500">
+              <div class="flex items-center justify-between mb-4">
+                <span id="pipe-num-1" class="text-xs font-mono text-emerald-400 font-bold">1. Ingestion</span>
+                <span id="pipe-badge-1" class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 animate-pulse">● ACTIVE FLOW</span>
+              </div>
+              <h4 class="font-heading font-extrabold text-base text-white">Behavioral Ingestion</h4>
+              <p class="text-[11px] font-mono text-red-400/90 mb-2">Passive Data Vectors</p>
+              <p class="text-xs font-sans text-slate-300 leading-relaxed mb-4">Keystroke dynamics, cursor velocity, and micro-gestures continuous capture.</p>
+            </div>
+
+            <div id="pipe-node-2" class="p-5 rounded-2xl border border-red-900/30 bg-black/40 hover:border-red-700/50 transition-all duration-500">
+              <div class="flex items-center justify-between mb-4">
+                <span id="pipe-num-2" class="text-xs font-mono text-slate-400 font-bold">2. Neural Engine</span>
+                <span id="pipe-badge-2" class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">STANDBY</span>
+              </div>
+              <h4 class="font-heading font-extrabold text-base text-white">Cognitive Neural Engine</h4>
+              <p class="text-[11px] font-mono text-red-400/90 mb-2">AI Entropy Evaluation</p>
+              <p class="text-xs font-sans text-slate-300 leading-relaxed mb-4">Deep learning transformers evaluate deviation from biometric baseline.</p>
+            </div>
+
+            <div id="pipe-node-3" class="p-5 rounded-2xl border border-red-900/30 bg-black/40 hover:border-red-700/50 transition-all duration-500">
+              <div class="flex items-center justify-between mb-4">
+                <span id="pipe-num-3" class="text-xs font-mono text-slate-400 font-bold">3. Risk Protocol</span>
+                <span id="pipe-badge-3" class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">STANDBY</span>
+              </div>
+              <h4 class="font-heading font-extrabold text-base text-white">Adaptive Risk Gateway</h4>
+              <p class="text-[11px] font-mono text-red-400/90 mb-2">Zero-Trust Protocol</p>
+              <p class="text-xs font-sans text-slate-300 leading-relaxed mb-4">Real-time session authorization or instant step-up challenges.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- INTERACTIVE APPLICATIONS SECTION (GOOGLE AI STUDIO SPEC) -->
+        <section id="interactive-applications" class="w-full my-16 py-20 px-6 sm:px-10 rounded-3xl bg-black border border-red-950/60 shadow-[0_20px_60px_rgba(0,0,0,0.95)] relative z-20 overflow-hidden">
+          <div class="absolute inset-0 bg-[linear-gradient(to_right,#ef444408_1px,transparent_1px),linear-gradient(to_bottom,#ef444408_1px,transparent_1px)] bg-[size:3rem_3rem] pointer-events-none opacity-30"></div>
+          <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-red-600/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+          <!-- Top Badge & Section Heading -->
+          <div class="flex flex-col items-center text-center space-y-3 mb-14 relative z-10">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-950/70 border border-red-800/60 text-red-400 text-xs font-mono uppercase tracking-widest shadow-[0_0_15px_rgba(220,38,38,0.2)]">
+              <svg class="w-3.5 h-3.5 text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+              <span>REAL-WORLD INTEGRATION</span>
+            </div>
+            <h2 class="font-heading font-extrabold text-3xl sm:text-4xl lg:text-5xl text-white tracking-tight">
+              Integrated Web Applications
+            </h2>
+            <p class="max-w-2xl text-sm font-sans text-slate-300 leading-relaxed">
+              Experience how COGNISEC AI embeds directly into web portals to deliver seamless, passwordless continuous identity verification.
+            </p>
+          </div>
+
+          <!-- 3 Horizontal Application Cards -->
+          <div id="applications" class="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
+            
+            <!-- Card 1: Shopping Portal -->
+            <div class="glass-panel p-7 rounded-2xl border border-amber-900/40 bg-gradient-to-b from-[#0f0918] via-[#090510] to-[#040207] shadow-[0_15px_35px_rgba(0,0,0,0.8)] hover:border-amber-500/80 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(245,158,11,0.3)] transition-all duration-500 flex flex-col justify-between space-y-6 group">
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <div class="p-3.5 rounded-xl bg-black/70 border border-amber-900/50 group-hover:border-amber-500 transition-colors">
+                    <svg class="w-6 h-6 text-amber-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                  </div>
+                  <span class="px-3 py-1 rounded-full text-[10px] font-mono font-bold border border-amber-500/50 text-amber-400 bg-amber-950/40 uppercase tracking-wider">E-COMMERCE &amp; RETAIL</span>
+                </div>
+                <div>
+                  <h3 class="font-heading font-extrabold text-2xl text-white group-hover:text-amber-300 transition-colors">Shopping Portal</h3>
+                  <span class="text-[11px] font-mono text-slate-400 block pt-1">Target: Nyraa Luxe Retail (UPI 1-Tap Checkout)</span>
+                </div>
+                <p class="text-xs font-sans text-slate-300 leading-relaxed">Secure customer accounts, shopping carts, and checkout sessions using continuous behavioral authentication.</p>
+                <div class="space-y-2 pt-2 border-t border-amber-950/60">
+                  <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-amber-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                    Protected Workflows
+                  </span>
+                  <ul class="space-y-1.5 text-xs font-mono text-slate-300">
+                    <li class="flex items-start gap-2 text-[11px]"><span class="text-emerald-400 font-bold shrink-0">✓</span><span>Protection against account takeover (ATO)</span></li>
+                    <li class="flex items-start gap-2 text-[11px]"><span class="text-emerald-400 font-bold shrink-0">✓</span><span>Frictionless checkout re-verification</span></li>
+                    <li class="flex items-start gap-2 text-[11px]"><span class="text-emerald-400 font-bold shrink-0">✓</span><span>Bot &amp; automated cart hoarding defense</span></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Interactive Button: Live Demo -->
+              <div class="pt-2">
+                <a href="shopping.html" class="w-full py-3.5 px-4 rounded-xl text-xs font-heading font-bold text-black uppercase bg-amber-500 hover:bg-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.5)] transition-all flex items-center justify-center gap-2 cursor-pointer">
+                  <span>Live Demo</span>
+                  <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </a>
+              </div>
+            </div>
+
+            <!-- Card 2: College Portal -->
+            <div class="glass-panel p-7 rounded-2xl border border-sky-900/40 bg-gradient-to-b from-[#090f18] via-[#050910] to-[#020407] shadow-[0_15px_35px_rgba(0,0,0,0.8)] hover:border-sky-500/80 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(14,165,233,0.3)] transition-all duration-500 flex flex-col justify-between space-y-6 group">
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <div class="p-3.5 rounded-xl bg-black/70 border border-sky-900/50 group-hover:border-sky-500 transition-colors">
+                    <svg class="w-6 h-6 text-sky-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+                  </div>
+                  <span class="px-3 py-1 rounded-full text-[10px] font-mono font-bold border border-sky-500/50 text-sky-400 bg-sky-950/40 uppercase tracking-wider">EDUCATION &amp; ACADEMICS</span>
+                </div>
+                <div>
+                  <h3 class="font-heading font-extrabold text-2xl text-white group-hover:text-sky-300 transition-colors">College Portal</h3>
+                  <span class="text-[11px] font-mono text-slate-400 block pt-1">Target: BITS Pilani Academic Portal</span>
+                </div>
+                <p class="text-xs font-sans text-slate-300 leading-relaxed">Protect student and faculty login sessions with behavioral biometrics and cognitive identity verification.</p>
+                <div class="space-y-2 pt-2 border-t border-sky-950/60">
+                  <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-sky-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                    Protected Workflows
+                  </span>
+                  <ul class="space-y-1.5 text-xs font-mono text-slate-300">
+                    <li class="flex items-start gap-2 text-[11px]"><span class="text-emerald-400 font-bold shrink-0">✓</span><span>Exam integrity &amp; proxy login prevention</span></li>
+                    <li class="flex items-start gap-2 text-[11px]"><span class="text-emerald-400 font-bold shrink-0">✓</span><span>Faculty research &amp; grade book security</span></li>
+                    <li class="flex items-start gap-2 text-[11px]"><span class="text-emerald-400 font-bold shrink-0">✓</span><span>Campus-wide Single Sign-On (SSO) protection</span></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Interactive Button: Live Demo -->
+              <div class="pt-2">
+                <a href="college.html" class="w-full py-3.5 px-4 rounded-xl text-xs font-heading font-bold text-black uppercase bg-sky-400 hover:bg-sky-300 shadow-[0_0_20px_rgba(14,165,233,0.5)] transition-all flex items-center justify-center gap-2 cursor-pointer">
+                  <span>Live Demo</span>
+                  <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </a>
+              </div>
+            </div>
+
+            <!-- Card 3: Healthcare Portal -->
+            <div class="glass-panel p-7 rounded-2xl border border-emerald-900/40 bg-gradient-to-b from-[#06120d] via-[#030907] to-[#010403] shadow-[0_15px_35px_rgba(0,0,0,0.8)] hover:border-emerald-500/80 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(16,185,129,0.3)] transition-all duration-500 flex flex-col justify-between space-y-6 group">
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <div class="p-3.5 rounded-xl bg-black/70 border border-emerald-900/50 group-hover:border-emerald-500 transition-colors">
+                    <svg class="w-6 h-6 text-emerald-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                  </div>
+                  <span class="px-3 py-1 rounded-full text-[10px] font-mono font-bold border border-emerald-500/50 text-emerald-400 bg-emerald-950/40 uppercase tracking-wider">CLINICAL &amp; PATIENT EHR</span>
+                </div>
+                <div>
+                  <h3 class="font-heading font-extrabold text-2xl text-white group-hover:text-emerald-300 transition-colors">Healthcare Portal</h3>
+                  <span class="text-[11px] font-mono text-slate-400 block pt-1">Target: AyuSync MedCare Network</span>
+                </div>
+                <p class="text-xs font-sans text-slate-300 leading-relaxed">Secure patient and doctor access using continuous authentication and adaptive risk analysis.</p>
+                <div class="space-y-2 pt-2 border-t border-emerald-950/60">
+                  <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-emerald-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                    Protected Workflows
+                  </span>
+                  <ul class="space-y-1.5 text-xs font-mono text-slate-300">
+                    <li class="flex items-start gap-2 text-[11px]"><span class="text-emerald-400 font-bold shrink-0">✓</span><span>HIPAA-compliant EHR workstation locking</span></li>
+                    <li class="flex items-start gap-2 text-[11px]"><span class="text-emerald-400 font-bold shrink-0">✓</span><span>Passive doctor rhythm verification</span></li>
+                    <li class="flex items-start gap-2 text-[11px]"><span class="text-emerald-400 font-bold shrink-0">✓</span><span>Telehealth prescription authorization</span></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Interactive Button: Live Demo -->
+              <div class="pt-2">
+                <a href="healthcare.html" class="w-full py-3.5 px-4 rounded-xl text-xs font-heading font-bold text-black uppercase bg-emerald-400 hover:bg-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.5)] transition-all flex items-center justify-center gap-2 cursor-pointer">
+                  <span>Live Demo</span>
+                  <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </a>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- USER PROFILE & ACTIVE SESSION TELEMETRY SECTION (UNLOCKED HUD SPEC) -->
+        <section id="user-profile-section" class="w-full my-16 py-20 px-6 sm:px-10 rounded-3xl bg-black border border-red-950/60 shadow-[0_20px_60px_rgba(0,0,0,0.95)] relative z-20 overflow-hidden">
+          <!-- Background Grid & Glowing Halos -->
+          <div class="absolute inset-0 bg-[linear-gradient(to_right,#ef444408_1px,transparent_1px),linear-gradient(to_bottom,#ef444408_1px,transparent_1px)] bg-[size:3rem_3rem] pointer-events-none opacity-30"></div>
+          <div class="absolute top-1/2 left-1/4 -translate-y-1/2 w-[500px] h-[500px] bg-red-600/5 rounded-full blur-[140px] pointer-events-none"></div>
+
+          <!-- Section Title & Subtitle -->
+          <div class="flex flex-col items-center text-center space-y-3 mb-14 relative z-10">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-950/70 border border-red-800/60 text-red-400 text-xs font-mono uppercase tracking-widest shadow-[0_0_15px_rgba(220,38,38,0.2)]">
+              <svg class="w-3.5 h-3.5 text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span>AUTHENTICATED USER IDENTITY</span>
+            </div>
+            <h2 class="font-heading font-extrabold text-3xl sm:text-4xl lg:text-5xl text-white tracking-tight">
+              Active User Identity Profile
+            </h2>
+            <p class="max-w-2xl text-sm font-sans text-slate-300 leading-relaxed">
+              Real-time continuous verification telemetry showing logged-in sessions, device signatures, and behavioral confidence.
+            </p>
+          </div>
+
+          <!-- Main Profile & Telemetry Card (Pinterest HUD Style) -->
+          <div class="relative z-10 max-w-6xl mx-auto p-8 sm:p-10 rounded-3xl bg-[#0b0614]/85 backdrop-blur-xl border border-red-900/50 shadow-[0_0_50px_rgba(239,68,68,0.15)] grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            
+            <!-- Left: Profile Avatar & HUD Frame -->
+            <div class="lg:col-span-4 flex flex-col items-center justify-center p-6 rounded-2xl bg-gradient-to-b from-[#140a1d] via-[#090510] to-black border border-red-900/40 relative group">
+              <!-- HUD Corner Markers -->
+              <div class="absolute top-2 left-2 w-3.5 h-3.5 border-t-2 border-l-2 border-red-500"></div>
+              <div class="absolute top-2 right-2 w-3.5 h-3.5 border-t-2 border-r-2 border-red-500"></div>
+              <div class="absolute bottom-2 left-2 w-3.5 h-3.5 border-b-2 border-l-2 border-red-500"></div>
+              <div class="absolute bottom-2 right-2 w-3.5 h-3.5 border-b-2 border-r-2 border-red-500"></div>
+
+              <!-- HUD Graphic Card Media Container -->
+              <div class="relative w-full max-w-[270px] aspect-square rounded-2xl bg-gradient-to-b from-red-950/40 via-black to-red-950/80 border-2 border-red-500/80 p-1 shadow-[0_0_35px_rgba(239,68,68,0.5)] mb-5 overflow-hidden group-hover:scale-[1.03] transition-all duration-500">
+                <img 
+                  src="profile_woman.png" 
+                  alt="Boomika Ram Security Administrator" 
+                  class="w-full h-full object-cover object-top rounded-xl filter contrast-[1.05] brightness-[1.02]"
+                />
+                <!-- Subtle Cyber Tech Scan Line Overlay -->
+                <div class="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_50%,rgba(239,68,68,0.12)_50%)] bg-[size:100%_4px] pointer-events-none rounded-xl"></div>
+                <div class="absolute bottom-2 right-2 px-2.5 py-1 rounded-md bg-emerald-950/90 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-700 shadow-[0_0_10px_rgba(16,185,129,0.5)] flex items-center gap-1.5 z-10">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                  IDENTITY ACTIVE
+                </div>
+              </div>
+
+              <!-- Name & Role -->
+              <h3 id="profile-name-label" class="text-xl font-heading font-extrabold text-white tracking-wide text-center">Boomika Ram</h3>
+              <p id="profile-role-label" class="text-xs font-mono text-red-400 font-bold tracking-wider uppercase mt-0.5 text-center">Security Administrator</p>
+              <span id="profile-id-badge" class="mt-2 px-3 py-1 rounded-full text-[10px] font-mono text-slate-300 bg-red-950/60 border border-red-900/50">ID: USR-001</span>
+            </div>
+
+            <!-- Right: User Details & Active Logged-in Systems -->
+            <div class="lg:col-span-8 space-y-6">
+              
+              <!-- User Info Row Grid -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs">
+                <div class="p-4 rounded-xl bg-black/60 border border-red-950 space-y-1">
+                  <span class="text-[10px] text-slate-400 block uppercase">Authentication Method</span>
+                  <strong class="text-sm text-white font-bold block flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Cognitive Biometrics + Zero Trust
+                  </strong>
+                </div>
+                <div class="p-4 rounded-xl bg-black/60 border border-red-950 space-y-1">
+                  <span class="text-[10px] text-slate-400 block uppercase">Account &amp; Session Status</span>
+                  <strong id="profile-session-status" class="text-sm text-emerald-400 font-bold block">Account: ACTIVE • Session: ACTIVE</strong>
+                </div>
+              </div>
+
+              <!-- Active Logged-In Devices & Systems -->
+              <div class="p-5 rounded-2xl bg-black/70 border border-red-900/40 space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-red-950">
+                  <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+                    <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Active Device Environment</h4>
+                  </div>
+                  <span class="text-[10px] font-mono text-emerald-400 font-bold">✓ Continuous Verification Active</span>
+                </div>
+
+                <div class="space-y-2.5 font-mono text-xs">
+                  <!-- Device 1 -->
+                  <div class="p-3.5 rounded-xl bg-[#090510] border border-red-950/80 flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                      <span class="text-red-400">💻</span>
+                      <div>
+                        <strong id="profile-device-label" class="text-slate-200 block text-xs">MacBook Pro (macOS / Chrome)</strong>
+                        <span id="profile-session-id-label" class="text-[10px] text-slate-400 block">Active Zero-Trust Session</span>
+                      </div>
+                    </div>
+                    <span class="px-2.5 py-1 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold shrink-0">AUTHENTICATED</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Behavioral Metrics Summary Strip -->
+              <div class="p-4 rounded-xl bg-gradient-to-r from-red-950/40 via-black to-red-950/20 border border-red-900/40 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs">
+                <div class="flex items-center gap-3">
+                  <div class="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></div>
+                  <span class="text-slate-300">Continuous Identity Confidence: <strong class="text-emerald-400 font-extrabold text-sm">99.98% (HIGH TRUST)</strong></span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button id="profile-action-btn" onclick="openAppropriateDashboard()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all cursor-pointer shrink-0 flex items-center gap-2">
+                    <span>Open Dashboard →</span>
+                  </button>
+                  <button id="profile-logout-btn" onclick="handleLogout()" class="hidden px-3 py-2 rounded-xl bg-red-950 hover:bg-red-900 border border-red-700 text-red-300 font-bold text-xs transition-all cursor-pointer shrink-0">
+                    Logout
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </section>
+
+        <!-- TECHNOLOGY SECTION (EXACT GOOGLE AI STUDIO SPEC) -->
+        <section id="technology" class="p-6 sm:p-10 rounded-3xl border border-red-900/40 bg-gradient-to-b from-[#0e0814]/90 via-[#09050d]/90 to-[#060308]/90 shadow-[0_15px_50px_rgba(0,0,0,0.85)] relative overflow-hidden">
+          
+          <!-- Top Badge & Header -->
+          <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-8 border-b border-red-950/80 relative z-10">
+            <div class="space-y-3">
+              <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-950/70 border border-red-800/60 text-red-400 text-xs font-mono uppercase tracking-widest shadow-[0_0_15px_rgba(220,38,38,0.2)]">
+                <svg class="w-3.5 h-3.5 text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                <span>HOW COGNISEC AI WORKS</span>
+              </div>
+              <h2 class="text-3xl sm:text-4xl font-heading font-extrabold text-white tracking-tight">
+                Core Security Technologies
+              </h2>
+              <p class="text-xs font-mono text-slate-400 max-w-2xl">
+                Explore the five core engines powering continuous cognitive identity protection and zero-trust session authorization.
+              </p>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/50 px-3.5 py-1.5 rounded-xl self-start md:self-auto font-bold">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>ALL 5 ENGINES OPERATIONAL</span>
+            </div>
+          </div>
+
+          <!-- 5 Horizontal Pillar Tabs -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 pt-6 relative z-10">
+            <!-- Tab 1 -->
+            <button onclick="switchTechTab('behavioral')" id="tab-behavioral" class="relative p-4 rounded-2xl border text-left transition-all duration-300 cursor-pointer border-red-500 bg-red-950/40 shadow-[0_0_25px_rgba(239,68,68,0.35)] flex flex-col justify-between space-y-3 group">
+              <div class="flex items-center justify-between">
+                <div id="tab-icon-behavioral" class="p-2.5 rounded-xl bg-red-900/40 border border-red-700/50 text-red-400">
+                  <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+                </div>
+                <span id="tab-dot-behavioral" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              </div>
+              <div>
+                <h4 class="text-xs font-mono font-bold text-white">Behavioral Biometrics</h4>
+                <p class="text-[10px] font-mono text-slate-400 mt-1 line-clamp-1">Passive Interaction Rhythm...</p>
+              </div>
+            </button>
+
+            <!-- Tab 2 -->
+            <button onclick="switchTechTab('cognitive')" id="tab-cognitive" class="relative p-4 rounded-2xl border text-left transition-all duration-300 cursor-pointer border-red-900/30 bg-black/40 hover:border-red-700/50 flex flex-col justify-between space-y-3 group">
+              <div class="flex items-center justify-between">
+                <div id="tab-icon-cognitive" class="p-2.5 rounded-xl bg-black/60 border border-red-950 text-slate-400">
+                  <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44L2.04 15.5A2.5 2.5 0 0 1 2 14.5v-5a2.5 2.5 0 0 1 2.04-2.44l5.04-4.5A2.48 2.48 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44l5.04-4.44A2.5 2.5 0 0 0 22 14.5v-5a2.5 2.5 0 0 0-2.04-2.44l-5.04-4.5A2.48 2.48 0 0 0 14.5 2Z"/></svg>
+                </div>
+                <span id="tab-dot-cognitive" class="w-2 h-2 rounded-full bg-slate-800 opacity-0"></span>
+              </div>
+              <div>
+                <h4 class="text-xs font-mono font-bold text-white">Cognitive Authentication</h4>
+                <p class="text-[10px] font-mono text-slate-400 mt-1 line-clamp-1">Zero-Knowledge Entropy Challenges</p>
+              </div>
+            </button>
+
+            <!-- Tab 3 -->
+            <button onclick="switchTechTab('device')" id="tab-device" class="relative p-4 rounded-2xl border text-left transition-all duration-300 cursor-pointer border-red-900/30 bg-black/40 hover:border-red-700/50 flex flex-col justify-between space-y-3 group">
+              <div class="flex items-center justify-between">
+                <div id="tab-icon-device" class="p-2.5 rounded-xl bg-black/60 border border-red-950 text-slate-400">
+                  <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+                </div>
+                <span id="tab-dot-device" class="w-2 h-2 rounded-full bg-slate-800 opacity-0"></span>
+              </div>
+              <div>
+                <h4 class="text-xs font-mono font-bold text-white">Device Fingerprinting</h4>
+                <p class="text-[10px] font-mono text-slate-400 mt-1 line-clamp-1">Hardware &amp; Browser Integrity...</p>
+              </div>
+            </button>
+
+            <!-- Tab 4 -->
+            <button onclick="switchTechTab('risk-engine')" id="tab-risk-engine" class="relative p-4 rounded-2xl border text-left transition-all duration-300 cursor-pointer border-red-900/30 bg-black/40 hover:border-red-700/50 flex flex-col justify-between space-y-3 group">
+              <div class="flex items-center justify-between">
+                <div id="tab-icon-risk-engine" class="p-2.5 rounded-xl bg-black/60 border border-red-950 text-slate-400">
+                  <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>
+                </div>
+                <span id="tab-dot-risk-engine" class="w-2 h-2 rounded-full bg-slate-800 opacity-0"></span>
+              </div>
+              <div>
+                <h4 class="text-xs font-mono font-bold text-white">AI Risk Engine</h4>
+                <p class="text-[10px] font-mono text-slate-400 mt-1 line-clamp-1">Sub-Millisecond Threat Inference</p>
+              </div>
+            </button>
+
+            <!-- Tab 5 -->
+            <button onclick="switchTechTab('continuous')" id="tab-continuous" class="relative p-4 rounded-2xl border text-left transition-all duration-300 cursor-pointer border-red-900/30 bg-black/40 hover:border-red-700/50 flex flex-col justify-between space-y-3 group">
+              <div class="flex items-center justify-between">
+                <div id="tab-icon-continuous" class="p-2.5 rounded-xl bg-black/60 border border-red-950 text-slate-400">
+                  <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </div>
+                <span id="tab-dot-continuous" class="w-2 h-2 rounded-full bg-slate-800 opacity-0"></span>
+              </div>
+              <div>
+                <h4 class="text-xs font-mono font-bold text-white">Continuous Verification</h4>
+                <p class="text-[10px] font-mono text-slate-400 mt-1 line-clamp-1">Always-On Zero Trust Protection</p>
+              </div>
+            </button>
+          </div>
+
+          <!-- Active Detail Card -->
+          <div id="tech-detail-card" class="mt-8 p-6 sm:p-8 rounded-2xl bg-black/60 border border-red-900/40 relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- Left Column -->
+            <div class="lg:col-span-7 space-y-6">
+              <div class="flex items-start gap-4">
+                <div id="tech-hero-icon" class="p-3.5 rounded-2xl bg-red-900/40 border border-red-700/50 text-red-400 shrink-0">
+                  <svg class="w-7 h-7" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+                </div>
+                <div class="space-y-1">
+                  <div class="flex items-center gap-3 flex-wrap">
+                    <h3 id="tech-title" class="text-2xl font-heading font-extrabold text-white">Behavioral Biometrics</h3>
+                    <span id="tech-badge" class="px-2.5 py-0.5 text-[10px] font-mono font-bold bg-red-950 text-red-300 border border-red-800 rounded">1,000Hz Monitoring</span>
+                  </div>
+                  <p id="tech-subtitle" class="text-xs font-mono font-bold text-red-400">Passive Interaction Rhythm Analysis</p>
+                </div>
+              </div>
+
+              <p id="tech-desc" class="text-xs sm:text-sm font-sans text-slate-300 leading-relaxed">
+                Analyzes unique human motor traits—such as flight-time, dwell-time keystroke dynamics, Bezier curve mouse accelerations, and touch swipe pressures—to form an un-replicable biometric signature.
+              </p>
+
+              <!-- Key Capabilities Grid -->
+              <div class="pt-4 border-t border-red-950/80 space-y-3">
+                <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">KEY CAPABILITIES:</span>
+                <div id="tech-capabilities-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono text-slate-300">
+                  <div class="flex items-start gap-2">
+                    <span class="w-4 h-4 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-400 flex items-center justify-center text-[10px] shrink-0">✓</span>
+                    <span>Keystroke flight &amp; dwell rhythm matching</span>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <span class="w-4 h-4 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-400 flex items-center justify-center text-[10px] shrink-0">✓</span>
+                    <span>Mouse curvature &amp; velocity vector analysis</span>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <span class="w-4 h-4 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-400 flex items-center justify-center text-[10px] shrink-0">✓</span>
+                    <span>Passive micro-gesture tracking</span>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <span class="w-4 h-4 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-400 flex items-center justify-center text-[10px] shrink-0">✓</span>
+                    <span>Non-intrusive background profiling</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="lg:col-span-5 p-6 rounded-2xl bg-gradient-to-b from-[#120a1a] to-black border border-red-900/40 space-y-5">
+              <div class="flex items-center justify-between pb-3 border-b border-red-950">
+                <span class="text-[10px] font-mono text-slate-400 uppercase tracking-wider">LIVE ENGINE BENCHMARK</span>
+                <span id="tech-metric" class="text-xs font-mono text-cyan-400 font-bold">99.94% Behavioral Accuracy</span>
+              </div>
+
+              <!-- Status -->
+              <div class="flex items-center justify-between text-xs font-mono">
+                <span class="text-slate-300">Engine Status:</span>
+                <span id="tech-status-text" class="text-emerald-400 font-bold flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Active &amp; Verified
+                </span>
+              </div>
+
+              <!-- Progress Bar 1: Fidelity Index -->
+              <div class="space-y-1.5 font-mono text-[11px]">
+                <div class="flex items-center justify-between">
+                  <span class="text-slate-400">Fidelity Index</span>
+                  <span id="tech-fidelity-val" class="text-cyan-400 font-bold">99.8%</span>
+                </div>
+                <div class="w-full h-2 rounded-full bg-slate-900 overflow-hidden">
+                  <div id="tech-fidelity-bar" class="h-full bg-gradient-to-r from-teal-500 to-cyan-400 rounded-full transition-all duration-500" style="width: 99.8%;"></div>
+                </div>
+              </div>
+
+              <!-- Progress Bar 2: Processing Overhead -->
+              <div class="space-y-1.5 font-mono text-[11px]">
+                <div class="flex items-center justify-between">
+                  <span class="text-slate-400">Processing Overhead</span>
+                  <span id="tech-overhead-val" class="text-red-400 font-bold">&lt; 0.8ms</span>
+                </div>
+                <div class="w-full h-1.5 rounded-full bg-slate-900 overflow-hidden">
+                  <div id="tech-overhead-bar" class="h-full bg-red-500 rounded-full transition-all duration-500" style="width: 15%;"></div>
+                </div>
+              </div>
+
+              <!-- Alert Box -->
+              <div class="p-3.5 rounded-xl bg-black/80 border border-red-950 flex items-start gap-3">
+                <div class="text-amber-400 shrink-0 pt-0.5">⚡</div>
+                <p id="tech-alert-text" class="text-xs font-sans text-slate-300 leading-snug">
+                  Sub-millisecond real-time scoring without user latency.
+                </p>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- LAST SECTION: COINFLECT MIGRATION & CONTINUOUS VERIFICATION PROTOCOL -->
+        <section id="animation-section-2" class="min-h-screen relative w-full bg-black my-16 rounded-3xl border border-red-950/40 shadow-[0_20px_60px_rgba(0,0,0,0.95)] flex flex-col justify-between overflow-hidden selection:bg-zinc-800 selection:text-white">
+          <!-- Background Video (Muted, Loop, Autoplay, Playsinline) -->
+          <video 
+            autoplay 
+            loop 
+            muted 
+            playsinline 
+            class="absolute inset-0 w-full h-full object-cover pointer-events-none z-0 opacity-80"
+          >
+            <source src="assets/futuristic-vr-visor.mp4" type="video/mp4" />
+            <source src="https://res.cloudinary.com/daer86ne/video/upload/v1785708068/Futuristic_man_VR_visor_202608030330_zn4sp7.mp4" type="video/mp4" />
+          </video>
+
+          <!-- Ambient Overlay Gradients -->
+          <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/80 pointer-events-none z-[1]"></div>
+          <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(239,68,68,0.15)_0%,transparent_75%)] pointer-events-none z-[1]"></div>
+
+          <!-- Top Minimal Header -->
+          <header id="site-header" class="relative z-10 w-full px-6 sm:px-10 py-6 flex items-center justify-between text-[11px] uppercase tracking-[0.3em] font-mono text-white/60">
+            <span class="hover:text-white transition-colors cursor-default font-bold text-red-400">Coinflect Protocol</span>
+            <span class="px-3.5 py-1 rounded-full bg-red-950/60 border border-red-800/60 text-red-300 text-[10px] tracking-[0.2em] font-mono font-bold shadow-[0_0_15px_rgba(220,38,38,0.2)]">v2.0 MIGRATION</span>
+          </header>
+
+          <!-- Main Hero Typography Stage -->
+          <main id="hero-stage" class="relative z-10 flex-1 flex flex-col items-center justify-center px-6 md:px-12 py-12">
+            <!-- Horizontal Split Typography Framing Center Space -->
+            <div id="primary-typography-container" class="w-full max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 md:gap-12 my-auto">
+              
+              <!-- Left Text: "Every Action" -->
+              <div id="text-left-block" class="flex-1 text-center md:text-left">
+                <h1 class="text-5xl sm:text-7xl md:text-8xl lg:text-[95px] xl:text-[110px] font-heading font-extrabold tracking-tight leading-[0.92] text-white drop-shadow-[0_10px_30px_rgba(0,0,0,0.9)]">
+                  Every<br />
+                  <span class="text-transparent bg-clip-text bg-gradient-to-r from-white via-red-200 to-red-500">Action</span>
+                </h1>
+              </div>
+
+              <!-- Center Space Gap (Preserving Center View for VR Video) -->
+              <div 
+                id="center-space-gap" 
+                class="w-full md:w-64 lg:w-80 xl:w-96 h-20 md:h-64 flex-shrink-0 flex items-center justify-center pointer-events-none"
+                aria-hidden="true"
+              >
+              </div>
+
+              <!-- Right Text: "Zero Trust" -->
+              <div id="text-right-block" class="flex-1 text-center md:text-right">
+                <h1 class="text-5xl sm:text-7xl md:text-8xl lg:text-[95px] xl:text-[110px] font-heading font-extrabold tracking-tight leading-[0.92] text-white drop-shadow-[0_10px_30px_rgba(0,0,0,0.9)]">
+                  Zero<br />
+                  <span class="text-transparent bg-clip-text bg-gradient-to-l from-white via-red-200 to-red-500">Trust</span>
+                </h1>
+              </div>
+
+            </div>
+
+            <!-- Subtitle & Article Link -->
+            <div id="center-subtitle-block" class="mt-10 md:mt-14 text-center space-y-2 z-10 font-mono">
+              <p class="text-sm md:text-base text-zinc-300 font-normal max-w-xl mx-auto">
+                Coinflect has officially migrated to wrapped Coinflect (wCFLT).
+              </p>
+              <div>
+                <button
+                  id="read-article-link-btn"
+                  onclick="openCoinflectModal('article')"
+                  class="text-sm md:text-base font-medium text-red-400 underline underline-offset-4 hover:text-red-300 transition-colors cursor-pointer focus:outline-none rounded-sm"
+                >
+                  Read more in our new article →
+                </button>
+              </div>
+            </div>
+          </main>
+
+          <!-- Bottom Floating Control Footer -->
+          <footer id="floating-controls-footer" class="relative z-10 w-full px-6 sm:px-10 py-8 flex items-center justify-between font-mono">
+            <!-- Bottom Left Pill: Migration Manual -->
+            <button
+              id="migration-manual-pill-btn"
+              onclick="openCoinflectModal('manual')"
+              class="px-5 py-2.5 rounded-full bg-black/80 border border-red-900/60 text-white/90 hover:text-white hover:border-red-500 text-xs tracking-wide font-bold transition-all flex items-center gap-2.5 backdrop-blur-md shadow-2xl hover:bg-red-950/40 cursor-pointer"
+            >
+              <svg class="w-4 h-4 text-amber-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+              <span>Migration Manual</span>
+            </button>
+
+            <!-- Bottom Right Pill: Wrapping Portal Launch -->
+            <button
+              id="wrapping-portal-pill-btn"
+              onclick="openCoinflectModal('portal')"
+              class="px-6 py-2.5 rounded-full bg-gradient-to-r from-red-600 to-red-800 border border-red-500/60 text-white hover:from-red-500 hover:to-red-700 text-xs tracking-wider font-bold transition-all flex items-center gap-2.5 shadow-[0_0_25px_rgba(220,38,38,0.5)] hover:shadow-[0_0_35px_rgba(239,68,68,0.8)] cursor-pointer"
+            >
+              <span>Wrapping Portal Launch</span>
+              <svg class="w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
+        </section>
+
+        <!-- SHIELD WAVES 4K ANIMATED VIDEO SECTION (TOP SHIELD ANIMATION ONLY) -->
+        <section id="shield-waves-footer-section" class="w-full relative bg-black overflow-hidden my-0 p-0 h-[35vh] sm:h-[48vh] lg:h-[58vh] flex items-start justify-center border-t border-red-950/60 shadow-[0_20px_60px_rgba(0,0,0,0.95)]">
+          <video 
+            autoplay 
+            loop 
+            muted 
+            playsinline 
+            class="w-full h-[160%] object-cover object-top pointer-events-none filter contrast-[1.08] brightness-[0.98]"
+          >
+            <source src="https://res.cloudinary.com/daer86ne/video/upload/v1785853004/Freeze_footer_animate_shield_waves_202608041946_rhmwid.mp4" type="video/mp4" />
+          </video>
+          <div class="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-black pointer-events-none"></div>
+        </section>
+
+        <!-- SITE FOOTER SECTION (EXACT REFERENCE DESIGN WITH ZERO TRUST WATERMARK) -->
+        <footer id="main-site-footer" class="w-full bg-black text-slate-300 font-sans border-t border-red-950/80 relative overflow-hidden pt-20 pb-10">
+          
+          <!-- Background Watermark Typography: ZERO TRUST -->
+          <div class="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none select-none opacity-[0.06] z-0 w-full text-center overflow-hidden">
+            <span class="text-[100px] sm:text-[160px] lg:text-[220px] font-heading font-black tracking-widest text-red-500 uppercase whitespace-nowrap leading-none">
+              ZERO TRUST
+            </span>
+          </div>
+
+          <div class="max-w-7xl mx-auto px-6 sm:px-10 relative z-10 space-y-12">
+            <!-- Top Footer Grid: 5 Columns -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10 pb-12 border-b border-red-950/80">
+              
+              <!-- Col 1: Brand Info (4 cols) -->
+              <div class="lg:col-span-4 space-y-4">
+                <div class="flex items-center gap-2.5">
+                  <div class="p-2 rounded-xl bg-gradient-to-br from-red-600 to-red-800 border border-red-500/60 shadow-[0_0_15px_rgba(239,68,68,0.5)]">
+                    <svg class="w-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                  </div>
+                  <span class="font-heading font-extrabold text-xl text-white tracking-tight">COGNISEC <span class="text-red-500">AI</span></span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed font-sans max-w-sm">
+                  Building the future of cybersecurity with continuous authentication and zero trust intelligence.
+                </p>
+                <!-- Social Buttons -->
+                <div class="flex items-center gap-2.5 pt-1">
+                  <!-- LinkedIn -->
+                  <a href="#linkedin" onclick="event.preventDefault()" class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-red-500/60 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold transition-all shadow-sm">
+                    in
+                  </a>
+                  <!-- Twitter / X -->
+                  <a href="#twitter" onclick="event.preventDefault()" class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-red-500/60 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold transition-all shadow-sm">
+                    𝕏
+                  </a>
+                  <!-- GitHub -->
+                  <a href="#github" onclick="event.preventDefault()" class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-red-500/60 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold transition-all shadow-sm">
+                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+                  </a>
+                  <!-- Email -->
+                  <a href="#email" onclick="event.preventDefault()" class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-red-500/60 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold transition-all shadow-sm">
+                    ✉
+                  </a>
+                </div>
+              </div>
+
+              <!-- Col 2: Platform (2 cols) -->
+              <div class="lg:col-span-2 space-y-3">
+                <h4 class="text-xs font-mono font-bold text-white uppercase tracking-wider">Platform</h4>
+                <ul class="space-y-2 text-xs text-slate-400 font-sans">
+                  <li><a href="#how-it-works" onclick="scrollToSection('technology')" class="hover:text-red-400 transition-colors">How It Works</a></li>
+                  <li><a href="#features" onclick="scrollToSection('technology')" class="hover:text-red-400 transition-colors">Features</a></li>
+                  <li><a href="#technology" onclick="scrollToSection('technology')" class="hover:text-red-400 transition-colors">Technology</a></li>
+                  <li><a href="#security" onclick="scrollToSection('user-profile-section')" class="hover:text-red-400 transition-colors">Security</a></li>
+                </ul>
+              </div>
+
+              <!-- Col 3: Solutions (2 cols) -->
+              <div class="lg:col-span-2 space-y-3">
+                <h4 class="text-xs font-mono font-bold text-white uppercase tracking-wider">Solutions</h4>
+                <ul class="space-y-2 text-xs text-slate-400 font-sans">
+                  <li><a href="#enterprises" onclick="scrollToSection('plain-black-applications-section')" class="hover:text-red-400 transition-colors">For Enterprises</a></li>
+                  <li><a href="#developers" onclick="scrollToSection('plain-black-applications-section')" class="hover:text-red-400 transition-colors">For Developers</a></li>
+                  <li><a href="#use-cases" onclick="scrollToSection('plain-black-applications-section')" class="hover:text-red-400 transition-colors">Use Cases</a></li>
+                  <li><a href="#integrations" onclick="scrollToSection('plain-black-applications-section')" class="hover:text-red-400 transition-colors">Integrations</a></li>
+                </ul>
+              </div>
+
+              <!-- Col 4: Company (2 cols) -->
+              <div class="lg:col-span-2 space-y-3">
+                <h4 class="text-xs font-mono font-bold text-white uppercase tracking-wider">Company</h4>
+                <ul class="space-y-2 text-xs text-slate-400 font-sans">
+                  <li><a href="#about" onclick="event.preventDefault()" class="hover:text-red-400 transition-colors">About Us</a></li>
+                  <li><a href="#careers" onclick="event.preventDefault()" class="hover:text-red-400 transition-colors">Careers</a></li>
+                  <li><a href="#blog" onclick="event.preventDefault()" class="hover:text-red-400 transition-colors">Blog</a></li>
+                  <li><a href="#contact" onclick="event.preventDefault()" class="hover:text-red-400 transition-colors">Contact</a></li>
+                </ul>
+              </div>
+
+              <!-- Col 5: Stay Updated (2 cols) -->
+              <div class="lg:col-span-2 space-y-3">
+                <h4 class="text-xs font-mono font-bold text-white uppercase tracking-wider">Stay Updated</h4>
+                <p class="text-[11px] text-slate-400 leading-normal font-sans">
+                  Get the latest insights on security, AI, and continuous identity.
+                </p>
+                <form onsubmit="event.preventDefault(); alert('Subscribed to Cognisec AI security updates!');" class="flex items-center gap-1.5 pt-1">
+                  <div class="relative flex-1">
+                    <input 
+                      type="email" 
+                      placeholder="Enter your email" 
+                      required 
+                      class="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-red-500 font-mono"
+                    />
+                  </div>
+                  <button 
+                    type="submit" 
+                    class="p-2 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold text-xs shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-all shrink-0 cursor-pointer"
+                    title="Subscribe"
+                  >
+                    🚀
+                  </button>
+                </form>
+              </div>
+
+            </div>
+
+            <!-- Bottom Sub-Footer Bar -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-500 pt-2">
+              <span>© 2026 Cognisec AI. All rights reserved.</span>
+              
+              <!-- Center Highlight -->
+              <span class="text-red-400 font-bold flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-red-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                <span>Continuous Protection. Always.</span>
+              </span>
+
+              <!-- Legal Links -->
+              <div class="flex items-center gap-4 text-slate-400">
+                <a href="#privacy" onclick="event.preventDefault()" class="hover:text-white transition-colors">Privacy Policy</a>
+                <a href="#terms" onclick="event.preventDefault()" class="hover:text-white transition-colors">Terms of Use</a>
+                <a href="#disclaimer" onclick="event.preventDefault()" class="hover:text-white transition-colors">Disclaimer</a>
+              </div>
+            </div>
+
+          </div>
+        </footer>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ================= COINFLECT MIGRATION MODALS ================= -->
+  <!-- 1. Article Modal -->
+  <div id="coinflect-modal-article" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-in font-mono">
+    <div class="relative w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-2xl p-6 md:p-8 text-zinc-100 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between pb-4 border-b border-zinc-800/80">
+        <div class="flex items-center gap-2 text-xs font-medium tracking-wider uppercase text-zinc-400">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-emerald-400 font-bold">Official Announcement</span>
+        </div>
+        <button onclick="closeCoinflectModal('article')" class="p-1.5 rounded-full bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer">
+          ✕
+        </button>
+      </div>
+      <div class="overflow-y-auto py-6 space-y-6 text-zinc-300 pr-1">
+        <div>
+          <span class="text-xs text-zinc-500">Published August 3, 2026 • 4 min read</span>
+          <h2 class="text-2xl md:text-3xl font-heading font-bold text-white mt-1 leading-snug">
+            Evolution of the Ecosystem: Transitioning to Wrapped Coinflect
+          </h2>
+        </div>
+        <p class="text-sm md:text-base text-zinc-300 leading-relaxed font-sans">
+          We are excited to announce the official release of the Wrapped Coinflect protocol upgrade. This transition brings full ERC-20 compatibility, lower gas overhead, and unified liquidity access across major decentralized finance (DeFi) platforms.
+        </p>
+        <div class="p-4 bg-zinc-900/80 border border-zinc-800 rounded-xl space-y-3">
+          <div class="flex items-center gap-2 text-white font-medium text-sm">
+            <span class="text-emerald-400">✓</span>
+            <span>Key Migration Highlights</span>
+          </div>
+          <ul class="text-xs md:text-sm text-zinc-400 space-y-2 list-disc list-inside">
+            <li><strong class="text-zinc-200">Exact 1:1 Swap Ratio:</strong> Every 1 Coinflect (v1) converts directly to 1 Wrapped Coinflect (wCFLT).</li>
+            <li><strong class="text-zinc-200">Zero Slippage &amp; Fee Offset:</strong> Protocol handles wrapper fees with zero price impact.</li>
+            <li><strong class="text-zinc-200">Cross-Chain Interoperability:</strong> Built on audited CCIP contracts for seamless multi-chain routing.</li>
+          </ul>
+        </div>
+        <div class="space-y-3">
+          <h3 class="text-base font-medium text-white flex items-center gap-2">Why Wrap Coinflect?</h3>
+          <p class="text-xs md:text-sm text-zinc-400 leading-relaxed font-sans">
+            The legacy Coinflect architecture lacked standard token callbacks required by modern automated market makers (AMMs) and lending vaults. Wrapped Coinflect encapsulates native utility into an ERC-20 standard, unlocking staking rewards, cross-chain bridges, and decentralized governance voting without compromising key security parameters.
+          </p>
+        </div>
+        <div class="p-4 bg-emerald-950/20 border border-emerald-900/40 rounded-xl flex items-center justify-between gap-4">
+          <div class="text-xs text-emerald-300">
+            <p class="font-medium text-emerald-200">Migration Portal is Now Live</p>
+            <p class="text-emerald-400/80 mt-0.5">Swap your legacy tokens with instant confirmation</p>
+          </div>
+          <button onclick="closeCoinflectModal('article'); openCoinflectModal('portal');" class="px-4 py-2 text-xs font-bold text-black bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-all shadow-sm shrink-0 cursor-pointer">
+            Launch Portal →
+          </button>
+        </div>
+      </div>
+      <div class="pt-4 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-500">
+        <span>Coinflect Protocol v2.0</span>
+        <span class="text-zinc-400">Security Audit Verified ✓</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Manual Modal -->
+  <div id="coinflect-modal-manual" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-in font-mono">
+    <div class="relative w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-2xl p-6 md:p-8 text-zinc-100 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between pb-4 border-b border-zinc-800/80">
+        <div class="flex items-center gap-2">
+          <span class="text-amber-400">ℹ</span>
+          <span class="text-sm font-bold text-white">Migration Manual &amp; FAQs</span>
+        </div>
+        <button onclick="closeCoinflectModal('manual')" class="p-1.5 rounded-full bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer">
+          ✕
+        </button>
+      </div>
+      
+      <div class="flex items-center gap-2 mt-4 border-b border-zinc-800 pb-2">
+        <button id="coinflect-tab-guide" onclick="switchCoinflectManualTab('guide')" class="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 text-white cursor-pointer">
+          Step-by-Step Guide
+        </button>
+        <button id="coinflect-tab-faq" onclick="switchCoinflectManualTab('faq')" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 cursor-pointer">
+          Frequently Asked Questions
+        </button>
+      </div>
+
+      <div class="overflow-y-auto py-5 space-y-6 text-zinc-300 pr-1">
+        <div id="coinflect-manual-guide-content" class="space-y-4">
+          <div class="p-3.5 bg-zinc-900/90 border border-zinc-800 rounded-xl space-y-1.5">
+            <span class="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Wrapped Token Address (wCFLT)</span>
+            <div class="flex items-center justify-between gap-2 bg-zinc-950 p-2 rounded-lg border border-zinc-800/80">
+              <code class="text-xs text-emerald-400 font-mono truncate">0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D</code>
+              <button onclick="copyCoinflectAddr(this)" class="px-2.5 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 text-white rounded transition-colors cursor-pointer">Copy</button>
+            </div>
+          </div>
+          <div class="space-y-3">
+            <h3 class="text-xs font-medium uppercase tracking-wider text-zinc-400">Migration Workflow</h3>
+            <div class="p-3.5 bg-zinc-900/50 border border-zinc-800/60 rounded-xl flex items-start gap-3">
+              <span class="w-6 h-6 rounded-full bg-zinc-800 text-xs font-bold text-white flex items-center justify-center shrink-0">1</span>
+              <div>
+                <h4 class="text-sm font-medium text-white">Connect Web3 Wallet</h4>
+                <p class="text-xs text-zinc-400 leading-relaxed font-sans">Connect your Web3 Wallet holding legacy Coinflect (v1) tokens.</p>
+              </div>
+            </div>
+            <div class="p-3.5 bg-zinc-900/50 border border-zinc-800/60 rounded-xl flex items-start gap-3">
+              <span class="w-6 h-6 rounded-full bg-zinc-800 text-xs font-bold text-white flex items-center justify-center shrink-0">2</span>
+              <div>
+                <h4 class="text-sm font-medium text-white">Approve Allowance</h4>
+                <p class="text-xs text-zinc-400 leading-relaxed font-sans">Grant approval for the audited Wrapping Contract to spend legacy tokens.</p>
+              </div>
+            </div>
+            <div class="p-3.5 bg-zinc-900/50 border border-zinc-800/60 rounded-xl flex items-start gap-3">
+              <span class="w-6 h-6 rounded-full bg-zinc-800 text-xs font-bold text-white flex items-center justify-center shrink-0">3</span>
+              <div>
+                <h4 class="text-sm font-medium text-white">Execute Wrap &amp; Swap</h4>
+                <p class="text-xs text-zinc-400 leading-relaxed font-sans">Confirm the 1:1 migration transaction to receive Wrapped Coinflect (wCFLT).</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="coinflect-manual-faq-content" class="hidden space-y-4">
+          <div class="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl space-y-1">
+            <h4 class="text-sm font-medium text-white">Is there a deadline for token wrapping?</h4>
+            <p class="text-xs text-zinc-400 font-sans">No. The Migration Wrapper contract is non-custodial and permanently active on-chain.</p>
+          </div>
+          <div class="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl space-y-1">
+            <h4 class="text-sm font-medium text-white">What is the exact conversion ratio?</h4>
+            <p class="text-xs text-zinc-400 font-sans">The ratio is fixed at 1:1. 1 Coinflect (v1) = 1 Wrapped Coinflect (wCFLT).</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Wrapping Portal Launch Modal -->
+  <div id="coinflect-modal-portal" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-in font-mono">
+    <div class="relative w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-2xl p-6 text-zinc-100 shadow-2xl overflow-hidden flex flex-col">
+      <div class="flex items-center justify-between pb-4 border-b border-zinc-800/80">
+        <div class="flex items-center gap-2">
+          <span class="text-emerald-400 font-bold">⚡</span>
+          <span class="text-sm font-bold text-white">Wrapping Portal Launch</span>
+        </div>
+        <button onclick="closeCoinflectModal('portal')" class="p-1.5 rounded-full bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer">
+          ✕
+        </button>
+      </div>
+
+      <div id="coinflect-portal-body" class="py-5 space-y-4">
+        <div class="flex items-center justify-between p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+          <div>
+            <p id="portal-wallet-status" class="text-xs font-medium text-white">No Wallet Connected</p>
+            <p class="text-[11px] text-zinc-500">Ethereum Mainnet</p>
+          </div>
+          <button id="portal-connect-btn" onclick="connectCoinflectWallet()" class="px-3 py-1.5 text-xs font-bold bg-white text-black hover:bg-zinc-200 rounded-lg transition-colors cursor-pointer">
+            Connect Wallet
+          </button>
+        </div>
+
+        <div id="portal-swap-form" class="space-y-3">
+          <div class="p-3.5 bg-zinc-900/80 border border-zinc-800 rounded-xl space-y-2">
+            <div class="flex items-center justify-between text-xs text-zinc-400">
+              <span>You Pay</span>
+              <span>Balance: <strong id="portal-v1-balance" class="text-white">12,500</strong> CFLT</span>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              <input id="portal-input-val" type="number" value="1000" oninput="updatePortalSwapAmount(this.value)" class="w-full bg-transparent text-xl font-bold text-white focus:outline-none" />
+              <span class="px-2.5 py-1 bg-zinc-800 rounded-lg text-xs font-bold text-white shrink-0">CFLT (v1)</span>
+            </div>
+          </div>
+
+          <div class="text-center text-zinc-400 text-sm">↓ 1:1 Exact Ratio</div>
+
+          <div class="p-3.5 bg-zinc-900/80 border border-zinc-800 rounded-xl space-y-2">
+            <div class="flex items-center justify-between text-xs text-zinc-400">
+              <span>You Receive</span>
+              <span>Balance: <strong id="portal-v2-balance" class="text-emerald-400">0</strong> wCFLT</span>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              <div id="portal-receive-val" class="text-xl font-bold text-emerald-400">1000</div>
+              <span class="px-2.5 py-1 bg-zinc-800 rounded-lg text-xs font-bold text-emerald-400 shrink-0">wCFLT (v2)</span>
+            </div>
+          </div>
+
+          <button id="portal-swap-btn" onclick="executeCoinflectSwap()" class="w-full py-3 px-4 bg-white hover:bg-zinc-200 text-black font-bold text-sm rounded-xl transition-all shadow-sm cursor-pointer">
+            Connect Wallet First
+          </button>
+        </div>
+
+        <div id="portal-success-view" class="hidden p-5 bg-emerald-950/20 border border-emerald-900/50 rounded-xl text-center space-y-3">
+          <div class="w-10 h-10 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-lg font-bold">✓</div>
+          <div>
+            <h3 class="text-base font-bold text-white">Migration Complete</h3>
+            <p class="text-xs text-zinc-400 mt-1">Successfully converted <span id="portal-tx-amount">1000</span> CFLT to wCFLT.</p>
+          </div>
+          <div class="p-2.5 bg-zinc-950 rounded-lg border border-zinc-800 text-xs font-mono text-zinc-400 flex items-center justify-between">
+            <span>TX Hash:</span>
+            <span id="portal-tx-hash" class="text-emerald-400 font-bold">0x8f9a...3b1e</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ================= END SCROLL ANIMATION SECTION (SEQ 2: 200 FRAMES) ================= -->
+  <div id="end-hero-container" class="relative w-full bg-black text-white overflow-hidden border-t border-red-900/40" style="height: 350vh;">
+    <!-- Sticky Canvas Viewport -->
+    <div class="sticky top-0 left-0 w-full h-screen flex items-center justify-center overflow-hidden">
+      <!-- 4K High-Res Canvas -->
+      <canvas id="end-hero-canvas" class="absolute inset-0 w-full h-full object-cover z-0"></canvas>
+      
+      <!-- Ambient Glow & Dark Gradients -->
+      <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/80 pointer-events-none z-10"></div>
+      
+      <!-- Overlay Typography Cards -->
+      <div class="relative z-20 max-w-5xl mx-auto px-6 text-center space-y-6">
+        
+        <!-- Text Card 1: 0% - 35% -->
+        <div id="end-card-1" class="transition-all duration-700 space-y-4">
+          <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-950/80 border border-red-500/50 text-red-400 text-xs font-mono font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(239,68,68,0.4)]">
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+            ZERO-TRUST AUTONOMOUS NEUTRALIZATION
+          </div>
+          <h2 class="font-heading font-extrabold text-4xl sm:text-6xl text-white tracking-tight leading-tight">
+            AI Threat Interception <br />
+            <span class="bg-gradient-to-r from-red-500 via-amber-400 to-red-400 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(239,68,68,0.8)]">Executed Live</span>
+          </h2>
+          <p class="text-sm sm:text-base font-mono text-slate-300 max-w-2xl mx-auto leading-relaxed">
+            Continuous motor dynamics analytics instantly terminate unauthorized Account Takeovers (ATO) before sensitive data is exposed.
+          </p>
+        </div>
+
+        <!-- Text Card 2: 35% - 70% -->
+        <div id="end-card-2" class="hidden transition-all duration-700 space-y-4">
+          <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/50 text-emerald-400 text-xs font-mono font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(52,211,153,0.4)]">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            100% BEHAVIORAL FIDELITY MATCH
+          </div>
+          <h2 class="font-heading font-extrabold text-4xl sm:text-6xl text-white tracking-tight leading-tight">
+            Continuous Guardian <br />
+            <span class="bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-500 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(52,211,153,0.8)]">Protecting Every Session</span>
+          </h2>
+          <p class="text-sm sm:text-base font-mono text-slate-300 max-w-2xl mx-auto leading-relaxed">
+            Seamlessly embedded into E-Commerce, Academic, Healthcare, and Web3 Enterprise protocols. Zero friction for legitimate users.
+          </p>
+        </div>
+
+        <!-- Text Card 3: 70% - 100% -->
+        <div id="end-card-3" class="hidden transition-all duration-700 space-y-6">
+          <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-950/80 border border-sky-500/50 text-sky-400 text-xs font-mono font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(14,165,233,0.4)]">
+            <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
+            COGNISEC AI ENTERPRISE 2026
+          </div>
+          <h2 class="font-heading font-extrabold text-4xl sm:text-6xl text-white tracking-tight leading-tight">
+            The Future of Identity <br />
+            <span class="bg-gradient-to-r from-sky-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(14,165,233,0.8)]">Is Continuous</span>
+          </h2>
+          <div class="flex flex-wrap items-center justify-center gap-4 pt-2 font-mono text-xs">
+            <button onclick="openModal('login'); setLoginScreen('soc');" class="px-7 py-3.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold uppercase tracking-wider shadow-[0_0_30px_rgba(239,68,68,0.7)] transition-all cursor-pointer">
+              Launch SOC Console →
+            </button>
+            <button onclick="openModal('liveDemo')" class="px-7 py-3.5 rounded-xl bg-black/80 hover:bg-slate-900 border border-slate-700 text-white font-bold uppercase tracking-wider transition-all cursor-pointer">
+              Interactive Applications
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 1. SOC ADMIN DASHBOARD COMMAND CENTER ================= -->
+  <div id="modal-dashboard" class="fixed inset-0 z-50 hidden bg-black/90 backdrop-blur-2xl flex items-center justify-center p-3 sm:p-5 md:p-6 animate-fade-in font-mono">
+    <div class="relative w-full max-w-7xl max-h-[92vh] bg-[#06040a] border border-red-900/60 rounded-3xl shadow-[0_0_90px_rgba(220,38,38,0.45)] overflow-hidden flex flex-col">
+      
+      <!-- SOC Command Header -->
+      <div class="px-6 py-4 border-b border-red-950 flex items-center justify-between bg-gradient-to-r from-red-950/80 via-black to-red-950/80">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 rounded-xl bg-red-900/40 border border-red-700/50 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+            <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-3">
+              <h3 class="font-heading font-extrabold text-xl text-white tracking-wider">COGNISEC SOC COMMAND CENTER</h3>
+              <span class="px-2.5 py-0.5 text-[10px] font-mono bg-red-950 text-red-400 border border-red-800 rounded-full font-bold uppercase tracking-widest animate-pulse">DEFCON 1: ONLINE</span>
+            </div>
+            <p class="text-xs text-slate-400 pt-0.5">Real-Time AI Threat Monitoring • Zero-Trust Behavioral Neural Engine Active</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="triggerSocRescan()" class="px-3.5 py-1.5 rounded-xl bg-red-950/70 hover:bg-red-900 border border-red-800 text-red-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5">
+            <span>⚡ AI Re-Scan</span>
+          </button>
+          <button onclick="handleLogout()" class="px-3.5 py-1.5 rounded-xl bg-red-950/90 hover:bg-red-800 border border-red-700 text-red-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5" title="Sign Out of SOC">
+            <span>🚪 Logout</span>
+          </button>
+          <button onclick="closeModal('dashboard')" class="p-2 rounded-xl bg-red-950/60 hover:bg-red-900/80 border border-red-800/50 text-slate-400 hover:text-white transition-colors cursor-pointer" title="Close (Keep Authenticated)">✕</button>
+        </div>
+      </div>
+
+      <!-- TOP METRIC KPI CARDS (LIVE METRICS) -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-4 bg-[#09060e] border-b border-red-950">
+        <!-- Live Sessions -->
+        <div class="p-3.5 rounded-2xl bg-black/60 border border-red-900/40 space-y-1">
+          <span class="text-[10px] text-slate-400 uppercase tracking-wider block">🔴 Live Sessions</span>
+          <div class="flex items-baseline justify-between">
+            <strong id="soc-stat-sessions" class="text-xl font-bold text-white font-mono">1,428</strong>
+            <span class="text-[10px] text-emerald-400 font-bold">99.8% OK</span>
+          </div>
+        </div>
+
+        <!-- Trusted Users -->
+        <div class="p-3.5 rounded-2xl bg-black/60 border border-emerald-900/40 space-y-1">
+          <span class="text-[10px] text-slate-400 uppercase tracking-wider block">🟢 Trusted Users</span>
+          <div class="flex items-baseline justify-between">
+            <strong id="soc-stat-trusted" class="text-xl font-bold text-emerald-400 font-mono">14,892</strong>
+            <span class="text-[10px] text-emerald-400 font-bold">Score &gt;95%</span>
+          </div>
+        </div>
+
+        <!-- Blocked Users -->
+        <div class="p-3.5 rounded-2xl bg-black/60 border border-red-900/50 space-y-1">
+          <span class="text-[10px] text-slate-400 uppercase tracking-wider block">⛔ Blocked / ATOs</span>
+          <div class="flex items-baseline justify-between">
+            <strong id="soc-stat-blocked" class="text-xl font-bold text-red-400 font-mono">18</strong>
+            <span class="text-[10px] text-red-400 font-bold">Intercepted</span>
+          </div>
+        </div>
+
+        <!-- New Devices -->
+        <div class="p-3.5 rounded-2xl bg-black/60 border border-sky-900/40 space-y-1">
+          <span class="text-[10px] text-slate-400 uppercase tracking-wider block">💻 New Devices</span>
+          <div class="flex items-baseline justify-between">
+            <strong id="soc-stat-devices" class="text-xl font-bold text-sky-400 font-mono">47</strong>
+            <span class="text-[10px] text-sky-400 font-bold">TPM Attested</span>
+          </div>
+        </div>
+
+        <!-- Active Alerts -->
+        <div class="p-3.5 rounded-2xl bg-black/60 border border-amber-900/40 space-y-1 col-span-2 sm:col-span-1">
+          <span class="text-[10px] text-slate-400 uppercase tracking-wider block">⚠️ Active Alerts</span>
+          <div class="flex items-baseline justify-between">
+            <strong id="soc-stat-alerts" class="text-xl font-bold text-amber-400 font-mono">3</strong>
+            <span class="text-[10px] text-amber-400 font-bold">Inspected</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SOC Navigation Tabs -->
+      <div class="px-6 py-2.5 bg-[#0a0711] border-b border-red-950/80 flex items-center gap-2 overflow-x-auto text-xs">
+        <button onclick="switchDashboardTab('overview')" id="dash-tab-overview" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)] cursor-pointer">
+          <span>🖥️ Command Overview</span>
+        </button>
+        <button onclick="switchDashboardTab('behavior')" id="dash-tab-behavior" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer">
+          <span>🧠 Behavior History &amp; Risk Trends</span>
+        </button>
+        <button onclick="switchDashboardTab('threatmap')" id="dash-tab-threatmap" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer">
+          <span>🗺 Threat Map &amp; Geo Radar</span>
+        </button>
+        <button onclick="switchDashboardTab('logs')" id="dash-tab-logs" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer">
+          <span>📜 Attack Timeline &amp; Login Logs</span>
+        </button>
+      </div>
+
+      <!-- SOC Body Content Container -->
+      <div class="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+        
+        <!-- 1. COMMAND OVERVIEW TAB -->
+        <div id="dash-content-overview" class="space-y-6">
+          
+          <!-- Top Grid: Live AI Risk Gauge & Threat Radar -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Left 7 Cols: Live Behavior History & AI Risk Trends -->
+            <div class="lg:col-span-7 glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/60 space-y-4">
+              <div class="flex items-center justify-between pb-3 border-b border-red-950">
+                <div class="flex items-center gap-2">
+                  <span class="text-red-400 font-bold">📈</span>
+                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">AI Behavior History &amp; Risk Trends</h4>
+                </div>
+                <span class="text-[10px] text-emerald-400 font-bold bg-emerald-950 px-2.5 py-1 rounded border border-emerald-800">
+                  ENTROPY STABLE (0.001)
+                </span>
+              </div>
+
+              <!-- Animated Waveform Chart -->
+              <div class="h-44 w-full bg-black/80 rounded-xl border border-red-950 p-3 flex flex-col justify-between relative overflow-hidden">
+                <div class="flex items-center justify-between text-[10px] text-slate-500">
+                  <span>100% Neural Match</span>
+                  <span>Real-Time Biometric Vector Stream</span>
+                  <span>0% Anomaly</span>
+                </div>
+
+                <!-- SVG Graph Waveform -->
+                <div class="w-full h-24 relative flex items-center">
+                  <svg class="w-full h-full text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]" viewBox="0 0 500 80" preserveAspectRatio="none">
+                    <path d="M0,40 Q25,10 50,40 T100,40 T150,20 T200,50 T250,30 T300,40 T350,15 T400,45 T450,35 T500,40" fill="none" stroke="currentColor" stroke-width="2.5" />
+                  </svg>
+                </div>
+
+                <div class="flex items-center justify-between text-[10px] text-slate-400 font-bold">
+                  <span>Keystroke Flight: 124ms</span>
+                  <span>Cursor Velocity: 840px/s</span>
+                  <span>Touch Angle: 42°</span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-3 text-[11px]">
+                <div class="p-2.5 rounded-xl bg-black/50 border border-red-950 flex flex-col">
+                  <span class="text-slate-400">Keystroke Match</span>
+                  <strong class="text-emerald-400 font-bold">99.98%</strong>
+                </div>
+                <div class="p-2.5 rounded-xl bg-black/50 border border-red-950 flex flex-col">
+                  <span class="text-slate-400">Mouse Velocity</span>
+                  <strong class="text-emerald-400 font-bold">Human Standard</strong>
+                </div>
+                <div class="p-2.5 rounded-xl bg-black/50 border border-red-950 flex flex-col">
+                  <span class="text-slate-400">Device Fingerprint</span>
+                  <strong class="text-sky-400 font-bold">Attested</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right 5 Cols: Global Threat Radar & Nodes -->
+            <div class="lg:col-span-5 glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/60 space-y-4">
+              <div class="flex items-center justify-between pb-3 border-b border-red-950">
+                <div class="flex items-center gap-2">
+                  <span class="text-red-400 font-bold">🗺</span>
+                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Threat Map &amp; Radar</h4>
+                </div>
+                <span class="text-[10px] text-sky-400 font-bold bg-sky-950 px-2.5 py-1 rounded border border-sky-800">
+                  4 NODES ACTIVE
+                </span>
+              </div>
+
+              <!-- Radar Container -->
+              <div class="h-44 w-full bg-black/80 rounded-xl border border-red-950 p-4 flex flex-col items-center justify-center relative">
+                <div class="w-32 h-32 rounded-full border border-red-900/40 relative flex items-center justify-center animate-pulse">
+                  <div class="w-20 h-20 rounded-full border border-red-800/60 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-full bg-red-600/30 border border-red-500 flex items-center justify-center text-[10px] text-white font-bold animate-ping"></div>
+                  </div>
+                  <!-- Pinging Nodes -->
+                  <span class="absolute top-2 left-4 w-2 h-2 bg-emerald-400 rounded-full animate-ping" title="Bengaluru HQ"></span>
+                  <span class="absolute bottom-4 right-6 w-2 h-2 bg-emerald-400 rounded-full animate-ping" title="San Francisco Node"></span>
+                  <span class="absolute top-6 right-8 w-2 h-2 bg-red-500 rounded-full animate-ping" title="Blocked Node"></span>
+                </div>
+                <span class="text-[10px] text-slate-400 mt-2">Active Geo Shield: Bengaluru &bull; SF &bull; Frankfurt &bull; Tokyo</span>
+              </div>
+
+              <div class="p-3 rounded-xl bg-red-950/30 border border-red-900/40 flex items-center justify-between text-[11px]">
+                <span class="text-slate-300">Latest Intercept:</span>
+                <strong class="text-red-400 font-bold">Blocked Botnet (185.220.101.4)</strong>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- VISUAL BEHAVIOR TIMELINE (JUDGES VISIBILITY FEATURE) -->
+          <div class="glass-panel p-6 rounded-2xl border border-red-900/50 bg-black/80 space-y-5">
+            <div class="flex items-center justify-between pb-3 border-b border-red-950">
+              <div class="flex items-center gap-2.5">
+                <span class="text-red-400 font-bold text-lg">⏳</span>
+                <div>
+                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">AI Behavior Threat Timeline</h4>
+                  <p class="text-[11px] text-slate-400">Step-by-step AI threat interception &amp; anomaly detection sequence</p>
+                </div>
+              </div>
+              <span class="px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-red-950 text-red-400 border border-red-800 animate-pulse">
+                LIVE SOC SEQUENCER
+              </span>
+            </div>
+
+            <!-- Vertical Timeline Steps -->
+            <div class="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-emerald-500 before:via-amber-500 before:to-red-600 font-mono text-xs">
+              
+              <!-- Step 1: 10:11 Login Successful -->
+              <div class="relative group">
+                <span class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-emerald-950 border-2 border-emerald-400 flex items-center justify-center text-[10px] text-emerald-400 font-bold shadow-[0_0_10px_rgba(52,211,153,0.8)]">1</span>
+                <div class="p-3.5 rounded-xl bg-slate-950/80 border border-emerald-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-md">
+                  <div class="space-y-0.5">
+                    <div class="flex items-center gap-2">
+                      <span class="text-emerald-400 font-bold text-sm">10:11</span>
+                      <strong class="text-white text-sm font-sans font-bold">Login Successful</strong>
+                    </div>
+                    <p class="text-slate-400 text-[11px]">Primary user authenticated via passwordless biometrics.</p>
+                  </div>
+                  <span class="px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-bold shrink-0">🟢 SESSION VERIFIED</span>
+                </div>
+              </div>
+
+              <!-- Step 2: 10:13 Typing Pattern Changed -->
+              <div class="relative group">
+                <span class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-amber-950 border-2 border-amber-400 flex items-center justify-center text-[10px] text-amber-400 font-bold shadow-[0_0_10px_rgba(245,158,11,0.8)]">2</span>
+                <div class="p-3.5 rounded-xl bg-slate-950/80 border border-amber-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-md">
+                  <div class="space-y-0.5">
+                    <div class="flex items-center gap-2">
+                      <span class="text-amber-400 font-bold text-sm">10:13</span>
+                      <strong class="text-white text-sm font-sans font-bold">Typing Pattern Changed</strong>
+                    </div>
+                    <p class="text-slate-400 text-[11px]">Keystroke flight time variance shifted +42ms. AI Engine flagged anomaly.</p>
+                  </div>
+                  <span class="px-2.5 py-1 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] font-bold shrink-0">🟡 ANOMALY DETECTED</span>
+                </div>
+              </div>
+
+              <!-- Step 3: 10:14 New Device Detected -->
+              <div class="relative group">
+                <span class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-orange-950 border-2 border-orange-500 flex items-center justify-center text-[10px] text-orange-400 font-bold shadow-[0_0_10px_rgba(249,115,22,0.8)]">3</span>
+                <div class="p-3.5 rounded-xl bg-slate-950/80 border border-orange-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-md">
+                  <div class="space-y-0.5">
+                    <div class="flex items-center gap-2">
+                      <span class="text-orange-400 font-bold text-sm">10:14</span>
+                      <strong class="text-white text-sm font-sans font-bold">New Device Detected</strong>
+                    </div>
+                    <p class="text-slate-400 text-[11px]">Unregistered hardware fingerprint &amp; foreign IP address attestation mismatch.</p>
+                  </div>
+                  <span class="px-2.5 py-1 rounded bg-orange-950 text-orange-300 border border-orange-800 text-[10px] font-bold shrink-0">🟠 UNTRUSTED DEVICE</span>
+                </div>
+              </div>
+
+              <!-- Step 4: 10:15 Risk Increased -->
+              <div class="relative group">
+                <span class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-red-950 border-2 border-red-500 flex items-center justify-center text-[10px] text-red-400 font-bold shadow-[0_0_10px_rgba(239,68,68,0.8)]">4</span>
+                <div class="p-3.5 rounded-xl bg-slate-950/80 border border-red-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-md">
+                  <div class="space-y-0.5">
+                    <div class="flex items-center gap-2">
+                      <span class="text-red-400 font-bold text-sm">10:15</span>
+                      <strong class="text-white text-sm font-sans font-bold">Risk Increased</strong>
+                    </div>
+                    <p class="text-slate-400 text-[11px]">Cumulative AI risk score breached threshold to 0.894 (CRITICAL ATO Threat).</p>
+                  </div>
+                  <span class="px-2.5 py-1 rounded bg-red-950 text-red-400 border border-red-800 text-[10px] font-bold shrink-0">🔴 RISK BREACH (0.894)</span>
+                </div>
+              </div>
+
+              <!-- Step 5: 10:15 Session Locked -->
+              <div class="relative group">
+                <span class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-red-600 border-2 border-white flex items-center justify-center text-[10px] text-white font-bold shadow-[0_0_15px_rgba(239,68,68,1)]">5</span>
+                <div class="p-3.5 rounded-xl bg-gradient-to-r from-red-950/80 via-black to-red-950/80 border-2 border-red-600 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-[0_0_30px_rgba(239,68,68,0.4)]">
+                  <div class="space-y-0.5">
+                    <div class="flex items-center gap-2">
+                      <span class="text-red-400 font-bold text-sm">10:15</span>
+                      <strong class="text-white text-sm font-sans font-bold">Session Locked &amp; Intercepted</strong>
+                    </div>
+                    <p class="text-slate-300 text-[11px]">Zero-Trust automated kill-switch executed. Account &amp; tokens instantly revoked.</p>
+                  </div>
+                  <span class="px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold text-xs tracking-wider uppercase shadow-[0_0_15px_rgba(239,68,68,0.8)] shrink-0">⛔ SESSION KILLED</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Bottom Grid: Live Streaming Attack Timeline & Login Logs -->
+          <div class="glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/60 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-red-950">
+              <div class="flex items-center gap-2">
+                <span class="text-red-400 font-bold">📜</span>
+                <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Attack Timeline &amp; Real-Time Login Logs</h4>
+              </div>
+              <span class="text-[10px] text-slate-400">Streaming Live Feed</span>
+            </div>
+
+            <div id="soc-live-logs" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+              <div class="p-3 rounded-xl bg-black/50 border border-emerald-950 flex items-center justify-between font-mono text-[11px]">
+                <div class="flex items-center gap-3">
+                  <span class="text-emerald-400 font-bold">🟢 [00:43:12]</span>
+                  <span class="text-white font-bold">Boomika Ram (Bengaluru Node)</span>
+                  <span class="text-slate-400 text-[10px]">&bull; Keystroke Match 99.98% &bull; Risk: 0.001</span>
+                </div>
+                <span class="px-2.5 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded text-[10px] font-bold">AUTHENTICATED</span>
+              </div>
+
+              <div class="p-3 rounded-xl bg-black/50 border border-red-950 flex items-center justify-between font-mono text-[11px]">
+                <div class="flex items-center gap-3">
+                  <span class="text-red-400 font-bold">🔴 [00:41:05]</span>
+                  <span class="text-white font-bold">ATO Attack Attempt (Account #84920)</span>
+                  <span class="text-slate-400 text-[10px]">&bull; Anomaly Score: 94.2% &bull; Motor Flight Mismatch</span>
+                </div>
+                <span class="px-2.5 py-0.5 bg-red-950 text-red-400 border border-red-800 rounded text-[10px] font-bold">INTERCEPTED &amp; BLOCKED</span>
+              </div>
+
+              <div class="p-3 rounded-xl bg-black/50 border border-sky-950 flex items-center justify-between font-mono text-[11px]">
+                <div class="flex items-center gap-3">
+                  <span class="text-sky-400 font-bold">🟡 [00:38:44]</span>
+                  <span class="text-white font-bold">New Device Onboarded (Mac M3 Pro)</span>
+                  <span class="text-slate-400 text-[10px]">&bull; Hardware TPM 2.0 Attested &bull; Bengaluru Node</span>
+                </div>
+                <span class="px-2.5 py-0.5 bg-sky-950 text-sky-400 border border-sky-800 rounded text-[10px] font-bold">TRUSTED</span>
+              </div>
+
+              <div class="p-3 rounded-xl bg-black/50 border border-emerald-950 flex items-center justify-between font-mono text-[11px]">
+                <div class="flex items-center gap-3">
+                  <span class="text-emerald-400 font-bold">🟢 [00:35:10]</span>
+                  <span class="text-white font-bold">Dr. Boomika Ram (AyuSync EHR)</span>
+                  <span class="text-slate-400 text-[10px]">&bull; Doctor Proximity Shield Lock Verified</span>
+                </div>
+                <span class="px-2.5 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded text-[10px] font-bold">EHR ACCESS GRANTED</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 2. BEHAVIOR HISTORY & RISK TRENDS TAB -->
+        <div id="dash-content-behavior" class="hidden space-y-6">
+          <div class="p-6 rounded-2xl bg-black/60 border border-red-900/50 space-y-4">
+            <h4 class="font-heading font-bold text-sm text-white uppercase">Behavioral Anomaly &amp; Sensitivity Controls</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-2">
+                <div class="flex justify-between text-xs">
+                  <span class="text-slate-400">Adaptive Sensitivity:</span>
+                  <span class="text-red-400 font-bold">85% (Strict Enforcement)</span>
+                </div>
+                <div class="w-full h-2 bg-red-950 rounded-full overflow-hidden">
+                  <div class="h-full bg-red-500 w-[85%]"></div>
+                </div>
+              </div>
+              <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-2">
+                <div class="flex justify-between text-xs">
+                  <span class="text-slate-400">Confidence Floor:</span>
+                  <span class="text-amber-400 font-bold">70% Minimum Trust</span>
+                </div>
+                <div class="w-full h-2 bg-red-950 rounded-full overflow-hidden">
+                  <div class="h-full bg-amber-400 w-[70%]"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. THREAT MAP & GEO RADAR TAB -->
+        <div id="dash-content-threatmap" class="hidden space-y-6">
+          <div class="p-6 rounded-2xl bg-black/60 border border-red-900/50 space-y-4 text-center">
+            <h4 class="font-heading font-bold text-sm text-white uppercase">Global Threat Interception Grid</h4>
+            <div class="h-64 rounded-xl bg-black border border-red-950 flex items-center justify-center text-slate-400">
+              <p>🗺 Active Geo Threat Radar Scanning Across Bengaluru, San Francisco, Frankfurt, and Tokyo Hubs...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. ATTACK TIMELINE & LOGIN LOGS TAB -->
+        <div id="dash-content-logs" class="hidden space-y-6">
+          <div class="p-6 rounded-2xl bg-black/60 border border-red-900/50 space-y-4">
+            <h4 class="font-heading font-bold text-sm text-white uppercase">Complete Authenticated Audit Log Feed</h4>
+            <p class="text-xs text-slate-400">Every login event, continuous re-verification pulse, and blocked ATO threat is cryptographically signed and stored.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SOC Command Footer -->
+      <div class="px-6 py-4 border-t border-red-950 bg-red-950/20 flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-emerald-400 font-bold">SOC ENGINE ONLINE &bull; 100% OPERATIONAL</span>
+        </div>
+        <button onclick="closeModal('dashboard')" class="px-5 py-2 text-xs font-heading font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.5)] cursor-pointer">
+          Close SOC Dashboard
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================= SOC ACCESS DENIED MODAL ================= -->
+  <div id="modal-soc-denied" class="fixed inset-0 z-50 hidden bg-black/90 backdrop-blur-2xl flex items-center justify-center p-4 font-mono animate-fade-in">
+    <div class="relative w-full max-w-md bg-[#08050e] border-2 border-red-600 rounded-3xl p-6 shadow-[0_0_80px_rgba(239,68,68,0.5)] text-white text-center space-y-5">
+      <div class="w-16 h-16 rounded-full bg-red-950/80 border-2 border-red-500 flex items-center justify-center mx-auto text-red-400 text-3xl shadow-[0_0_20px_#ef4444] animate-pulse">
+        🔒
+      </div>
+      <div>
+        <h3 class="font-heading font-extrabold text-xl text-white tracking-wider">SOC ADMIN AUTHENTICATION REQUIRED</h3>
+        <p class="text-xs text-slate-400 mt-2 leading-relaxed font-sans">
+          The SOC Command Center Dashboard is strictly restricted to authenticated Administrator sessions. Unauthenticated users and general guests cannot access telemetry data.
+        </p>
+      </div>
+      <div class="p-3 bg-red-950/40 rounded-xl border border-red-900/60 text-xs text-red-300">
+        Please sign in as SOC Admin to unlock live session analytics.
+      </div>
+      <div class="grid grid-cols-2 gap-3 pt-2">
+        <button onclick="closeModal('soc-denied')" class="py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs uppercase cursor-pointer">
+          Cancel
+        </button>
+        <button onclick="closeModal('soc-denied'); openModal('login'); setLoginScreen('soc');" class="py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase shadow-[0_0_15px_rgba(239,68,68,0.6)] cursor-pointer">
+          Sign In SOC Admin →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 2. SIGN IN ACCESS SELECTOR & LOGIN MODAL ================= -->
+  <div id="modal-login" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-in">
+    <div id="login-modal-container" class="relative w-full max-w-3xl bg-[#08050e] border border-red-900/60 rounded-2xl shadow-[0_0_80px_rgba(220,38,38,0.4)] overflow-hidden flex flex-col transition-all duration-300">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-red-950 flex items-center justify-between bg-gradient-to-r from-red-950/40 via-black to-red-950/20">
+        <div class="flex items-center gap-3">
+          <button id="login-back-btn" onclick="setLoginScreen('select')" class="hidden p-1.5 rounded-lg bg-black/60 hover:bg-red-950 border border-red-900/40 text-slate-400 hover:text-white transition-colors cursor-pointer mr-1">←</button>
+          <div>
+            <h3 id="login-modal-title" class="font-heading font-extrabold text-base text-white tracking-wide">ENTERPRISE ACCESS PORTAL</h3>
+            <p id="login-modal-subtitle" class="text-xs font-mono text-slate-400">Select your enterprise authorization environment</p>
+          </div>
+        </div>
+        <button onclick="closeModal('login')" class="p-2 rounded-xl bg-red-950/60 hover:bg-red-900/80 border border-red-800/50 text-slate-400 hover:text-white transition-colors cursor-pointer" title="Close">✕</button>
+      </div>
+
+      <!-- SCREEN 1: ACCESS TYPE SELECTOR CARDS -->
+      <div id="login-screen-select" class="p-6 sm:p-8 space-y-6">
+        <div class="text-center space-y-1.5 max-w-lg mx-auto">
+          <h4 class="font-heading font-bold text-lg text-white">Choose Access Type</h4>
+          <p class="text-xs font-mono text-slate-400">Select your designated access domain to proceed to authentication.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <!-- CARD 1: User Portal -->
+          <div onclick="setLoginScreen('user')" class="group relative p-6 rounded-2xl bg-gradient-to-b from-[#0f0918] via-[#090510] to-[#040207] border border-red-900/40 hover:border-red-600/60 shadow-[0_10px_30px_rgba(0,0,0,0.6)] hover:shadow-[0_0_35px_rgba(220,38,38,0.25)] transition-all duration-300 flex flex-col justify-between space-y-5 cursor-pointer">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="p-3 rounded-xl bg-black/60 border border-red-950 text-red-400">
+                  <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-red-950/60 text-red-300 border border-red-800/50 uppercase tracking-wider">User Access</span>
+              </div>
+              <div>
+                <h5 class="font-heading font-extrabold text-xl text-white group-hover:text-red-300 transition-colors">User Portal</h5>
+                <p class="text-xs font-mono text-red-400 font-semibold pt-0.5">Secure access for authenticated users.</p>
+              </div>
+              <p class="text-xs font-sans text-slate-300 leading-relaxed">Access your protected applications with continuous identity verification.</p>
+            </div>
+            <button class="w-full py-3 px-4 rounded-xl bg-red-950/80 hover:bg-red-600 text-white font-heading font-bold text-xs uppercase tracking-wider border border-red-800/60 flex items-center justify-center gap-2 cursor-pointer">
+              <span>Continue to User Login</span> →
+            </button>
+          </div>
+
+          <!-- CARD 2: Security Operations Center -->
+          <div onclick="setLoginScreen('soc')" class="group relative p-6 rounded-2xl bg-gradient-to-b from-[#0f0918] via-[#090510] to-[#040207] border border-red-900/40 hover:border-red-600/60 shadow-[0_10px_30px_rgba(0,0,0,0.6)] hover:shadow-[0_0_35px_rgba(220,38,38,0.25)] transition-all duration-300 flex flex-col justify-between space-y-5 cursor-pointer">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="p-3 rounded-xl bg-black/60 border border-red-950 text-red-400">
+                  <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                </div>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-red-950/60 text-red-300 border border-red-800/50 uppercase tracking-wider">Admin Access</span>
+              </div>
+              <div>
+                <h5 class="font-heading font-extrabold text-xl text-white group-hover:text-red-300 transition-colors">Security Operations Center</h5>
+                <p class="text-xs font-mono text-red-400 font-semibold pt-0.5">Administrator &amp; SOC Analyst access.</p>
+              </div>
+              <p class="text-xs font-sans text-slate-300 leading-relaxed">Monitor live identity sessions, security events, and authentication activity.</p>
+            </div>
+            <button class="w-full py-3 px-4 rounded-xl bg-red-950/80 hover:bg-red-600 text-white font-heading font-bold text-xs uppercase tracking-wider border border-red-800/60 flex items-center justify-center gap-2 cursor-pointer">
+              <span>Continue to SOC Login</span> →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 2: USER PORTAL FORM -->
+      <form id="login-screen-user" onsubmit="submitLoginForm(event, 'user')" class="hidden p-6 space-y-5 max-w-md mx-auto w-full">
+        <div class="space-y-1">
+          <h4 class="font-heading font-bold text-lg text-white">User Portal Authentication</h4>
+          <p class="text-xs font-mono text-slate-400">Enter user credentials to access protected applications.</p>
+        </div>
+        <div id="login-error-user" class="hidden p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs font-mono"></div>
+        <div class="space-y-4 font-mono text-xs">
+          <div class="space-y-1.5">
+            <label class="text-slate-300 uppercase tracking-wider block">User Email</label>
+            <input id="login-user-email" type="email" placeholder="user.portal@cognisec.ai" required class="w-full px-4 py-3 rounded-xl bg-black/80 border border-red-900/50 text-white focus:outline-none focus:border-red-500">
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-slate-300 uppercase tracking-wider block">Password</label>
+            <input id="login-user-password" type="password" placeholder="Enter your password" autocomplete="current-password" required class="w-full px-4 py-3 rounded-xl bg-black/80 border border-red-900/50 text-white focus:outline-none focus:border-red-500">
+          </div>
+        </div>
+        <button id="btn-submit-user-login" type="submit" class="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-heading font-extrabold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(220,38,38,0.5)] transition-all cursor-pointer">
+          Sign In User Portal
+        </button>
+      </form>
+
+      <!-- SCREEN 3: SOC ADMIN FORM -->
+      <form id="login-screen-soc" onsubmit="submitLoginForm(event, 'soc')" class="hidden p-6 space-y-5 max-w-md mx-auto w-full">
+        <div class="space-y-1">
+          <h4 class="font-heading font-bold text-lg text-white">SOC Administrator Authentication</h4>
+          <p class="text-xs font-mono text-slate-400">Enter SOC credentials to access live telemetry and threat response.</p>
+        </div>
+        <div id="login-error-soc" class="hidden p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs font-mono"></div>
+        <div class="space-y-4 font-mono text-xs">
+          <div class="space-y-1.5">
+            <label class="text-slate-300 uppercase tracking-wider block">SOC Admin Email</label>
+            <input id="login-soc-email" type="email" placeholder="admin.soc@cognisec.ai" required class="w-full px-4 py-3 rounded-xl bg-black/80 border border-red-900/50 text-white focus:outline-none focus:border-red-500">
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-slate-300 uppercase tracking-wider block">Password</label>
+            <input id="login-soc-password" type="password" placeholder="Enter admin password" autocomplete="current-password" required class="w-full px-4 py-3 rounded-xl bg-black/80 border border-red-900/50 text-white focus:outline-none focus:border-red-500">
+          </div>
+        </div>
+        <button id="btn-submit-soc-login" type="submit" class="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-heading font-extrabold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(220,38,38,0.5)] transition-all cursor-pointer">
+          Sign In SOC Console
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= 3. USER DASHBOARD & LAUNCH CONSOLE MODAL ================= -->
+  <div id="modal-liveDemo" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+    <div class="relative w-full max-w-5xl bg-[#09060e] border border-red-800/70 rounded-2xl shadow-[0_0_80px_rgba(220,38,38,0.5)] overflow-hidden flex flex-col max-h-[92vh]">
+      
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-red-950 flex items-center justify-between bg-red-950/30">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 rounded-xl bg-red-900/40 text-red-400 border border-red-700/50">
+            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="font-heading font-extrabold text-base text-white tracking-wide">USER DASHBOARD</h3>
+              <span class="px-2 py-0.5 text-[10px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 rounded uppercase font-bold">AUTHENTICATED SESSION</span>
+            </div>
+            <p class="text-xs font-mono text-slate-400">Zero-Trust Continuous Identity Verification &amp; Application Portal</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="handleLogout()" class="px-3.5 py-1.5 rounded-xl bg-red-950/80 hover:bg-red-900 border border-red-700 text-red-300 font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5" title="Sign Out">
+            <span>🚪 Logout</span>
+          </button>
+          <button onclick="closeModal('liveDemo')" class="p-2 rounded-xl bg-red-950/60 hover:bg-red-900/80 border border-red-800/50 text-slate-400 hover:text-white transition-colors cursor-pointer" title="Close (Keep Authenticated)">✕</button>
+        </div>
+      </div>
+
+      <!-- User Dashboard Body -->
+      <div class="p-6 space-y-6 overflow-y-auto flex-1 font-mono">
+        
+        <!-- Authenticated User Profile Summary Card -->
+        <div class="p-5 rounded-2xl bg-black/60 border border-red-900/60 shadow-lg space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-red-950">
+            <div>
+              <span class="text-xs text-slate-400 block">Welcome,</span>
+              <h4 id="user-dash-name" class="text-lg font-heading font-bold text-white">Verified User</h4>
+              <span id="user-dash-email" class="text-xs text-red-400">user.portal@cognisec.ai</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="user-dash-role" class="px-3 py-1 rounded-lg bg-red-950 text-red-300 border border-red-800 text-xs font-bold">ROLE: USER</span>
+              <span id="user-dash-status" class="px-3 py-1 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800 text-xs font-bold">ACCOUNT: ACTIVE</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs pt-1">
+            <div class="p-3 rounded-xl bg-black/80 border border-red-950/80">
+              <span class="text-slate-400 block text-[10px]">Active Session</span>
+              <strong id="user-dash-session" class="text-emerald-400 font-bold block truncate">Active (TLS 1.3)</strong>
+            </div>
+            <div class="p-3 rounded-xl bg-black/80 border border-red-950/80">
+              <span class="text-slate-400 block text-[10px]">Registered Device</span>
+              <strong id="user-dash-device" class="text-slate-200 font-bold block truncate">macOS / Chrome (Desktop)</strong>
+            </div>
+            <div class="p-3 rounded-xl bg-black/80 border border-red-950/80">
+              <span class="text-slate-400 block text-[10px]">Zero-Trust Security Status</span>
+              <strong class="text-emerald-400 font-bold block flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                TRUSTED (ALLOW)
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROTECTED APPLICATIONS LAUNCH TILES -->
+        <div class="space-y-3">
+          <h5 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <span>🚀</span> Launch Protected Applications (Zero-Trust SSO)
+          </h5>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- App 1: College -->
+            <div class="p-4 rounded-2xl bg-black/50 border border-sky-900/60 hover:border-sky-500/80 transition-all flex flex-col justify-between space-y-3">
+              <div>
+                <div class="flex items-center justify-between pb-1">
+                  <span class="text-lg">🎓</span>
+                  <span class="px-2 py-0.5 rounded text-[9px] bg-sky-950 text-sky-400 border border-sky-800 font-bold">ACADEMIC SHIELD</span>
+                </div>
+                <h6 class="font-bold text-white text-sm">BITS Pilani Portal</h6>
+                <p class="text-[11px] text-slate-400 font-sans pt-1">Anti-proxy exam proctoring and student gradebook verification.</p>
+              </div>
+              <a href="college.html" class="w-full py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs text-center block transition-all">
+                Launch Academic Portal →
+              </a>
+            </div>
+
+            <!-- App 2: E-Commerce -->
+            <div class="p-4 rounded-2xl bg-black/50 border border-amber-900/60 hover:border-amber-500/80 transition-all flex flex-col justify-between space-y-3">
+              <div>
+                <div class="flex items-center justify-between pb-1">
+                  <span class="text-lg">🛍️</span>
+                  <span class="px-2 py-0.5 rounded text-[9px] bg-amber-950 text-amber-400 border border-amber-800 font-bold">RETAIL ATO DEFENSE</span>
+                </div>
+                <h6 class="font-bold text-white text-sm">Aura Luxe Retail</h6>
+                <p class="text-[11px] text-slate-400 font-sans pt-1">Account takeover defense and high-value checkout authorization.</p>
+              </div>
+              <a href="shopping.html" class="w-full py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs text-center block transition-all">
+                Launch Shopping Portal →
+              </a>
+            </div>
+
+            <!-- App 3: Healthcare -->
+            <div class="p-4 rounded-2xl bg-black/50 border border-emerald-900/60 hover:border-emerald-500/80 transition-all flex flex-col justify-between space-y-3">
+              <div>
+                <div class="flex items-center justify-between pb-1">
+                  <span class="text-lg">🏥</span>
+                  <span class="px-2 py-0.5 rounded text-[9px] bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">EHR CLINICAL GUARD</span>
+                </div>
+                <h6 class="font-bold text-white text-sm">Apollo MedVigil EHR</h6>
+                <p class="text-[11px] text-slate-400 font-sans pt-1">ABHA health records and continuous physician identity verification.</p>
+              </div>
+              <a href="healthcare.html" class="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs text-center block transition-all">
+                Launch Healthcare Portal →
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-Time Telemetry Capture Interactive Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+          <!-- Left: Typing Input -->
+          <div class="glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/40 space-y-3">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-mono font-bold text-white uppercase tracking-wider">Typing Dynamics Capture</label>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold">● LIVE TELEMETRY</span>
+            </div>
+            <textarea id="console-textarea" oninput="handleConsoleTyping(event)" placeholder="Type any text to stream behavioral dynamics to FastAPI..." class="w-full h-24 p-3 rounded-xl bg-black/80 border border-red-900/50 focus:border-red-500 text-xs font-mono text-white placeholder-slate-500 focus:outline-none resize-none"></textarea>
+            <div class="grid grid-cols-3 gap-2 text-[11px] font-mono pt-1">
+              <div class="p-2 rounded-xl bg-red-950/30 border border-red-900/30 flex items-center justify-between">
+                <span class="text-slate-400">Chars:</span>
+                <strong id="char-count" class="text-white">0</strong>
+              </div>
+              <div class="p-2 rounded-xl bg-red-950/30 border border-red-900/30 flex items-center justify-between">
+                <span class="text-slate-400">Words:</span>
+                <strong id="word-count" class="text-white">0</strong>
+              </div>
+              <div class="p-2 rounded-xl bg-red-950/30 border border-red-900/30 flex items-center justify-between">
+                <span class="text-slate-400">Speed:</span>
+                <strong id="wpm-count" class="text-amber-400">0 WPM</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Telemetry Event Stream -->
+          <div class="glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/40 space-y-3 font-mono text-xs flex flex-col justify-between">
+            <div>
+              <span class="font-bold text-white uppercase block border-b border-red-950 pb-2">Behavioral Telemetry Stream</span>
+              <div id="console-event-log" class="h-24 overflow-y-auto space-y-1.5 text-[11px] pr-1 pt-2">
+                <div class="p-2 rounded bg-black/60 border border-emerald-950 text-emerald-400">&gt; Zero-Trust Session Active. Telemetry Stream Connected.</div>
+              </div>
+            </div>
+            <button onclick="runConsoleVerification()" id="btn-console-verify" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-heading font-extrabold text-xs tracking-wider uppercase shadow-[0_0_20px_rgba(220,38,38,0.5)] cursor-pointer">
+              Trigger Continuous Re-Verification
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="px-6 py-3.5 border-t border-red-950 bg-red-950/20 flex items-center justify-between font-mono">
+        <span class="text-xs text-slate-400">COGNISEC-AI Continuous Identity Guard</span>
+        <button onclick="closeModal('liveDemo')" class="px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-lg cursor-pointer">Close Dashboard</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 4. APPLICATION PORTAL FLOW MODAL ================= -->
+  <div id="modal-portal" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+    <div id="portal-modal-card" class="relative w-full max-w-4xl bg-[#07050a] border border-amber-600/50 rounded-2xl shadow-[0_0_80px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[90vh]">
+      <!-- Header -->
+      <div id="portal-modal-header" class="px-6 py-3.5 border-b border-red-950/80 bg-gradient-to-r from-amber-950/40 via-black to-amber-950/20 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="p-2 rounded-xl bg-black/60 border border-red-900/60 text-red-400">
+            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="portal-modal-title" class="font-heading font-extrabold text-sm sm:text-base text-white tracking-wide">Aura Luxe Shopping Portal</h3>
+              <span class="px-2 py-0.5 text-[10px] font-mono bg-red-950 text-red-400 border border-red-800 rounded uppercase font-bold">COGNISEC PROTECTED</span>
+            </div>
+            <p id="portal-modal-tagline" class="text-[11px] font-mono text-slate-400">Premium Global Retail Platform</p>
+          </div>
+        </div>
+        <button onclick="closeModal('portal')" class="p-2 rounded-xl bg-red-950/60 hover:bg-red-900/80 border border-red-800/50 text-slate-400 hover:text-white transition-colors cursor-pointer">✕</button>
+      </div>
+
+      <!-- FLOW STEP 1: INITIALIZING LOADING CHECKLIST -->
+      <div id="portal-step-loading" class="p-8 sm:p-12 flex flex-col items-center justify-center space-y-8 my-auto">
+        <div class="relative w-20 h-20 flex items-center justify-center">
+          <div class="absolute inset-0 rounded-full border-2 border-red-500/30 animate-ping opacity-30"></div>
+          <div class="p-4 rounded-2xl bg-red-950/80 border border-red-700/60 text-red-400 shadow-[0_0_30px_rgba(220,38,38,0.5)]">
+            <svg class="w-10 h-10 animate-pulse" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+          </div>
+        </div>
+
+        <div class="text-center space-y-2">
+          <h4 class="font-heading font-bold text-xl text-white">Initializing COGNISEC AI Integration</h4>
+          <p class="text-xs font-mono text-slate-400">Establishing continuous cognitive biometric guardrails</p>
+        </div>
+
+        <div class="w-full max-w-md p-5 rounded-2xl bg-black/60 border border-red-950/80 space-y-3 font-mono text-xs">
+          <div id="check-1" class="flex items-center justify-between text-slate-400">
+            <span>● Initializing COGNISEC AI...</span>
+            <span class="text-amber-400">Checking...</span>
+          </div>
+          <div id="check-2" class="flex items-center justify-between text-slate-400">
+            <span>● Device Fingerprint Verified</span>
+            <span class="text-amber-400">Checking...</span>
+          </div>
+          <div id="check-3" class="flex items-center justify-between text-slate-400">
+            <span>● Behavioral Monitoring Started</span>
+            <span class="text-amber-400">Checking...</span>
+          </div>
+          <div id="check-4" class="flex items-center justify-between text-slate-400">
+            <span>● Cognitive Authentication Enabled</span>
+            <span class="text-amber-400">Checking...</span>
+          </div>
+          <div id="check-5" class="flex items-center justify-between text-slate-400">
+            <span>● Zero Trust Session Created</span>
+            <span class="text-amber-400">Checking...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- FLOW STEP 2: LOGIN FORM -->
+      <div id="portal-step-login" class="hidden p-6 sm:p-8 space-y-6 my-auto max-w-md mx-auto w-full">
+        <div class="text-center space-y-2">
+          <h4 id="portal-login-heading" class="font-heading font-bold text-2xl text-white">Sign In to Shopping Portal</h4>
+          <p class="text-xs font-mono text-slate-400">Continuous authentication powered by COGNISEC AI</p>
+        </div>
+
+        <form onsubmit="submitPortalLogin(event)" class="space-y-4 font-mono text-xs">
+          <div class="space-y-1.5">
+            <label class="text-slate-300 uppercase tracking-wider block">Identity Email</label>
+            <input id="portal-email-input" type="email" value="customer.jane@auraluxe.com" required class="w-full px-4 py-3 rounded-xl bg-black/80 border border-red-900/50 text-white focus:outline-none focus:border-red-500">
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-slate-300 uppercase tracking-wider block">Password</label>
+            <input type="password" value="••••••••••••" required class="w-full px-4 py-3 rounded-xl bg-black/80 border border-red-900/50 text-white focus:outline-none focus:border-red-500">
+          </div>
+          <div class="p-3.5 rounded-xl bg-red-950/30 border border-red-900/40 space-y-1">
+            <span class="font-bold text-white block">Cognitive Guard active</span>
+            <p class="text-[11px] text-slate-400">Session will be continuously protected without requiring secondary MFA prompts.</p>
+          </div>
+          <button id="btn-portal-signin" type="submit" class="w-full py-3.5 px-5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-heading font-extrabold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(245,158,11,0.5)] transition-all cursor-pointer">
+            Sign In &amp; Launch Session →
+          </button>
+        </form>
+      </div>
+
+      <!-- FLOW STEP 3: AUTHENTICATED VIEW -->
+      <div id="portal-step-authenticated" class="hidden flex flex-col h-full overflow-hidden">
+        <div class="px-6 py-2.5 bg-red-950/40 border-b border-red-900/50 flex items-center justify-between text-xs font-mono">
+          <span class="text-emerald-400 font-bold">● COGNISEC AI: Continuous Authentication Active (Risk: 0.001)</span>
+          <button onclick="closeModal('portal'); openModal('dashboard');" class="px-3 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-bold text-[11px] shadow-[0_0_10px_rgba(220,38,38,0.5)] cursor-pointer">
+            Open Security Dashboard
+          </button>
+        </div>
+
+        <div class="p-6 sm:p-8 overflow-y-auto space-y-6">
+          <div class="p-5 rounded-2xl bg-black/60 border border-red-950 flex items-center justify-between">
+            <div>
+              <h4 id="portal-user-welcome" class="font-heading font-extrabold text-lg text-white">Welcome, Jane Doe</h4>
+              <span id="portal-user-role" class="text-xs font-mono text-slate-400">VIP Customer Account &bull; customer.jane@auraluxe.com</span>
+            </div>
+            <span class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">✓ Authenticated Session</span>
+          </div>
+
+          <!-- Specific Content Container -->
+          <div id="portal-app-specific-content"></div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-3.5 border-t border-red-950 bg-red-950/20 flex items-center justify-between">
+        <span class="text-xs font-mono text-slate-400">COGNISEC AI Web Application Integration Framework</span>
+        <button onclick="closeModal('portal')" class="px-4 py-2 text-xs font-heading font-bold text-white bg-red-600 hover:bg-red-500 rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.5)] cursor-pointer">Close Application</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= COGNITIVE AI AGENT WIDGET ================= -->
+  <div id="ai-agent-widget" class="fixed bottom-6 right-6 z-50 font-mono">
+    
+    <!-- Floating Trigger Button -->
+    <button 
+      id="ai-agent-toggle-btn"
+      onclick="toggleAiAgent()" 
+      class="group relative flex items-center gap-3 px-4 py-3 rounded-full bg-gradient-to-r from-red-600 via-red-700 to-red-800 text-white font-bold text-xs tracking-wider uppercase border border-red-400 shadow-[0_0_30px_rgba(239,68,68,0.75)] hover:shadow-[0_0_45px_rgba(239,68,68,0.95)] hover:scale-105 transition-all cursor-pointer"
+    >
+      <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+      <span class="text-base">🤖</span>
+      <span>COGNISEC AI AGENT</span>
+    </button>
+
+    <!-- Interactive AI Agent Window -->
+    <div 
+      id="ai-agent-window" 
+      class="hidden absolute bottom-16 right-0 w-96 max-w-[calc(100vw-2.5rem)] rounded-2xl bg-[#0c0615]/95 backdrop-blur-2xl border border-red-900/60 shadow-[0_0_60px_rgba(239,68,68,0.4)] overflow-hidden flex flex-col transition-all duration-300 animate-fade-in"
+    >
+      <!-- Agent Header -->
+      <div class="p-4 bg-gradient-to-r from-red-950/80 via-black to-red-950/80 border-b border-red-900/50 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-xl bg-red-900/40 border border-red-700/50 text-red-400">
+            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+          </div>
+          <div>
+            <h4 class="font-heading font-extrabold text-xs text-white tracking-wide">COGNISEC AGENTIC AI</h4>
+            <span class="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              ONLINE &amp; SCANNING
+            </span>
+          </div>
+        </div>
+        <button onclick="toggleAiAgent()" class="p-1.5 rounded-lg bg-black/60 text-slate-400 hover:text-white hover:bg-red-950/60 transition-colors cursor-pointer">✕</button>
+      </div>
+
+      <!-- Agent Messages Container -->
+      <div id="ai-agent-messages" class="p-4 h-72 overflow-y-auto space-y-3 text-xs text-slate-200 leading-relaxed pr-2">
+        <div class="p-3 rounded-xl bg-red-950/40 border border-red-900/40 space-y-1.5">
+          <span class="text-[10px] text-red-400 font-bold uppercase block">🤖 AGENTIC SECURITY BOT</span>
+          <p>Hello! I am <strong>Cognisec AI Agent</strong>. I continuously evaluate your typing dynamics, cursor velocity vectors, and zero-trust risk scores across active sessions.</p>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="px-4 py-2 bg-black/40 border-t border-red-950 flex flex-wrap gap-1.5 text-[10px]">
+        <button onclick="sendAgentQuickQuery('scan')" class="px-2.5 py-1 rounded-lg bg-red-950/70 hover:bg-red-900 border border-red-800 text-red-300 font-bold transition-all cursor-pointer">⚡ Threat Scan</button>
+        <button onclick="sendAgentQuickQuery('risk')" class="px-2.5 py-1 rounded-lg bg-sky-950/70 hover:bg-sky-900 border border-sky-800 text-sky-300 font-bold transition-all cursor-pointer">🛡 Check Risk</button>
+        <button onclick="sendAgentQuickQuery('match')" class="px-2.5 py-1 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 font-bold transition-all cursor-pointer">✓ Biometric Match</button>
+      </div>
+
+      <!-- Input Form -->
+      <form onsubmit="handleAgentMessageSubmit(event)" class="p-3 bg-black/80 border-t border-red-950 flex items-center gap-2">
+        <input 
+          id="ai-agent-input" 
+          type="text" 
+          placeholder="Ask COGNISEC AI Agent..." 
+          required
+          class="flex-1 px-3 py-2 rounded-xl bg-red-950/30 border border-red-900/50 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-red-500"
+        />
+        <button type="submit" class="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase shadow-[0_0_15px_rgba(220,38,38,0.5)] transition-all cursor-pointer">
+          →
+        </button>
+      </form>
+    </div>
+
+  <!-- ================= SECURITY NOTIFICATION POPUP ================= -->
+  <div 
+    id="notif-popup-container" 
+    class="fixed top-20 right-6 z-50 w-96 max-w-[calc(100vw-2rem)] font-mono animate-fade-in transition-all duration-300"
+  >
+    <div class="relative p-5 rounded-2xl bg-[#0b0614]/95 backdrop-blur-2xl border-2 border-red-600 shadow-[0_0_60px_rgba(239,68,68,0.5)] text-white space-y-4 overflow-hidden">
+      <!-- Top Glowing Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-red-950">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+          <span class="text-xs font-bold text-amber-400 tracking-wider uppercase">🔔 COGNISEC NOTIFICATION</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] text-slate-400">JUST NOW</span>
+          <button onclick="closeNotificationPopup()" class="text-slate-400 hover:text-white text-xs p-1 cursor-pointer">✕</button>
+        </div>
+      </div>
+
+      <!-- Notification Content -->
+      <div class="space-y-2">
+        <div class="flex items-center gap-2 text-red-400 font-bold text-sm">
+          <svg class="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          <span>New Login Detected</span>
+        </div>
+        <p class="text-xs text-slate-300 leading-relaxed font-sans">
+          An unrecognized device login attempt was registered for <strong>Boomika Ram</strong> from <span class="text-amber-300 font-mono font-bold">Bengaluru, IN (MacBook Pro M3 • IP 103.21.124.9)</span>.
+        </p>
+      </div>
+
+      <!-- Question Banner -->
+      <div class="p-3 rounded-xl bg-red-950/40 border border-red-900/60 text-center font-bold text-xs text-white">
+        Was this you?
+      </div>
+
+      <!-- Action Buttons: YES / NO -->
+      <div id="notif-action-buttons" class="grid grid-cols-2 gap-3 pt-1">
+        <button 
+          onclick="handleNotificationResponse('yes')" 
+          class="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(52,211,153,0.4)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+        >
+          <span>YES</span>
+        </button>
+        <button 
+          onclick="handleNotificationResponse('no')" 
+          class="py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(239,68,68,0.7)] transition-all cursor-pointer flex items-center justify-center gap-1.5 animate-pulse"
+        >
+          <span>NO</span>
+        </button>
+      </div>
+
+      <!-- Result Banner Container -->
+      <div id="notif-result-banner" class="hidden p-3 rounded-xl text-center text-xs font-bold"></div>
+    </div>
+  </div>
+
+  <script src="cognisec-client.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nyraa Luxe Retail — Protected by COGNISEC AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap"
+    rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    @keyframes fadeInScale {
+      from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    .animate-fade-in {
+      animation: fadeInScale 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .product-card {
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .product-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 30px -10px rgba(217, 119, 6, 0.15);
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col justify-between selection:bg-amber-500/20 selection:text-amber-900">
+
+  <!-- TOP COGNISEC AI SECURITY BANNER -->
+  <div
+    class="bg-slate-950 text-white border-b border-slate-800 px-6 py-2.5 flex items-center justify-between text-xs font-mono shadow-md">
+    <div class="flex items-center gap-3">
+      <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span class="text-amber-400 font-bold">COGNISEC AI SECURITY:</span>
+      <span class="text-slate-300">Identity Match 99.98% (High Trust) &bull; UPI 1-Tap Active</span>
+    </div>
+    <div class="flex items-center gap-4 text-slate-400">
+      <span class="hidden sm:inline">Keystroke Dynamics: 1,000Hz</span>
+      <a href="index.html"
+        class="px-3 py-1 rounded bg-amber-500 text-black font-bold hover:bg-amber-400 transition-all text-[11px] uppercase tracking-wider">
+        ← Back to Platform
+      </a>
+    </div>
+  </div>
+
+  <!-- WHITE HEADER (UNIQUE BRAND: NYRAA LUXE RETAIL) -->
+  <header
+    class="bg-white border-b border-slate-200 px-6 sm:px-10 py-5 flex items-center justify-between shadow-sm sticky top-0 z-30">
+    <div class="flex items-center gap-3">
+      <div
+        class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-600 font-bold text-xl">
+        💎
+      </div>
+      <div>
+        <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">NYRAA LUXE RETAIL</h1>
+        <p class="text-xs font-mono text-amber-700 font-bold">Bengaluru &bull; Mumbai &bull; Delhi NCR &bull; GSTIN
+          Verified</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-4">
+      <div id="user-header-info" class="text-right font-mono text-xs hidden md:block">
+        <span id="user-status-label" class="text-slate-500 block">Logged-in Customer</span>
+        <strong id="user-name-label" class="text-slate-900 font-bold">Boomika Ram (Bengaluru)</strong>
+      </div>
+
+      <!-- Sign Out Button -->
+      <button id="btn-header-signout" onclick="handleSignOut()"
+        class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
+        <span>Sign Out</span>
+        <svg class="w-3.5 h-3.5 text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" x2="9" y1="12" y2="12" />
+        </svg>
+      </button>
+
+      <!-- Sign In Button -->
+      <button id="btn-header-signin" onclick="openSignInModal()"
+        class="hidden px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-md">
+        <span>Sign In</span>
+        <svg class="w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+          <polyline points="10 17 15 12 10 7" />
+          <line x1="15" x2="3" y1="12" y2="12" />
+        </svg>
+      </button>
+
+      <button onclick="openCartModal()"
+        class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center gap-2 cursor-pointer">
+        <span>Cart (<span id="cart-count-badge">0</span> items - ₹<span id="cart-total-badge">0</span>)</span>
+        <span id="cart-status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN HERO & CONTROLS -->
+  <main class="max-w-6xl mx-auto px-6 py-10 flex-1 w-full space-y-8">
+
+    <!-- LIGHT HERO BANNER -->
+    <div
+      class="p-8 rounded-3xl bg-white border border-slate-200 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
+      <div class="space-y-4 max-w-xl relative z-10">
+        <div class="flex flex-wrap items-center gap-2">
+          <span
+            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-mono font-bold">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+            BEHAVIORAL BIOMETRIC CHECKOUT ACTIVE
+          </span>
+          <span
+            class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-mono font-bold">
+            ⚡ UPI 1-Tap Auto-Pay Enabled
+          </span>
+        </div>
+        <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
+          Passwordless &amp; OTP-Free High-Value Purchases
+        </h2>
+        <p class="text-sm text-slate-600 leading-relaxed">
+          Integrated with GPay, PhonePe, Paytm, and BHIM UPI. Cognisec AI continuously verifies your motor interaction
+          pattern so high-value orders process instantly without waiting for SMS OTPs.
+        </p>
+      </div>
+
+      <!-- LIVE SECURITY TELEMETRY CARD -->
+      <div
+        class="p-6 rounded-2xl bg-slate-900 text-white font-mono text-xs space-y-3.5 w-full md:w-80 shadow-2xl shrink-0 border border-slate-800">
+        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+          <span class="text-slate-400">UPI Fraud Shield:</span>
+          <strong class="text-emerald-400 font-bold text-sm">PROTECTED (0.001 Risk)</strong>
+        </div>
+        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+          <span class="text-slate-400">SIM Swap Defense:</span>
+          <strong class="text-emerald-400 font-bold">PASS (100% Match)</strong>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Delivery Pincode:</span>
+          <strong class="text-amber-400 font-bold">560001 (Bengaluru)</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- FRONTEND FILTER & SEARCH CONTROLS -->
+    <div
+      class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+      <!-- Search Input -->
+      <div class="relative w-full sm:w-80">
+        <input id="product-search-input" type="text" placeholder="Search products (e.g. Watch, Bag, Headphones)..."
+          oninput="filterProducts()"
+          class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-amber-500" />
+        <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">🔍</span>
+      </div>
+
+      <!-- Category Filter Tabs -->
+      <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto text-xs font-mono">
+        <button onclick="setCategoryFilter('all')" id="cat-all"
+          class="px-3.5 py-2 rounded-xl bg-amber-600 text-white font-bold cursor-pointer">All Items</button>
+        <button onclick="setCategoryFilter('watches')" id="cat-watches"
+          class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Watches</button>
+        <button onclick="setCategoryFilter('bags')" id="cat-bags"
+          class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Leather
+          Bags</button>
+        <button onclick="setCategoryFilter('audio')" id="cat-audio"
+          class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Audio
+          &amp; Tech</button>
+      </div>
+    </div>
+
+    <!-- PRODUCTS GRID -->
+    <div id="products-grid-container" class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <!-- Dynamically Rendered Products -->
+    </div>
+  </main>
+
+  <!-- INTERACTIVE UPI & CART MODAL -->
+  <div id="upi-modal"
+    class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+    <div
+      class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="text-amber-600 text-lg">⚡</span>
+          <strong id="modal-title" class="text-base font-extrabold font-sans">Cognisec AI 1-Tap UPI Checkout</strong>
+        </div>
+        <button onclick="closeUpiModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1">✕</button>
+      </div>
+
+      <div id="modal-step-confirm" class="space-y-4">
+        <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-1.5 text-xs">
+          <span class="text-slate-500">Order Summary:</span>
+          <strong id="modal-item-name" class="text-slate-900 block font-bold text-sm">Titan Stellar Chronograph</strong>
+          <span class="text-amber-800 font-bold block text-base pt-1">Amount to Pay: <span
+              id="modal-item-price">₹14,999</span></span>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-slate-900 text-white space-y-2 text-xs">
+          <span class="text-amber-400 font-bold">Continuous Behavioral Verification:</span>
+          <p class="text-slate-300 text-[11px] leading-relaxed">No OTP required. Your typing velocity match index
+            (99.98%) automatically authorizes instant UPI debit.</p>
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-xs text-slate-500 font-bold">Select UPI App:</label>
+          <div class="grid grid-cols-3 gap-2 text-xs">
+            <button onclick="selectUpiApp(this)"
+              class="upi-app-btn p-2.5 rounded-xl border-2 border-amber-500 bg-amber-50 text-amber-900 text-center font-bold">Google
+              Pay</button>
+            <button onclick="selectUpiApp(this)"
+              class="upi-app-btn p-2.5 rounded-xl border border-slate-200 hover:border-amber-500 bg-slate-50 text-center font-bold">PhonePe</button>
+            <button onclick="selectUpiApp(this)"
+              class="upi-app-btn p-2.5 rounded-xl border border-slate-200 hover:border-amber-500 bg-slate-50 text-center font-bold">Paytm
+              UPI</button>
+          </div>
+        </div>
+
+        <button onclick="processUpiPayment()"
+          class="w-full py-3.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+          Authorize Instant Payment →
+        </button>
+      </div>
+
+      <div id="modal-step-success" class="hidden text-center py-6 space-y-4">
+        <div
+          class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
+          ✓
+        </div>
+        <div>
+          <h4 class="font-extrabold text-xl text-slate-900 font-sans">Payment &amp; Order Confirmed!</h4>
+          <p class="text-xs text-slate-500 mt-1">Order ID: <strong id="success-order-id"
+              class="text-slate-900">#NYR-849201</strong> &bull; UPI Ref: 38401928391</p>
+        </div>
+        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800">
+          Delivery Address: Boomika Ram, Indiranagar, Bengaluru - 560038
+        </div>
+        <button onclick="closeUpiModal()"
+          class="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase">
+          Done &amp; Continue Shopping
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERACTIVE SIGN IN MODAL -->
+  <div id="signin-modal"
+    class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+    <div
+      class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative animate-fade-in">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 font-bold text-lg">💎</div>
+          <div>
+            <h4 class="font-extrabold text-base text-slate-900 font-sans">Sign In to Nyraa Luxe Retail</h4>
+            <p class="text-[11px] text-amber-800 font-bold">Protected by COGNISEC AI Zero Trust</p>
+          </div>
+        </div>
+        <button onclick="closeSignInModal()"
+          class="text-slate-400 hover:text-slate-800 text-sm p-1 cursor-pointer">✕</button>
+      </div>
+
+      <form onsubmit="handleSignInSubmit(event)" class="space-y-4">
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-slate-700 uppercase">Customer Email / ID</label>
+          <input id="signin-email-input" type="email" value="boomika.ram@cognisec.ai" required
+            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-amber-500" />
+        </div>
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-slate-700 uppercase">Password</label>
+          <input id="signin-pass-input" type="password" value="••••••••••••" required
+            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-amber-500" />
+        </div>
+
+        <div
+          class="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Cognisec Keystroke Dynamics</span>
+          </div>
+          <span class="font-bold text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded">1,000Hz Active</span>
+        </div>
+
+        <button type="submit" id="btn-submit-signin"
+          class="w-full py-3.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+          Sign In &amp; Authorize Session →
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION TOAST CONTAINER -->
+  <div id="auth-toast"
+    class="fixed top-16 right-6 z-50 hidden p-4 rounded-2xl bg-slate-900 text-white shadow-2xl border border-slate-700 font-mono text-xs max-w-sm animate-fade-in">
+    <div class="flex items-center gap-3">
+      <div id="toast-icon" class="text-lg">🟢</div>
+      <div class="space-y-0.5">
+        <h5 id="toast-title" class="font-bold text-white font-sans">Cognisec Security</h5>
+        <p id="toast-desc" class="text-[11px] text-slate-300">Identity state updated successfully.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIGHT FOOTER -->
+  <footer class="bg-white border-t border-slate-200 px-8 py-6 text-center text-xs font-mono text-slate-500">
+    Nyraa Luxe Retail Pvt. Ltd. &bull; Protected continuously by COGNISEC AI India Behavioral Engine.
+  </footer>
+
+  <!-- FRONTEND WORKING SCRIPT -->
+  <script src="cognisec-client.js"></script>
+  <script>
+    if (window.cognisec) window.cognisec.setApplication('ecommerce');
+    let isLoggedIn = true;
+
+    function showToast(title, desc, icon = "🟢") {
+      const toast = document.getElementById('auth-toast');
+      document.getElementById('toast-title').textContent = title;
+      document.getElementById('toast-desc').textContent = desc;
+      document.getElementById('toast-icon').textContent = icon;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3500);
+    }
+
+    function openSignInModal() {
+      document.getElementById('signin-modal').classList.remove('hidden');
+    }
+
+    function closeSignInModal() {
+      document.getElementById('signin-modal').classList.add('hidden');
+    }
+
+    async function handleSignInSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-submit-signin');
+      btn.innerHTML = `<span>Authenticating via Cognisec AI...</span>`;
+
+      const emailInput = document.getElementById('login-email-input');
+      const email = emailInput ? emailInput.value : 'customer.jane@auraluxe.com';
+      if (window.cognisec) {
+        await window.cognisec.login(email, 'Customer@123', 'ecommerce');
+      }
+
+      setTimeout(() => {
+        isLoggedIn = true;
+        btn.innerHTML = `<span>Sign In &amp; Authorize Session →</span>`;
+        closeSignInModal();
+
+        // Update Header UI
+        document.getElementById('user-header-info').classList.remove('hidden');
+        document.getElementById('user-status-label').textContent = 'Logged-in Customer';
+        document.getElementById('user-name-label').textContent = 'Boomika Ram (Bengaluru)';
+        document.getElementById('btn-header-signout').classList.remove('hidden');
+        document.getElementById('btn-header-signin').classList.add('hidden');
+        document.getElementById('cart-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+
+        showToast("Signed In Successfully!", "Welcome back, Boomika Ram. Identity verified (99.98% High Trust).", "🔐");
+      }, 700);
+    }
+
+    function syncShoppingAuthState() {
+      const isAuth = window.cognisec ? window.cognisec.isAuthenticated() : false;
+      const user = window.cognisec ? window.cognisec.getUser() : null;
+      isLoggedIn = isAuth;
+
+      if (isAuth && user) {
+        document.getElementById('user-header-info').classList.remove('hidden');
+        document.getElementById('user-status-label').textContent = 'Logged-in Customer';
+        document.getElementById('user-name-label').textContent = `${user.name}`;
+        document.getElementById('btn-header-signout').classList.remove('hidden');
+        document.getElementById('btn-header-signin').classList.add('hidden');
+        document.getElementById('cart-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+      } else {
+        document.getElementById('user-status-label').textContent = 'Guest Customer';
+        document.getElementById('user-name-label').textContent = 'Not Signed In';
+        document.getElementById('btn-header-signout').classList.add('hidden');
+        document.getElementById('btn-header-signin').classList.remove('hidden');
+        document.getElementById('cart-status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
+      }
+    }
+
+    window.addEventListener('cognisec:auth_change', syncShoppingAuthState);
+    document.addEventListener('DOMContentLoaded', () => {
+      syncShoppingAuthState();
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('signin') === 'true' || urlParams.get('login') === 'true') {
+        openSignInModal();
+      }
+    });
+    setTimeout(syncShoppingAuthState, 150);
+
+    async function handleSignOut() {
+      if (window.cognisec) await window.cognisec.logout();
+      syncShoppingAuthState();
+      cart = [];
+      updateCartBadges();
+      showToast("Signed Out", "You have signed out. Zero Trust session terminated.", "🚪");
+    }
+
+    const PRODUCTS = [
+      { id: 1, name: "Nyraa Titan Chronograph", category: "watches", price: 14999, oldPrice: 18999, tag: "Swiss Horology", desc: "Sapphire glass, automatic movement, mesh strap.", icon: "⌚" },
+      { id: 2, name: "Nyraa Artisanal Duffle Bag", category: "bags", price: 5999, oldPrice: 8499, tag: "Leather Goods", desc: "Vegetable tanned handcrafted genuine leather.", icon: "💼" },
+      { id: 3, name: "Nyraa Neural ANC Headphones", category: "audio", price: 24990, oldPrice: 29990, tag: "Pro Acoustics", desc: "Active noise cancelling planar magnetic audio.", icon: "🎧" },
+      { id: 4, name: "Nyraa Royal Gold Watch", category: "watches", price: 22499, oldPrice: 27999, tag: "Horology", desc: "18K Gold PVD coating with skeleton dial.", icon: "⏱️" },
+      { id: 5, name: "Nyraa Leather Laptop Sleeve", category: "bags", price: 2499, oldPrice: 3999, tag: "Accessories", desc: "Water-resistant padded leather sleeve for 15-inch laptops.", icon: "📁" },
+      { id: 6, name: "Nyraa Studio Earbuds Pro", category: "audio", price: 8999, oldPrice: 12999, tag: "Wireless", desc: "Spatial audio, quad-mic beamforming for calls.", icon: "🎵" }
+    ];
+
+    let currentCategory = 'all';
+    let searchQuery = '';
+    let cart = [];
+
+    function renderProducts() {
+      const container = document.getElementById('products-grid-container');
+      if (!container) return;
+
+      const filtered = PRODUCTS.filter(p => {
+        const matchCat = (currentCategory === 'all' || p.category === currentCategory);
+        const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.desc.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchCat && matchSearch;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="col-span-3 text-center py-12 font-mono text-slate-400">No products found matching your filter.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(p => `
+        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all space-y-5 flex flex-col justify-between group">
+          <div class="space-y-4">
+            <div class="w-full h-48 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-5xl group-hover:scale-105 transition-transform">
+              ${p.icon}
+            </div>
+            <div>
+              <span class="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 uppercase">${p.tag}</span>
+              <h4 class="font-bold text-slate-900 text-xl mt-2">${p.name}</h4>
+              <p class="text-xs text-slate-600 mt-1 leading-relaxed">${p.desc}</p>
+            </div>
+          </div>
+          <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+            <div>
+              <span class="text-slate-400 text-[10px] block line-through">₹${p.oldPrice.toLocaleString('en-IN')}</span>
+              <span class="text-slate-900 font-extrabold text-xl font-mono">₹${p.price.toLocaleString('en-IN')}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="addToCart(${p.id})" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-mono text-xs font-bold transition-all">
+                + Cart
+              </button>
+              <button onclick="buyProduct('${p.name}', ${p.price})" class="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-mono text-xs font-bold transition-all shadow-sm">
+                Buy UPI →
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function setCategoryFilter(cat) {
+      currentCategory = cat;
+      ['all', 'watches', 'bags', 'audio'].forEach(c => {
+        const btn = document.getElementById(`cat-${c}`);
+        if (btn) {
+          if (c === cat) {
+            btn.className = 'px-3.5 py-2 rounded-xl bg-amber-600 text-white font-bold cursor-pointer';
+          } else {
+            btn.className = 'px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer';
+          }
+        }
+      });
+      renderProducts();
+    }
+
+    function filterProducts() {
+      searchQuery = document.getElementById('product-search-input')?.value || '';
+      renderProducts();
+    }
+
+    function addToCart(productId) {
+      if (!isLoggedIn) {
+        showToast("Sign In Required", "Please sign in to add items to your cart.", "🔒");
+        openSignInModal();
+        return;
+      }
+      const item = PRODUCTS.find(p => p.id === productId);
+      if (item) {
+        cart.push(item);
+        updateCartBadges();
+        showToast("Added to Cart", `${item.name} added to cart.`, "🛒");
+      }
+    }
+
+    function updateCartBadges() {
+      const total = cart.reduce((sum, item) => sum + item.price, 0);
+      document.getElementById('cart-count-badge').textContent = cart.length;
+      document.getElementById('cart-total-badge').textContent = total.toLocaleString('en-IN');
+    }
+
+    function buyProduct(name, price) {
+      if (!isLoggedIn) {
+        showToast("Sign In Required", "Please sign in to complete purchases.", "🔒");
+        openSignInModal();
+        return;
+      }
+      document.getElementById('modal-item-name').textContent = name;
+      document.getElementById('modal-item-price').textContent = '₹' + parseInt(price).toLocaleString('en-IN');
+      document.getElementById('modal-step-confirm').classList.remove('hidden');
+      document.getElementById('modal-step-success').classList.add('hidden');
+      document.getElementById('upi-modal').classList.remove('hidden');
+    }
+
+    function openCartModal() {
+      if (!isLoggedIn) {
+        showToast("Sign In Required", "Please sign in to view your cart.", "🔒");
+        openSignInModal();
+        return;
+      }
+      if (cart.length === 0) {
+        buyProduct('Titan Chronograph (Quick Cart)', 14999);
+      } else {
+        const total = cart.reduce((sum, item) => sum + item.price, 0);
+        buyProduct(`Cart Items (${cart.length} selected)`, total);
+      }
+    }
+
+    function closeUpiModal() {
+      document.getElementById('upi-modal').classList.add('hidden');
+    }
+
+    function selectUpiApp(btn) {
+      document.querySelectorAll('.upi-app-btn').forEach(b => {
+        b.className = 'upi-app-btn p-2.5 rounded-xl border border-slate-200 hover:border-amber-500 bg-slate-50 text-center font-bold';
+      });
+      btn.className = 'upi-app-btn p-2.5 rounded-xl border-2 border-amber-500 bg-amber-50 text-amber-900 text-center font-bold';
+    }
+
+    function processUpiPayment() {
+      const confirmStep = document.getElementById('modal-step-confirm');
+      confirmStep.innerHTML = `
+        <div class="text-center py-8 space-y-3">
+          <div class="w-10 h-10 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p class="text-xs font-bold text-slate-800">Verifying Keystroke Vector &amp; Authorizing UPI Debit...</p>
+        </div>
+      `;
+      setTimeout(() => {
+        document.getElementById('success-order-id').textContent = '#NYR-' + Math.floor(100000 + Math.random() * 900000);
+        confirmStep.classList.add('hidden');
+        document.getElementById('modal-step-success').classList.remove('hidden');
+      }, 1400);
+    }
+
+    // Initialize
+    renderProducts();
+  </script>
+</body>
+
+</html>
