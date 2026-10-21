@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
 from sqlalchemy.orm import relationship
 from app.database.base import Base
 
@@ -18,8 +18,17 @@ class Session(Base):
     ip_address = Column(String(45), nullable=True)
     login_time = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     logout_time = Column(DateTime(timezone=True), nullable=True)
-    status = Column(String(25), default="ACTIVE", nullable=False)  # "ACTIVE", "TERMINATED", "RESTRICTED", "STEP_UP_REQUIRED"
+    status = Column(String(30), default="ACTIVE", nullable=False)  # "ACTIVE", "PENDING_OBSERVATION", "PENDING_OTP", "TERMINATED", "RESTRICTED", "STEP_UP_REQUIRED"
     current_risk_level = Column(String(20), default="LOW", nullable=False)  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    step_up_verified_at = Column(DateTime(timezone=True), nullable=True)
+    step_up_valid_until = Column(DateTime(timezone=True), nullable=True)
+    step_up_factor = Column(String(50), nullable=True)
+    step_up_risk_cleared = Column(Float, nullable=True)
+    observation_started_at = Column(DateTime(timezone=True), nullable=True)
+    observation_ends_at = Column(DateTime(timezone=True), nullable=True)
+    observation_completed_at = Column(DateTime(timezone=True), nullable=True)
+    login_outcome = Column(String(50), nullable=True)
+    login_otp_challenge_id = Column(String(64), nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="sessions")

@@ -1,153 +1,965 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BITS Pilani Academic Portal — Protected by COGNISEC AI</title>
+  <title>BITS Pilani Academic Portal — Student Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #0f172a; }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
 
     @keyframes fadeInScale {
-      from { opacity: 0; transform: scale(0.95) translateY(10px); }
+      from { opacity: 0; transform: scale(0.97) translateY(8px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
     }
     .animate-fade-in {
-      animation: fadeInScale 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: fadeInScale 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
-    .course-card {
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    .portal-card {
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .course-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 20px 30px -10px rgba(14, 165, 233, 0.15);
+    .portal-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px -8px rgba(15, 23, 42, 0.08);
+    }
+
+    /* Subnav active pill */
+    .subnav-link {
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .subnav-link:hover {
+      color: #0284c7;
+      background-color: #f0f9ff;
+    }
+
+    /* NeuralTrace Step-Up Modal Viewport Fit & Internal Scroll */
+    #modal-stepup {
+      box-sizing: border-box;
+      padding: 1rem;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    #stepup-modal-container {
+      box-sizing: border-box;
+      max-height: calc(100vh - 32px);
+      max-height: calc(100dvh - 32px);
+      display: flex;
+      flex-direction: column;
+      margin: auto;
+      overflow: hidden;
+      width: 100%;
+      max-width: 32rem;
+    }
+    #stepup-modal-container * {
+      box-sizing: border-box;
+    }
+    #stepup-modal-header {
+      flex-shrink: 0;
+    }
+    #stepup-modal-body {
+      box-sizing: border-box;
+      overflow-y: auto;
+      overflow-x: hidden;
+      flex: 1 1 auto;
+      min-height: 0;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(245, 158, 11, 0.4) transparent;
+    }
+    #stepup-modal-footer {
+      flex-shrink: 0;
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
+      box-sizing: border-box;
+      background: linear-gradient(180deg, rgba(8, 5, 14, 0.96) 0%, #08050e 100%);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-top: 1px solid rgba(245, 158, 11, 0.25);
+    }
+    @media (max-height: 820px) {
+      .neuraltrace-container {
+        max-width: 290px;
+      }
+      #stepup-modal-container {
+        max-height: calc(100vh - 24px);
+        max-height: calc(100dvh - 24px);
+      }
+    }
+    @media (max-height: 700px) {
+      .neuraltrace-container {
+        max-width: 240px;
+      }
+      #stepup-modal-container {
+        max-height: calc(100vh - 16px);
+        max-height: calc(100dvh - 16px);
+      }
+    }
+    @media (max-width: 480px) {
+      #modal-stepup {
+        padding: 0.5rem;
+      }
+      #stepup-modal-container {
+        max-height: calc(100vh - 16px);
+        max-height: calc(100dvh - 16px);
+      }
+      .neuraltrace-container {
+        max-width: 280px;
+      }
     }
   </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between selection:bg-sky-500/20 selection:text-sky-900">
   
-  <!-- TOP COGNISEC AI ACADEMIC SECURITY BANNER -->
-  <div class="bg-slate-950 text-white border-b border-slate-800 px-6 py-2.5 flex items-center justify-between text-xs font-mono shadow-md">
+  <!-- TOP COGNISEC AI ACADEMIC SECURITY BANNER (PRESERVED) -->
+  <div class="bg-slate-950 text-white border-b border-slate-800 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs font-mono shadow-md">
     <div class="flex items-center gap-3">
       <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
       <span class="text-sky-400 font-bold">COGNISEC AI ACADEMIC GUARD (INDIA):</span>
-      <span class="text-slate-300">DigiLocker &amp; Exam Proxy Defense Active</span>
+      <span class="text-slate-300 hidden sm:inline">DigiLocker &amp; Exam Proxy Defense Active</span>
     </div>
     <div class="flex items-center gap-4 text-slate-400">
-      <span class="hidden sm:inline">SSO Session: Encrypted (TLS 1.3)</span>
+      <span class="hidden md:inline">SSO Session: Encrypted (TLS 1.3)</span>
       <a href="index.html" class="px-3 py-1 rounded bg-sky-500 text-black font-bold hover:bg-sky-400 transition-all text-[11px] uppercase tracking-wider">
         ← Back to Platform
       </a>
     </div>
   </div>
 
-  <!-- WHITE ACADEMIC PORTAL HEADER -->
-  <header class="bg-white border-b border-slate-200 px-6 sm:px-10 py-5 flex items-center justify-between shadow-sm sticky top-0 z-30">
+  <!-- WHITE ACADEMIC PORTAL HEADER (PRESERVED BRANDING & CONTROLS) -->
+  <header class="bg-white border-b border-slate-200 px-4 sm:px-8 py-4 flex items-center justify-between shadow-sm sticky top-0 z-30">
     <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-600 font-bold text-xl">
+      <div class="w-11 h-11 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center text-sky-700 font-bold text-2xl shadow-sm">
         🎓
       </div>
       <div>
-        <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">BITS PILANI ACADEMIC PORTAL</h1>
-        <p class="text-xs font-mono text-sky-700 font-bold">Department of Computer Science &bull; Pilani &bull; Goa &bull; Hyderabad</p>
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">BITS PILANI ACADEMIC PORTAL</h1>
+          <span class="hidden sm:inline-block px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-mono text-[10px] font-bold">STUDENT ERP</span>
+        </div>
+        <p class="text-xs font-mono text-sky-700 font-semibold">Department of Computer Science &bull; Pilani Campus</p>
       </div>
     </div>
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-3">
       <div id="student-header-info" class="text-right font-mono text-xs hidden md:block">
-        <span id="student-status-label" class="text-slate-500 block">Student Roll No: 2021BCE0492</span>
-        <strong id="student-name-label" class="text-slate-900 font-bold">Boomika Ram (CGPA: 9.42 / 10)</strong>
+        <span id="student-status-label" class="text-slate-500 block truncate max-w-[200px]">Guest Student</span>
+        <strong id="student-name-label" class="text-slate-900 font-bold block truncate max-w-[200px]">Not Authenticated</strong>
       </div>
+
+      <!-- Cognitive MFA Enrollment Button -->
+      <button id="btn-header-mfa" onclick="window.openFactorEnrollmentModal ? window.openFactorEnrollmentModal() : (window.cognisec && window.cognisec.openFactorEnrollmentModal())"
+        class="hidden px-3 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 border border-amber-700/60 text-amber-300 font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+        title="Configure Adaptive Multi-Factor Authenticators">
+        <span>🛡️ MFA Setup</span>
+      </button>
 
       <!-- Sign Out Button -->
       <button id="btn-header-signout" onclick="handleStudentSignOut()"
-        class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
+        class="hidden px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
         <span>Sign Out</span>
         <svg class="w-3.5 h-3.5 text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
       </button>
 
       <!-- Sign In Button -->
       <button id="btn-header-signin" onclick="openStudentSignInModal()"
-        class="hidden px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-md">
+        class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-md">
         <span>Sign In</span>
         <svg class="w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
       </button>
 
-      <button onclick="openStudentModal()" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center gap-2 cursor-pointer">
-        <span>DigiLocker Verified</span>
-        <span id="student-status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+      <!-- DigiLocker Verification Button -->
+      <button onclick="openStudentModal()" class="px-4 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-sm">
+        <span>DigiLocker</span>
+        <span id="student-status-dot" class="w-2 h-2 rounded-full bg-red-500"></span>
       </button>
     </div>
   </header>
 
-  <!-- MAIN HERO & CONTROLS -->
-  <main class="max-w-6xl mx-auto px-6 py-10 flex-1 w-full space-y-8">
+  <!-- SECONDARY STICKY SUB-NAVIGATION BAR FOR COLLEGE SECTIONS -->
+  <nav class="bg-slate-50 border-b border-slate-200 sticky top-[73px] z-20 px-4 sm:px-8 py-2 overflow-x-auto shadow-xs">
+    <div class="max-w-6xl mx-auto flex items-center gap-2 text-xs font-semibold text-slate-600 min-w-max">
+      <a href="#overview" class="subnav-link px-3 py-1.5 rounded-lg text-sky-700 bg-sky-50 font-bold flex items-center gap-1.5">
+        <span>📌</span> Overview
+      </a>
+      <a href="#courses" class="subnav-link px-3 py-1.5 rounded-lg hover:text-sky-700 flex items-center gap-1.5">
+        <span>📚</span> Courses (<span id="nav-course-count">4</span>)
+      </a>
+      <a href="#timetable" class="subnav-link px-3 py-1.5 rounded-lg hover:text-sky-700 flex items-center gap-1.5">
+        <span>🗓️</span> Timetable
+      </a>
+      <a href="#assignments" class="subnav-link px-3 py-1.5 rounded-lg hover:text-sky-700 flex items-center gap-1.5">
+        <span>📝</span> Assignments (<span id="nav-pending-count" class="text-amber-600 font-bold">3 Due</span>)
+      </a>
+      <a href="#exams" class="subnav-link px-3 py-1.5 rounded-lg hover:text-sky-700 flex items-center gap-1.5">
+        <span>📋</span> Exams
+      </a>
+      <a href="#notices" class="subnav-link px-3 py-1.5 rounded-lg hover:text-sky-700 flex items-center gap-1.5">
+        <span>📢</span> Notices
+      </a>
+      <a href="#resources" class="subnav-link px-3 py-1.5 rounded-lg hover:text-sky-700 flex items-center gap-1.5">
+        <span>📂</span> Academic Resources
+      </a>
+      <a href="#services" class="subnav-link px-3 py-1.5 rounded-lg hover:text-sky-700 flex items-center gap-1.5">
+        <span>🏛️</span> Student Services
+      </a>
+      <a href="#confidential-student-records" class="subnav-link px-3 py-1.5 rounded-lg hover:text-sky-700 text-sky-800 font-bold flex items-center gap-1.5">
+        <span>🔒</span> Confidential Vault
+      </a>
+    </div>
+  </nav>
+
+  <!-- MAIN STUDENT PORTAL CONTENT -->
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full space-y-10">
     
-    <!-- LIGHT HERO BANNER -->
-    <div class="p-8 rounded-3xl bg-white border border-slate-200 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
-      <div class="space-y-4 max-w-xl relative z-10">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 border border-sky-200 text-sky-800 text-xs font-mono font-bold">
-            <span class="w-2 h-2 rounded-full bg-sky-500 animate-ping"></span>
-            AI EXAM PROCTORING ACTIVE
+    <!-- ================= SECTION 1: WELCOME & ACADEMIC OVERVIEW ================= -->
+    <section id="overview" class="space-y-6">
+      
+      <!-- WELCOME HERO BANNER -->
+      <div class="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-white via-slate-50 to-sky-50/40 border border-slate-200 shadow-sm relative overflow-hidden">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          <div class="space-y-3 max-w-2xl">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-3 py-1 rounded-full bg-sky-100 text-sky-800 font-mono text-[11px] font-bold">
+                Academic Session 2025–2026
+              </span>
+              <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-mono text-[11px] font-bold">
+                Semester VII (B.Tech CSE Hons)
+              </span>
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 font-mono text-[11px] font-bold border border-emerald-200">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Enrollment: Active
+              </span>
+            </div>
+            
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Welcome back, <span id="welcome-student-name" class="text-sky-700">Student</span> 👋
+            </h2>
+            <p class="text-sm text-slate-600 leading-relaxed">
+              Track your Semester 7 courses, lecture schedules, upcoming mid-semester examinations, and academic records. Continuous integrity verification safeguards your identity and degree vault.
+            </p>
+
+            <div class="flex flex-wrap items-center gap-4 pt-1 text-xs text-slate-600">
+              <span class="flex items-center gap-1.5">
+                <span class="text-slate-400">Campus:</span> <strong>Pilani Campus (Rajasthan)</strong>
+              </span>
+              <span class="text-slate-300">&bull;</span>
+              <span class="flex items-center gap-1.5">
+                <span class="text-slate-400">Faculty Advisor:</span> <strong>Prof. K. R. Sharma</strong>
+              </span>
+              <span class="text-slate-300">&bull;</span>
+              <span class="flex items-center gap-1.5">
+                <span class="text-slate-400">Class Section:</span> <strong>CS-A (Batch 2021)</strong>
+              </span>
+            </div>
+          </div>
+
+          <!-- QUICK NOTIFICATION / EXAM ALERT CHIP -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm w-full lg:w-80 shrink-0 space-y-3 text-xs">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+              <span class="font-bold text-slate-900 flex items-center gap-1.5">
+                <span>📢</span> Academic Notice
+              </span>
+              <span class="text-[10px] font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded font-bold">CURRENT</span>
+            </div>
+            <p class="text-slate-600 leading-relaxed text-[11px]">
+              Mid-Semester Examinations commence <strong>November 12, 2026</strong>. Verify your course enrollment and download your digital hall ticket below.
+            </p>
+            <div class="pt-1">
+              <a href="#exams" class="text-sky-700 hover:text-sky-800 font-bold inline-flex items-center gap-1 text-[11px]">
+                View Examination Schedule →
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4-GRID ACADEMIC METRICS -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Metric 1: CGPA -->
+        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2 portal-card">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Cumulative GPA</span>
+            <span class="p-1.5 rounded-lg bg-sky-50 text-sky-600 text-sm">📈</span>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <span id="metric-cgpa-val" class="text-2xl sm:text-3xl font-extrabold text-slate-900">••••</span>
+            <span class="text-xs font-mono text-slate-400">/ 10.00</span>
+          </div>
+          <div class="flex items-center justify-between text-[11px]">
+            <span id="metric-cgpa-rank" class="text-slate-500 font-mono">Vault Clearance Req.</span>
+            <span class="text-slate-400 font-mono">Confidential</span>
+          </div>
+        </div>
+
+        <!-- Metric 2: Attendance -->
+        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2 portal-card">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Overall Attendance</span>
+            <span class="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-sm">✅</span>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <span class="text-2xl sm:text-3xl font-extrabold text-emerald-600">94.8%</span>
+            <span class="text-xs font-mono text-slate-400">Avg</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+            <div class="bg-emerald-500 h-1.5 rounded-full" style="width: 94.8%"></div>
+          </div>
+          <div class="flex items-center justify-between text-[11px] text-slate-500">
+            <span>68/72 Sessions</span>
+            <span class="text-slate-400 font-mono">Min 75% Req</span>
+          </div>
+        </div>
+
+        <!-- Metric 3: Credits Completed -->
+        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2 portal-card">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Credits Completed</span>
+            <span class="p-1.5 rounded-lg bg-amber-50 text-amber-600 text-sm">🎓</span>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">142</span>
+            <span class="text-xs font-mono text-slate-400">/ 148 Req</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+            <div class="bg-sky-500 h-1.5 rounded-full" style="width: 95.9%"></div>
+          </div>
+          <div class="flex items-center justify-between text-[11px] text-slate-500">
+            <span>6 Credits Pending</span>
+            <span class="text-emerald-600 font-bold">On Track (Sem 7)</span>
+          </div>
+        </div>
+
+        <!-- Metric 4: Current Semester Load -->
+        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2 portal-card">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Current Courses</span>
+            <span class="p-1.5 rounded-lg bg-purple-50 text-purple-600 text-sm">📚</span>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">4 Core + 2 Elec</span>
+          </div>
+          <div class="flex items-center justify-between text-[11px] text-slate-500">
+            <span>18 Credit Units</span>
+            <span class="text-sky-700 font-mono font-bold">CS Major</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CONTINUOUS BEHAVIORAL VERIFICATION PANEL (PRESERVED FOR INTEGRITY & TESTS) ================= -->
+    <div id="continuous-verification-panel" class="p-6 rounded-3xl bg-slate-900 border border-slate-800 text-white shadow-xl space-y-4 font-mono">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 text-lg">
+            🛡️
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="font-sans font-bold text-sm text-white tracking-wide">COGNISEC ZERO-TRUST CONTINUOUS VERIFICATION</h3>
+              <span id="cv-status-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800">CALIBRATING</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Passive telemetry stream evaluating student typing dynamics, cursor velocity, and motor rhythms</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button onclick="triggerExhibitionStepUpTest()" 
+            class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 hover:text-amber-200 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+            title="Simulate step-up verification challenge for exhibition demonstration">
+            <span>⚡ [EXHIBITION TEST] Simulate Step-Up</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 4-Grid Live State Metrics -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+        <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider block font-semibold">Behavioral Observation</span>
+          <strong id="cv-observation-state" class="text-sky-400 font-bold block truncate">Calibrating Baseline (30s)</strong>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider block font-semibold">Telemetry Stream</span>
+          <strong id="cv-telemetry-state" class="text-emerald-400 font-bold block truncate">Connected (TLS 1.3)</strong>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider block font-semibold">Confidential Vault</span>
+          <strong id="cv-resource-state" class="text-amber-400 font-bold block truncate">🔒 Locked (Masked)</strong>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider block font-semibold">Server Decision &amp; Audit</span>
+          <strong id="cv-server-decision" class="text-slate-300 font-bold block truncate">PENDING_OBSERVATION</strong>
+        </div>
+      </div>
+
+      <div class="pt-2 flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-400 gap-2 border-t border-slate-800/60 font-mono">
+        <div class="flex items-center gap-2">
+          <span>Privacy Safe: Passive physics vectors only (Dwell/Flight/Velocity). No form data, passwords, or grades captured.</span>
+        </div>
+        <div class="flex items-center gap-1 text-slate-400">
+          <span>Last Server Auth:</span>
+          <strong id="cv-last-auth-time" class="text-sky-400 font-mono">None</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= CONFIDENTIAL STUDENT RECORD VAULT (PRESERVED) ================= -->
+    <div id="confidential-student-records" class="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 shadow-xl space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center text-sky-600 text-xl font-bold">
+            🗄️
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="text-lg font-extrabold text-slate-900 tracking-tight font-sans">CONFIDENTIAL STUDENT RECORD VAULT</h3>
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-50 text-sky-700 border border-sky-200 uppercase">DIGILOCKER INTEGRATED</span>
+            </div>
+            <p class="text-xs font-mono text-slate-500">Official Grade History &bull; Document Vault &bull; Scholarship &amp; Escrow Account Ledger</p>
+          </div>
+        </div>
+        <div id="vault-access-badge-container">
+          <span id="vault-access-badge" class="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-mono font-bold flex items-center gap-1.5">
+            <span>🔒</span>
+            <span>Zero-Trust Locked</span>
           </span>
-          <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-mono font-bold">
-            ✓ Aadhaar ID Authenticated
-          </span>
         </div>
-        <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-          Anti-Proxy &amp; Integrity Exam Shield
-        </h2>
-        <p class="text-sm text-slate-600 leading-relaxed">
-          Continuous motor gesture analytics ensure proxy test takers are automatically detected during mid-semesters, end-semesters, and lab gradebook updates.
-        </p>
       </div>
 
-      <!-- LIVE SECURITY TELEMETRY CARD -->
-      <div class="p-6 rounded-2xl bg-slate-900 text-white font-mono text-xs space-y-3.5 w-full md:w-80 shadow-2xl shrink-0 border border-slate-800">
-        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
-          <span class="text-slate-400">Semester:</span>
-          <strong class="text-sky-400 font-bold">7th Semester (B.Tech)</strong>
+      <!-- MASKED VAULT PREVIEW (Shown by default) -->
+      <div id="academic-vault-masked" class="space-y-6">
+        <div class="p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-4 relative overflow-hidden">
+          <div class="max-w-md mx-auto space-y-2">
+            <div class="w-12 h-12 rounded-2xl bg-sky-100 text-sky-600 border border-sky-200 flex items-center justify-center mx-auto text-xl font-bold">
+              🔒
+            </div>
+            <h4 class="font-extrabold text-slate-900 text-base font-sans">Confidential Academic Dossier Sealed</h4>
+            <p class="text-xs text-slate-600 leading-relaxed font-mono">
+              Privileged academic transcripts, provisional certificates, and scholarship ledgers are protected by COGNISEC AI continuous behavioral monitoring.
+            </p>
+          </div>
+
+          <!-- Synthetic Masked Preview Cards (Blurred) -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 filter blur-[3px] select-none pointer-events-none opacity-60 font-mono text-xs">
+            <div class="p-4 rounded-xl bg-white border border-slate-200 text-left space-y-2">
+              <span class="text-slate-400 text-[10px]">CUMULATIVE CGPA</span>
+              <strong class="text-slate-900 block text-base">•••• / 10.00</strong>
+              <span class="text-slate-400 block text-[11px]">Rank: Sealed (Auth Required)</span>
+            </div>
+            <div class="p-4 rounded-xl bg-white border border-slate-200 text-left space-y-2">
+              <span class="text-slate-400 text-[10px]">DIGILOCKER CREDENTIALS</span>
+              <strong class="text-slate-900 block text-base">Degree Verified</strong>
+              <span class="text-slate-400 block text-[11px]">SHA-256 Sealed Vault</span>
+            </div>
+            <div class="p-4 rounded-xl bg-white border border-slate-200 text-left space-y-2">
+              <span class="text-slate-400 text-[10px]">SCHOLARSHIP ACCOUNT</span>
+              <strong class="text-slate-900 block text-base">80% Fee Waiver</strong>
+              <span class="text-slate-400 block text-[11px]">Escrow Dues: ₹0.00</span>
+            </div>
+          </div>
+
+          <div class="pt-2">
+            <button id="btn-request-vault" onclick="requestAcademicVaultAccess()"
+              class="px-6 py-3.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs uppercase tracking-wider shadow-lg transition-all inline-flex items-center gap-2 cursor-pointer">
+              <span>Authorize &amp; View Confidential Academic Record →</span>
+            </button>
+          </div>
         </div>
-        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
-          <span class="text-slate-400">Proctor Score:</span>
-          <strong class="text-emerald-400 font-bold">ACTIVE (100% Genuine)</strong>
+      </div>
+
+      <!-- UNLOCKED VAULT CONTENT (Revealed only after server-authoritative authorization) -->
+      <div id="academic-vault-unlocked" class="hidden space-y-6 font-mono animate-fade-in">
+        <!-- Loading State Container -->
+        <div id="academic-vault-loading" class="hidden text-center py-12 font-mono">
+          <div class="w-8 h-8 border-3 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p class="text-xs text-sky-700 font-bold">Retrieving sealed academic records from secure vault...</p>
         </div>
-        <div class="flex justify-between items-center">
-          <span class="text-slate-400">DigiLocker Status:</span>
-          <strong class="text-sky-400 font-bold">Verified</strong>
+
+        <!-- Dynamic Vault Content Container (Empty before server authorization) -->
+        <div id="academic-vault-dynamic-content" class="space-y-6"></div>
+
+        <!-- Authorized Vault Footer Controls -->
+        <div class="p-4 rounded-2xl bg-slate-100 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div class="flex items-center gap-2 text-slate-600">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span>Server-Authoritative Zero Trust Access Granted &bull; Logged in Security Audit Trail</span>
+          </div>
+          <button onclick="lockAcademicVault()"
+            class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs transition-all cursor-pointer">
+            🔒 Re-lock Confidential Records
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- FRONTEND SEARCH & COURSE FILTERS -->
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-      <div class="relative w-full sm:w-80">
-        <input 
-          id="course-search-input" 
-          type="text" 
-          placeholder="Search courses or topics..." 
-          oninput="filterCourses()"
-          class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-sky-500"
-        />
-        <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">🔍</span>
+    <!-- ================= SECTION 2: MY COURSES & SYLLABI ================= -->
+    <section id="courses" class="space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+        <div>
+          <h3 class="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>📚</span> My Enrolled Courses
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Explore syllabus modules, track attendance, and launch semester proctored examinations.</p>
+        </div>
+        <span class="px-3 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-xs font-mono font-bold self-start sm:self-auto">
+          Semester VII &bull; 18 Credits
+        </span>
       </div>
 
-      <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto text-xs font-mono">
-        <button onclick="setCourseFilter('all')" id="course-all" class="px-3.5 py-2 rounded-xl bg-sky-600 text-white font-bold cursor-pointer">All Courses</button>
-        <button onclick="setCourseFilter('cs')" id="course-cs" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Computer Science</button>
-        <button onclick="setCourseFilter('ai')" id="course-ai" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Artificial Intelligence</button>
-      </div>
-    </div>
+      <!-- SEARCH & COURSE FILTERS -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+        <div class="relative w-full sm:w-80">
+          <input 
+            id="course-search-input" 
+            type="text" 
+            placeholder="Search courses, professors, or codes..." 
+            oninput="filterCourses()"
+            class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all"
+          />
+          <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">🔍</span>
+        </div>
 
-    <!-- COURSES CONTAINER -->
-    <div id="courses-grid-container" class="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <!-- Dynamically Rendered Courses -->
-    </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto text-xs font-mono">
+          <button onclick="setCourseFilter('all')" id="course-all" class="px-3.5 py-2 rounded-xl bg-sky-600 text-white font-bold cursor-pointer transition-all">All Courses</button>
+          <button onclick="setCourseFilter('cs')" id="course-cs" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer transition-all">Computer Science</button>
+          <button onclick="setCourseFilter('ai')" id="course-ai" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer transition-all">Artificial Intelligence</button>
+          <button onclick="setCourseFilter('elec')" id="course-elec" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer transition-all">Electives</button>
+        </div>
+      </div>
+
+      <!-- DYNAMIC COURSES CONTAINER (GRID) -->
+      <div id="courses-grid-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Dynamically rendered via renderCourses() -->
+      </div>
+    </section>
+
+    <!-- ================= SECTION 3: WEEKLY TIMETABLE ================= -->
+    <section id="timetable" class="space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+        <div>
+          <h3 class="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>🗓️</span> Weekly Class Timetable
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Lectures, practical laboratories, and tutorial slots for Academic Year 2025–26.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="downloadDemoResource('Weekly Timetable (PDF)')" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono font-bold flex items-center gap-1.5 shadow-xs cursor-pointer">
+            <span>📥 Export PDF</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- DAY PICKER -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs font-mono">
+        <button onclick="setTimetableDay('Monday')" id="tt-day-Monday" class="px-4 py-2 rounded-xl bg-sky-600 text-white font-bold cursor-pointer shadow-xs">Monday</button>
+        <button onclick="setTimetableDay('Tuesday')" id="tt-day-Tuesday" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Tuesday</button>
+        <button onclick="setTimetableDay('Wednesday')" id="tt-day-Wednesday" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Wednesday</button>
+        <button onclick="setTimetableDay('Thursday')" id="tt-day-Thursday" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Thursday</button>
+        <button onclick="setTimetableDay('Friday')" id="tt-day-Friday" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Friday</button>
+        <button onclick="setTimetableDay('Saturday')" id="tt-day-Saturday" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Saturday</button>
+      </div>
+
+      <!-- DYNAMIC TIMETABLE SLOTS -->
+      <div id="timetable-slots-container" class="space-y-3">
+        <!-- Rendered dynamically via renderTimetable() -->
+      </div>
+    </section>
+
+    <!-- ================= SECTION 4: ASSIGNMENTS & DEADLINES ================= -->
+    <section id="assignments" class="space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+        <div>
+          <h3 class="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>📝</span> Assignments &amp; Course Deliverables
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Submit programming assignments, lab reports, and term research papers.</p>
+        </div>
+
+        <!-- STATUS FILTER BUTTONS -->
+        <div class="flex items-center gap-2 text-xs font-mono">
+          <button onclick="setAssignmentFilter('all')" id="asgn-filter-all" class="px-3.5 py-1.5 rounded-xl bg-sky-600 text-white font-bold cursor-pointer">All (5)</button>
+          <button onclick="setAssignmentFilter('pending')" id="asgn-filter-pending" class="px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Pending (3)</button>
+          <button onclick="setAssignmentFilter('submitted')" id="asgn-filter-submitted" class="px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Submitted (2)</button>
+        </div>
+      </div>
+
+      <!-- DYNAMIC ASSIGNMENT CARDS -->
+      <div id="assignments-list-container" class="space-y-3">
+        <!-- Rendered dynamically via renderAssignments() -->
+      </div>
+    </section>
+
+    <!-- ================= SECTION 5: EXAMINATION SCHEDULE ================= -->
+    <section id="exams" class="space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+        <div>
+          <h3 class="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>📋</span> Mid-Semester Examination Schedule
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Official examination schedule, reporting venues, and seat allocations for November 2026.</p>
+        </div>
+        <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-bold self-start sm:self-auto">
+          Hall Ticket: Verified
+        </span>
+      </div>
+
+      <!-- EXAM SEARCH & FILTERS -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+        <div class="relative w-full sm:w-80">
+          <input 
+            id="exam-search-input" 
+            type="text" 
+            placeholder="Search exam code, venue, or course..." 
+            oninput="searchExams()"
+            class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-sky-500 bg-slate-50 focus:bg-white"
+          />
+          <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">🔍</span>
+        </div>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto text-xs font-mono">
+          <button onclick="filterExams('all')" id="exam-filter-all" class="px-3.5 py-2 rounded-xl bg-sky-600 text-white font-bold cursor-pointer">All Exams</button>
+          <button onclick="filterExams('theory')" id="exam-filter-theory" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Theory (3)</button>
+          <button onclick="filterExams('practical')" id="exam-filter-practical" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Practical &amp; Viva (2)</button>
+        </div>
+      </div>
+
+      <!-- DYNAMIC EXAM SCHEDULE CONTAINER -->
+      <div id="exams-container" class="space-y-3">
+        <!-- Rendered dynamically via renderExams() -->
+      </div>
+    </section>
+
+    <!-- ================= SECTION 6: NOTICES & CAMPUS CIRCULARS ================= -->
+    <section id="notices" class="space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+        <div>
+          <h3 class="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>📢</span> Official Notices &amp; Department Circulars
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Click any notice to expand and view the full circular memo from administration.</p>
+        </div>
+
+        <!-- CATEGORY FILTERS -->
+        <div class="flex items-center gap-2 text-xs font-mono overflow-x-auto">
+          <button onclick="filterAnnouncements('all')" id="notice-filter-all" class="px-3 py-1.5 rounded-xl bg-sky-600 text-white font-bold cursor-pointer">All</button>
+          <button onclick="filterAnnouncements('academic')" id="notice-filter-academic" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Academic</button>
+          <button onclick="filterAnnouncements('exam')" id="notice-filter-exam" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Examinations</button>
+          <button onclick="filterAnnouncements('placement')" id="notice-filter-placement" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Placements</button>
+        </div>
+      </div>
+
+      <!-- DYNAMIC NOTICES CONTAINER (EXPANDABLE) -->
+      <div id="announcements-container" class="space-y-3">
+        <!-- Rendered dynamically via renderAnnouncements() -->
+      </div>
+    </section>
+
+    <!-- ================= SECTION 7: ACADEMIC RESOURCES ================= -->
+    <section id="resources" class="space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+        <div>
+          <h3 class="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>📂</span> Academic Resources &amp; Course Materials
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Official syllabus documents, lecture notes archive, past examination papers, and compute access.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        
+        <!-- Resource 1 -->
+        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4 portal-card flex flex-col justify-between">
+          <div class="space-y-2">
+            <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-xl font-bold">
+              📘
+            </div>
+            <h4 class="font-bold text-slate-900 text-base">Course Handouts &amp; Syllabus</h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Complete semester syllabus, grading weightages, reference textbooks, and lecture timelines for CS &amp; AI.
+            </p>
+          </div>
+          <button onclick="downloadDemoResource('CS Semester 7 Handouts Package (PDF)')" class="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-sky-50 text-sky-700 border border-slate-200 font-mono text-xs font-bold transition-all text-center cursor-pointer">
+            Download Handouts (PDF)
+          </button>
+        </div>
+
+        <!-- Resource 2 -->
+        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4 portal-card flex flex-col justify-between">
+          <div class="space-y-2">
+            <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl font-bold">
+              📓
+            </div>
+            <h4 class="font-bold text-slate-900 text-base">Lecture Slides &amp; Code Archives</h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Synchronized professor slide decks, Jupyter notebooks, and algorithm implementations from lab sessions.
+            </p>
+          </div>
+          <button onclick="downloadDemoResource('Lecture Slides & PyTorch Notebooks Archive (ZIP)')" class="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-purple-50 text-purple-700 border border-slate-200 font-mono text-xs font-bold transition-all text-center cursor-pointer">
+            Access Drive Archive
+          </button>
+        </div>
+
+        <!-- Resource 3 -->
+        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4 portal-card flex flex-col justify-between">
+          <div class="space-y-2">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
+              📑
+            </div>
+            <h4 class="font-bold text-slate-900 text-base">Past 5-Year Question Papers</h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Archive of mid-term and comprehensive examination papers with solution keys and rubric breakdowns.
+            </p>
+          </div>
+          <button onclick="downloadDemoResource('Past 5-Year Compre Question Papers (PDF)')" class="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-amber-50 text-amber-700 border border-slate-200 font-mono text-xs font-bold transition-all text-center cursor-pointer">
+            View Question Bank
+          </button>
+        </div>
+
+        <!-- Resource 4 -->
+        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4 portal-card flex flex-col justify-between">
+          <div class="space-y-2">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+              🔬
+            </div>
+            <h4 class="font-bold text-slate-900 text-base">HPC Cluster &amp; Virtual Labs</h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              GPU acceleration access for AI models, remote Linux cluster SSH keys, and MATLAB/JupyterHub terminals.
+            </p>
+          </div>
+          <button onclick="downloadDemoResource('HPC GPU Server SSH Credentials & Guide')" class="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-emerald-50 text-emerald-700 border border-slate-200 font-mono text-xs font-bold transition-all text-center cursor-pointer">
+            Launch Virtual Lab
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SECTION 8: STUDENT SERVICES & SUPPORT ================= -->
+    <section id="services" class="space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+        <div>
+          <h3 class="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>🏛️</span> Student Services &amp; Campus Life
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Quick access to library facilities, faculty directories, medical care, and hostel desks.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        
+        <!-- Service 1: Library -->
+        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3 portal-card">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center text-lg">
+              📚
+            </div>
+            <div>
+              <h5 class="font-bold text-slate-900 text-sm">Central Library</h5>
+              <p class="text-[11px] text-slate-500">OPAC &bull; IEEE &bull; ACM</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Search physical book collections, reserve study pods, and browse IEEE Xplore digital papers.
+          </p>
+          <button onclick="openServiceModal('library')" class="text-sky-700 hover:text-sky-800 font-bold text-xs inline-flex items-center gap-1 cursor-pointer">
+            Library Catalog &amp; Renewals →
+          </button>
+        </div>
+
+        <!-- Service 2: Faculty Directory -->
+        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3 portal-card">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center text-lg">
+              👨‍🏫
+            </div>
+            <div>
+              <h5 class="font-bold text-slate-900 text-sm">Faculty Office Hours</h5>
+              <p class="text-[11px] text-slate-500">CS &bull; AI &bull; Maths Dept</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Find instructor consultation schedules, office locations, and request mentorship appointments.
+          </p>
+          <button onclick="openServiceModal('faculty')" class="text-purple-700 hover:text-purple-800 font-bold text-xs inline-flex items-center gap-1 cursor-pointer">
+            View Office Hours Directory →
+          </button>
+        </div>
+
+        <!-- Service 3: Campus Health -->
+        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3 portal-card">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg">
+              🏥
+            </div>
+            <div>
+              <h5 class="font-bold text-slate-900 text-sm">Health &amp; Wellness</h5>
+              <p class="text-[11px] text-slate-500">Medical Center 24x7</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            On-campus doctors, emergency ambulance hotline, and confidential student wellness counseling.
+          </p>
+          <button onclick="openServiceModal('health')" class="text-emerald-700 hover:text-emerald-800 font-bold text-xs inline-flex items-center gap-1 cursor-pointer">
+            Medical Center Info →
+          </button>
+        </div>
+
+        <!-- Service 4: Placement Cell -->
+        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3 portal-card">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-lg">
+              💼
+            </div>
+            <div>
+              <h5 class="font-bold text-slate-900 text-sm">Placement &amp; Training</h5>
+              <p class="text-[11px] text-slate-500">Campus Drives 2026</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Placement guidelines, company schedules, resume verification, and interview slot bookings.
+          </p>
+          <button onclick="openServiceModal('placement')" class="text-amber-700 hover:text-amber-800 font-bold text-xs inline-flex items-center gap-1 cursor-pointer">
+            Placement Schedule →
+          </button>
+        </div>
+      </div>
+    </section>
+
   </main>
 
-  <!-- INTERACTIVE EXAM PROCTORING MODAL -->
+  <!-- ================= MODALS & OVERLAYS ================= -->
+
+  <!-- COURSE DETAILS MODAL (NEW INTERACTIVE) -->
+  <div id="course-details-modal" class="fixed inset-0 z-50 hidden bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 font-mono">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative animate-fade-in max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="p-2 rounded-xl bg-sky-50 text-sky-700 text-lg">📘</span>
+          <div>
+            <h4 id="cd-title" class="font-extrabold text-base text-slate-900 font-sans">Course Details</h4>
+            <p id="cd-subtitle" class="text-xs text-slate-500 font-mono">BITS Pilani &bull; Department of Computer Science</p>
+          </div>
+        </div>
+        <button onclick="closeCourseDetailsModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer">✕</button>
+      </div>
+
+      <div class="space-y-4 text-xs font-sans">
+        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+          <div class="flex justify-between items-center text-slate-500 font-mono">
+            <span>Course Code: <strong id="cd-code" class="text-sky-700">CS F301</strong></span>
+            <span>Credits: <strong id="cd-credits" class="text-slate-800">3-1-4</strong></span>
+          </div>
+          <p id="cd-desc" class="text-slate-700 leading-relaxed text-xs">Course description goes here.</p>
+        </div>
+
+        <div class="space-y-2">
+          <h5 class="font-bold text-slate-900 font-mono text-xs uppercase tracking-wider">Syllabus Modules</h5>
+          <div id="cd-modules" class="space-y-2 font-mono text-[11px]">
+            <!-- Dynamic Modules -->
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 font-mono text-xs pt-1">
+          <div class="p-3 rounded-xl bg-sky-50 border border-sky-100">
+            <span class="text-slate-500 block text-[10px]">Instructor:</span>
+            <strong id="cd-prof" class="text-slate-900 font-bold block pt-0.5">Prof. K. R. Sharma</strong>
+          </div>
+          <div class="p-3 rounded-xl bg-sky-50 border border-sky-100">
+            <span class="text-slate-500 block text-[10px]">Evaluation Scheme:</span>
+            <span class="text-sky-800 font-bold block pt-0.5">Mid-Sem 30% &bull; Compre 40%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-3 font-mono text-xs">
+        <button onclick="closeCourseDetailsModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer">
+          Close
+        </button>
+        <button id="cd-launch-exam-btn" onclick="launchExamFromDetails()" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold cursor-pointer shadow-sm">
+          Launch Online Exam →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ASSIGNMENT SUBMISSION MODAL (NEW INTERACTIVE) -->
+  <div id="assignment-submit-modal" class="fixed inset-0 z-50 hidden bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 font-mono">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative animate-fade-in">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">📤</span>
+          <div>
+            <h4 class="font-extrabold text-base text-slate-900 font-sans">Submit Course Deliverable</h4>
+            <p id="asgn-modal-course" class="text-xs text-sky-700 font-bold">CS F360 &bull; Raft Consensus</p>
+          </div>
+        </div>
+        <button onclick="closeSubmitAssignmentModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1.5 cursor-pointer">✕</button>
+      </div>
+
+      <form onsubmit="handleAssignmentSubmit(event)" class="space-y-4">
+        <div class="p-5 rounded-2xl border-2 border-dashed border-slate-300 hover:border-sky-500 text-center space-y-2 bg-slate-50/50 cursor-pointer">
+          <div class="text-2xl">📁</div>
+          <div class="text-xs font-bold text-slate-700 font-sans">Click or drag assignment package here</div>
+          <p class="text-[10px] text-slate-500 font-mono">Accepted formats: .zip, .tar.gz, .pdf (Max 25 MB)</p>
+          <input type="file" id="asgn-file-input" class="hidden" onchange="updateSelectedFileName(this)" />
+          <button type="button" onclick="document.getElementById('asgn-file-input').click()" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold shadow-xs">
+            Browse File
+          </button>
+          <div id="selected-file-label" class="text-[11px] text-sky-700 font-bold hidden font-mono"></div>
+        </div>
+
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-slate-700 uppercase">Student Comments (Optional)</label>
+          <textarea id="asgn-comments" rows="2" placeholder="e.g. Completed benchmark simulations for Leader Election..."
+            class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-sky-500"></textarea>
+        </div>
+
+        <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-mono leading-relaxed">
+          <span>ℹ️ Academic Honesty: Submissions are checked with MOSS code similarity engine.</span>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" onclick="closeSubmitAssignmentModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">
+            Cancel
+          </button>
+          <button type="submit" id="btn-submit-assignment" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs uppercase tracking-wider shadow-md cursor-pointer transition-all">
+            Upload &amp; Submit →
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- STUDENT SERVICES CONTACT MODAL (NEW INTERACTIVE) -->
+  <div id="service-contact-modal" class="fixed inset-0 z-50 hidden bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 font-mono">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 text-slate-900 relative animate-fade-in">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span id="service-modal-icon" class="text-xl">🏛️</span>
+          <div>
+            <h4 id="service-modal-title" class="font-extrabold text-base text-slate-900 font-sans">Campus Facility Support</h4>
+            <p id="service-modal-subtitle" class="text-xs text-slate-500">BITS Pilani Service Desk</p>
+          </div>
+        </div>
+        <button onclick="closeServiceModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1.5 cursor-pointer">✕</button>
+      </div>
+
+      <div id="service-modal-body" class="space-y-3 text-xs font-sans leading-relaxed text-slate-700">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex justify-end">
+        <button onclick="closeServiceModal()" class="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer">
+          Got it, Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERACTIVE EXAM PROCTORING MODAL (PRESERVED) -->
   <div id="exam-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -155,14 +967,14 @@
           <span class="text-sky-600 text-lg">🎓</span>
           <strong class="text-base font-extrabold font-sans">Cognisec AI Proctored Examination</strong>
         </div>
-        <button onclick="closeExamModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1">✕</button>
+        <button onclick="closeExamModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1 cursor-pointer">✕</button>
       </div>
 
       <div id="exam-step-init" class="space-y-4">
         <div class="p-4 rounded-2xl bg-sky-50 border border-sky-200 space-y-1.5 text-xs">
           <span class="text-slate-500">Course Selected:</span>
           <strong id="exam-course-name" class="text-slate-900 block font-bold text-sm">CS F301 - Data Structures &amp; Algorithms</strong>
-          <span class="text-sky-800 font-bold block pt-1">Student: Boomika Ram (2021BCE0492)</span>
+          <span class="text-sky-800 font-bold block pt-1">Student: <span id="exam-student-label">Authenticated Student (2021BCE0492)</span></span>
         </div>
 
         <div class="p-4 rounded-2xl bg-slate-900 text-white space-y-2 text-xs">
@@ -186,14 +998,14 @@
         <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800">
           Proctor Score: 99.98% Confidence &bull; Anti-Proxy Shield Lock ACTIVE
         </div>
-        <button onclick="closeExamModal()" class="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase">
+        <button onclick="closeExamModal()" class="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase cursor-pointer">
           Return to Portal
         </button>
       </div>
     </div>
   </div>
 
-  <!-- INTERACTIVE STUDENT SIGN IN MODAL -->
+  <!-- INTERACTIVE STUDENT SIGN IN MODAL (PRESERVED) -->
   <div id="student-signin-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative animate-fade-in">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -210,13 +1022,22 @@
       <form onsubmit="handleStudentSignInSubmit(event)" class="space-y-4">
         <div class="space-y-1">
           <label class="text-xs font-bold text-slate-700 uppercase">Student Roll No / Email</label>
-          <input id="student-signin-email" type="text" value="2021bce0492@bits-pilani.ac.in" required
+          <input id="student-signin-email" type="text" value="" placeholder="Enter your registered email" autocomplete="username" required
             class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-sky-500" />
+          <p class="text-[10px] text-slate-500 font-mono">Sign in with the email address you registered with COGNISEC AI.</p>
         </div>
         <div class="space-y-1">
-          <label class="text-xs font-bold text-slate-700 uppercase">Password</label>
-          <input id="student-signin-pass" type="password" value="••••••••••••" required
-            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-sky-500" />
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-slate-700 uppercase">Password</label>
+            <button type="button" onclick="openForgotPasswordModal(document.getElementById('student-signin-email')?.value)" class="text-[11px] text-sky-600 hover:text-sky-800 underline font-mono cursor-pointer">Forgot Password?</button>
+          </div>
+          <div class="relative flex items-center">
+            <input id="student-signin-pass" type="password" value="" placeholder="Enter student password" autocomplete="current-password" required
+              class="w-full pl-4 pr-11 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-sky-500" />
+            <button type="button" onclick="togglePasswordVisibility('student-signin-pass', this)" aria-label="Show password" title="Show password" class="absolute right-3 p-1 rounded-lg text-slate-400 hover:text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 pointer-events-none" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
         </div>
 
         <div class="p-3.5 rounded-xl bg-sky-50 border border-sky-200 text-xs text-sky-900 flex items-center justify-between">
@@ -235,7 +1056,7 @@
     </div>
   </div>
 
-  <!-- NOTIFICATION TOAST CONTAINER -->
+  <!-- NOTIFICATION TOAST CONTAINER (PRESERVED) -->
   <div id="auth-toast" class="fixed top-16 right-6 z-50 hidden p-4 rounded-2xl bg-slate-900 text-white shadow-2xl border border-slate-700 font-mono text-xs max-w-sm animate-fade-in">
     <div class="flex items-center gap-3">
       <div id="toast-icon" class="text-lg">🟢</div>
@@ -247,18 +1068,33 @@
   </div>
 
   <!-- LIGHT FOOTER -->
-  <footer class="bg-white border-t border-slate-200 px-8 py-6 text-center text-xs font-mono text-slate-500">
-    BITS Pilani Academic Portal &bull; Protected continuously by COGNISEC AI Anti-Proxy Proctoring Shield.
+  <footer class="bg-white border-t border-slate-200 px-6 sm:px-10 py-8 text-center text-xs font-mono text-slate-500 mt-12 space-y-2">
+    <div class="flex flex-wrap items-center justify-center gap-4 text-slate-600 font-sans font-semibold">
+      <a href="#overview" class="hover:text-sky-600">Overview</a>
+      <span>&bull;</span>
+      <a href="#courses" class="hover:text-sky-600">Courses</a>
+      <span>&bull;</span>
+      <a href="#timetable" class="hover:text-sky-600">Timetable</a>
+      <span>&bull;</span>
+      <a href="#assignments" class="hover:text-sky-600">Assignments</a>
+      <span>&bull;</span>
+      <a href="#exams" class="hover:text-sky-600">Exams</a>
+      <span>&bull;</span>
+      <a href="#resources" class="hover:text-sky-600">Resources</a>
+    </div>
+    <p>Birla Institute of Technology and Science, Pilani (Rajasthan) &bull; Academic Enterprise Portal</p>
+    <p class="text-[11px] text-slate-400">Protected behind-the-scenes by COGNISEC AI continuous motor telemetry and zero-trust identity guard.</p>
   </footer>
 
-  <!-- FRONTEND WORKING SCRIPT -->
+  <!-- COGNISEC CLIENT SCRIPT & FRONTEND INTERACTION LOGIC -->
   <script src="cognisec-client.js"></script>
   <script>
     if (window.cognisec) window.cognisec.setApplication('college');
-    let isStudentLoggedIn = true;
+    let isStudentLoggedIn = false;
 
     function showToast(title, desc, icon = "🟢") {
       const toast = document.getElementById('auth-toast');
+      if (!toast) return;
       document.getElementById('toast-title').textContent = title;
       document.getElementById('toast-desc').textContent = desc;
       document.getElementById('toast-icon').textContent = icon;
@@ -266,6 +1102,18 @@
       setTimeout(() => {
         toast.classList.add('hidden');
       }, 3500);
+    }
+
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 pointer-events-none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+      } else {
+        input.type = 'password';
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 pointer-events-none"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>`;
+      }
     }
 
     function openStudentSignInModal() {
@@ -281,59 +1129,484 @@
       const btn = document.getElementById('btn-submit-student-signin');
       btn.innerHTML = `<span>Authenticating DigiLocker Biometrics...</span>`;
 
-      const emailInput = document.getElementById('student-email-input');
-      const email = emailInput ? emailInput.value : 'student.alex@veritas.edu';
-      if (window.cognisec) {
-        await window.cognisec.login(email, 'Student@123', 'college');
+      const emailInput = document.getElementById('student-signin-email') || document.getElementById('student-email-input');
+      const email = emailInput ? emailInput.value.trim() : '';
+      const passInput = document.getElementById('student-signin-pass');
+      const pass = passInput ? passInput.value : '';
+      if (!email || !pass) {
+        btn.innerHTML = `<span>Sign In &amp; Authorize Academic Portal →</span>`;
+        showToast("Sign In Failed", "Enter your registered email and password.", "⚠️");
+        return;
       }
 
-      setTimeout(() => {
-        isStudentLoggedIn = true;
-        btn.innerHTML = `<span>Sign In &amp; Authorize Academic Portal →</span>`;
-        closeStudentSignInModal();
+      if (window.cognisec) {
+        const loginRes = await window.cognisec.login(email, pass, 'college');
+        if (loginRes && loginRes.success && loginRes.data) {
+          closeStudentSignInModal();
+          btn.innerHTML = `<span>Sign In &amp; Authorize Academic Portal →</span>`;
+          syncPortalAuthState();
+          showToast("Academic Identity Active", "Session established. Observation running silently in background (30s).", "🎓");
+          window.cognisec.startObservationFlow(loginRes.data);
+          return;
+        } else {
+          btn.innerHTML = `<span>Sign In &amp; Authorize Academic Portal →</span>`;
+          showToast("Sign In Failed", loginRes?.error || "Invalid student credentials.", "⚠️");
+          return;
+        }
+      }
 
-        // Update Header UI
-        document.getElementById('student-status-label').textContent = 'Student Roll No: 2021BCE0492';
-        document.getElementById('student-name-label').textContent = 'Boomika Ram (CGPA: 9.42 / 10)';
-        document.getElementById('btn-header-signout').classList.remove('hidden');
-        document.getElementById('btn-header-signin').classList.add('hidden');
-        document.getElementById('student-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+      btn.innerHTML = `<span>Sign In &amp; Authorize Academic Portal →</span>`;
+      showToast("Backend Offline", "Cognisec AI client not connected.", "⚠️");
+    }
 
-        showToast("Student Authenticated", "Welcome back, Boomika Ram. DigiLocker Academic ID verified.", "🎓");
-      }, 700);
+    let isAcademicVaultUnlocked = false;
+
+    async function updateContinuousVerificationPanel(serverOutcome = null) {
+      const obsEl = document.getElementById('cv-observation-state');
+      const telemEl = document.getElementById('cv-telemetry-state');
+      const resEl = document.getElementById('cv-resource-state');
+      const decEl = document.getElementById('cv-server-decision');
+      const badgeEl = document.getElementById('cv-status-badge');
+      const vaultBadge = document.getElementById('vault-access-badge');
+
+      const isAuth = window.cognisec ? window.cognisec.isAuthenticated() : false;
+      const isVerified = window.cognisec ? window.cognisec.isFullyVerified() : false;
+      const isObs = window.cognisec ? window.cognisec.isPendingObservation() : false;
+
+      if (!isAuth) {
+        if (obsEl) obsEl.textContent = 'Inactive (Sign in required)';
+        if (telemEl) telemEl.textContent = 'Standby';
+        if (resEl) resEl.textContent = '🔒 Locked (Masked)';
+        if (decEl) decEl.textContent = 'NO_SESSION';
+        if (badgeEl) {
+          badgeEl.textContent = 'OFFLINE';
+          badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700';
+        }
+        if (vaultBadge) {
+          vaultBadge.className = 'px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 text-xs font-mono font-bold flex items-center gap-1.5';
+          vaultBadge.innerHTML = '<span>🔒</span><span>Sign In Required</span>';
+        }
+        return;
+      }
+
+      if (isObs) {
+        if (obsEl) obsEl.textContent = 'Calibrating Baseline (30s)';
+        if (telemEl) telemEl.textContent = 'Connected (Buffering)';
+        if (resEl) resEl.textContent = '🔒 Locked (Masked)';
+        if (decEl) decEl.textContent = serverOutcome?.decision || 'OBSERVATION_PENDING';
+        if (badgeEl) {
+          badgeEl.textContent = 'CALIBRATING';
+          badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 animate-pulse';
+        }
+        if (vaultBadge) {
+          vaultBadge.className = 'px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-mono font-bold flex items-center gap-1.5';
+          vaultBadge.innerHTML = '<span>🔒</span><span>Observation In-Flight</span>';
+        }
+        return;
+      }
+
+      // Active / Verified State
+      if (telemEl) telemEl.textContent = 'Connected (TLS 1.3)';
+      if (obsEl) obsEl.textContent = 'Active (Passive Dynamics)';
+
+      if (isAcademicVaultUnlocked) {
+        if (resEl) resEl.textContent = '🔓 Authorized & Viewable';
+        if (decEl) decEl.textContent = serverOutcome?.decision || 'ALLOW (Server-Verified)';
+        if (badgeEl) {
+          badgeEl.textContent = 'VERIFIED';
+          badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800';
+        }
+        if (vaultBadge) {
+          vaultBadge.className = 'px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-bold flex items-center gap-1.5';
+          vaultBadge.innerHTML = '<span>🔓</span><span>Authorized (ALLOW)</span>';
+        }
+      } else {
+        if (resEl) resEl.textContent = '🔒 Locked (Masked)';
+        if (decEl) decEl.textContent = serverOutcome?.decision || (isVerified ? 'READY (Awaiting Request)' : 'VERIFY_REQUIRED');
+        if (badgeEl) {
+          badgeEl.textContent = isVerified ? 'GUARD ACTIVE' : 'STEP-UP REQUIRED';
+          badgeEl.className = isVerified
+            ? 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800'
+            : 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800';
+        }
+        if (vaultBadge) {
+          vaultBadge.className = 'px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-mono font-bold flex items-center gap-1.5';
+          vaultBadge.innerHTML = '<span>🔒</span><span>Zero-Trust Locked</span>';
+        }
+      }
+
+      const lastAuthEl = document.getElementById('cv-last-auth-time');
+      if (lastAuthEl) {
+        lastAuthEl.textContent = isVerified ? new Date().toLocaleTimeString() : 'None';
+      }
+    }
+
+    async function loadAndDisplayAcademicVault() {
+      const cs = window.cognisec;
+      const ANCHOR = 'btn-request-vault';
+      const loadingEl = document.getElementById('academic-vault-loading');
+      const contentEl = document.getElementById('academic-vault-dynamic-content');
+      const unlockedEl = document.getElementById('academic-vault-unlocked');
+      const maskedEl = document.getElementById('academic-vault-masked');
+
+      if (maskedEl) maskedEl.classList.add('hidden');
+      if (unlockedEl) unlockedEl.classList.remove('hidden');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      if (contentEl) contentEl.innerHTML = '';
+
+      try {
+        if (!cs) throw new Error("Cognisec AI client not connected.");
+        const res = await cs.fetchVaultData('academic_vault');
+        if (!res || !res.access_granted || !res.data) {
+          throw new Error((res && res.detail) || "Failed to retrieve authorized academic vault records.");
+        }
+        renderAcademicVaultContent(res.data);
+        isAcademicVaultUnlocked = true;
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (contentEl) contentEl.classList.remove('hidden');
+        updateContinuousVerificationPanel();
+        showToast("Academic Record Unlocked", "Zero Trust verified: Confidential gradebook and DigiLocker vault accessible.", "🎓");
+      } catch (err) {
+        console.error('[COGNISEC-AI] Failed to load academic vault:', err);
+        if (loadingEl) loadingEl.classList.add('hidden');
+        lockAcademicVault();
+        if (cs) {
+          cs.showVaultAccessNotice({
+            anchorId: ANCHOR,
+            tone: 'error',
+            title: 'Vault retrieval failed',
+            message: err.message || 'Server rejected confidential clearance.',
+            actions: [{ label: 'Retry', onClick: requestAcademicVaultAccess }]
+          });
+        }
+        showToast("Access Denied", err.message || "Failed to retrieve confidential records.", "🚫");
+      }
+    }
+
+    function renderAcademicVaultContent(data) {
+      const container = document.getElementById('academic-vault-dynamic-content');
+      if (!container) return;
+
+      const cgpa = data.cgpa || '';
+      const standing = data.academic_standing || '';
+      const credits = data.credits_completed || '';
+      const major = data.major || '';
+
+      // Update metric 1 card if present
+      const metricCgpa = document.getElementById('metric-cgpa-val');
+      if (metricCgpa && cgpa) metricCgpa.textContent = cgpa.split('/')[0].trim();
+      const metricRank = document.getElementById('metric-cgpa-rank');
+      if (metricRank && standing) metricRank.textContent = standing;
+
+      const transcripts = data.transcripts || [];
+      const transcriptRows = transcripts.map(t => `
+        <div class="flex justify-between p-1.5 rounded bg-white border border-sky-100">
+          <span class="text-slate-700">${t.code || ''} ${t.name || ''}</span>
+          <strong class="text-sky-700">${t.grade || ''}</strong>
+        </div>
+      `).join('');
+
+      const docs = data.documents || [];
+      const docRows = docs.map(d => `
+        <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-1">
+          <div class="flex justify-between items-center">
+            <strong class="text-slate-900 font-bold">${d.title || ''}</strong>
+            <span class="text-[10px] text-emerald-600 font-bold">✓ ${d.status || ''}</span>
+          </div>
+          <p class="text-[10px] text-slate-500 font-mono">Doc ID: ${d.doc_id || ''} &bull; ${d.authority || ''}</p>
+        </div>
+      `).join('');
+
+      const fin = data.financial_ledger || {};
+
+      container.innerHTML = `
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Card 1: Official Academic Transcript & Grade History -->
+          <div class="p-5 rounded-2xl bg-sky-50/50 border border-sky-200 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-sky-100">
+              <span class="text-xs font-bold text-sky-900 flex items-center gap-1.5">
+                <span>📊</span> Academic Performance Ledger
+              </span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">VERIFIED</span>
+            </div>
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between items-center">
+                <span class="text-slate-500">Cumulative GPA:</span>
+                <strong class="text-slate-900 font-bold text-sm">${cgpa}</strong>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-slate-500">Academic Standing:</span>
+                <strong class="text-emerald-700 font-bold">${standing}</strong>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-slate-500">Graduation Credits:</span>
+                <strong class="text-slate-900 font-bold">${credits}</strong>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-slate-500">Major:</span>
+                <strong class="text-slate-900 font-bold">${major}</strong>
+              </div>
+            </div>
+
+            <!-- Sem 7 Transcript Table -->
+            <div class="pt-2 border-t border-sky-100 space-y-1.5">
+              <span class="text-[10px] text-slate-500 uppercase tracking-wider font-bold block">Semester 7 Grade Breakdown</span>
+              <div class="space-y-1 text-[11px]">
+                ${transcriptRows}
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: DigiLocker Student Document Vault -->
+          <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+              <span class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                <span>📜</span> DigiLocker Document Vault
+              </span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200">SHA-256</span>
+            </div>
+            <div class="space-y-2.5 text-xs">
+              ${docRows}
+            </div>
+          </div>
+
+          <!-- Card 3: Scholarship & Fee-Account Summary -->
+          <div class="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-200 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-emerald-100">
+              <span class="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                <span>💰</span> Scholarship &amp; Fee Ledger
+              </span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">NIL DUES</span>
+            </div>
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between items-center">
+                <span class="text-slate-600">Scholarship Award:</span>
+                <strong class="text-emerald-800 font-bold">${fin.scholarship}</strong>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-slate-600">Tuition Fee Due:</span>
+                <strong class="text-emerald-700 font-bold">${fin.tuition_due}</strong>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-slate-600">Semester Status:</span>
+                <strong class="text-emerald-700 font-bold">${fin.status}</strong>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-slate-600">Bank Mandate:</span>
+                <strong class="text-slate-900 font-bold">${fin.bank_mandate}</strong>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-emerald-100 space-y-1.5">
+              <span class="text-[10px] text-slate-500 uppercase tracking-wider font-bold block">Official Receipt Archive</span>
+              <div class="p-2 rounded-xl bg-white border border-emerald-100 text-[11px] flex items-center justify-between">
+                <span>Receipt ${fin.receipt_ref}</span>
+                <span class="text-emerald-700 font-bold">${fin.receipt_status}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function requestAcademicVaultAccess() {
+      const cs = window.cognisec;
+      const ANCHOR = 'btn-request-vault';
+      console.info('[COGNISEC-AI][vault] confidential-access click', { hasClient: !!cs, modalOpen: !!(cs && cs.isStepUpModalOpen) });
+      if (cs && cs.isStepUpModalOpen) return;
+      if (cs) cs.clearVaultAccessNotice();
+
+      const isAuth = isStudentLoggedIn || (cs && cs.isAuthenticated());
+      if (!isAuth) {
+        showToast("Student Authentication Required", "Please sign in to access confidential academic records.", "🔒");
+        if (cs) cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'info', title: 'Sign in required', message: 'Sign in to your student account to request confidential academic records.', actions: [{ label: 'Sign in', onClick: openStudentSignInModal }] });
+        openStudentSignInModal();
+        return;
+      }
+
+      try {
+        if (!cs) {
+          showToast("Security Engine Offline", "Cognisec AI client not connected.", "⚠️");
+          return;
+        }
+        const retry = { label: 'Retry', onClick: requestAcademicVaultAccess };
+        const restart = { label: 'Sign out & start a new session', onClick: () => cs.signOutAndRestart() };
+
+        // Authoritative server decision
+        const accessCheck = await cs.checkResourceAccess('academic_vault');
+        if (accessCheck && accessCheck.access_granted) {
+          await loadAndDisplayAcademicVault();
+          return;
+        }
+
+        if (accessCheck && (accessCheck.decision === 'TERMINATE_SESSION' || accessCheck.risk_level === 'CRITICAL')) {
+          lockAcademicVault();
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'error', title: 'Access denied', message: accessCheck.message || 'Confidential access denied by server Zero Trust policy.', actions: [restart] });
+          return;
+        }
+
+        if (accessCheck && !accessCheck.verification_required && (accessCheck.decision === 'RESTRICT' || accessCheck.risk_level === 'HIGH')) {
+          lockAcademicVault();
+          showToast("Elevated Risk", "Sensitive operations restricted under elevated risk policy.", "⚠️");
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'warn', title: 'Elevated risk - NeuralTrace not available', message: accessCheck.message || 'Sensitive operations are restricted under elevated risk policy.', actions: [restart] });
+          return;
+        }
+
+        if (accessCheck && accessCheck.decision === 'OBSERVATION_PENDING') {
+          lockAcademicVault();
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'info', title: 'Observation period active', message: accessCheck.message || 'Confidential access is locked during behavioral observation. Try again when it finishes.', actions: [retry] });
+          return;
+        }
+
+        if (accessCheck && accessCheck.decision === 'UNAUTHENTICATED') {
+          lockAcademicVault();
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'warn', title: 'Please sign in again', message: accessCheck.message, actions: [{ label: 'Sign in', onClick: () => { cs.clearAuth(); syncPortalAuthState(); openStudentSignInModal(); } }] });
+          return;
+        }
+
+        if (!accessCheck || accessCheck.decision === 'ERROR' || !accessCheck.verification_required) {
+          lockAcademicVault();
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'error', title: 'Could not get an access decision', message: (accessCheck && accessCheck.message) || 'The security server did not return a usable decision. Records stay locked.', actions: [retry] });
+          return;
+        }
+
+        // Step-up required
+        showToast("NeuralTrace Verification Required", "Reconstruct your enrolled neural route to authorize confidential access.", "🛡️");
+        cs.openStepUpModal({
+          preferredFactor: 'GESTURE_PATTERN',
+          targetResource: 'academic_vault',
+          title: 'NEURALTRACE — CONFIDENTIAL ACCESS VERIFICATION',
+          subtitle: 'Additional identity verification is required to access confidential academic records.',
+          reason: 'Zero Trust verification: Reconstruct your enrolled neural route to authorize access to your confidential academic dossier.',
+          forceNew: true,
+          onSuccess: async (data) => {
+            const verifyCheck = await cs.checkResourceAccess('academic_vault');
+            if (verifyCheck && verifyCheck.access_granted) {
+              cs.clearVaultAccessNotice();
+              await loadAndDisplayAcademicVault();
+            } else {
+              lockAcademicVault();
+              cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'error', title: 'Access denied', message: (verifyCheck && verifyCheck.message) || 'Server rejected confidential clearance.', actions: [retry] });
+            }
+          },
+          onCancel: () => {
+            lockAcademicVault();
+            cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'info', title: 'Verification cancelled', message: 'The confidential academic dossier remains sealed.', actions: [retry] });
+          }
+        });
+      } catch (err) {
+        console.error('[COGNISEC-AI] Failed to authorize vault:', err);
+        lockAcademicVault();
+        if (window.cognisec) window.cognisec.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'error', title: 'Authorization error', message: 'Failed to contact the security engine. Records stay locked.', actions: [{ label: 'Retry', onClick: requestAcademicVaultAccess }] });
+      }
+    }
+
+    function lockAcademicVault() {
+      isAcademicVaultUnlocked = false;
+      if (window.cognisec) {
+        window.cognisec.revokeResourceClearance('academic_vault');
+      }
+      const contentEl = document.getElementById('academic-vault-dynamic-content');
+      if (contentEl) contentEl.innerHTML = '';
+      const metricCgpa = document.getElementById('metric-cgpa-val');
+      if (metricCgpa) metricCgpa.textContent = '••••';
+      const metricRank = document.getElementById('metric-cgpa-rank');
+      if (metricRank) metricRank.textContent = "Vault Clearance Req.";
+
+      document.getElementById('academic-vault-loading')?.classList.add('hidden');
+      document.getElementById('academic-vault-masked')?.classList.remove('hidden');
+      document.getElementById('academic-vault-unlocked')?.classList.add('hidden');
+      updateContinuousVerificationPanel();
+      showToast("Academic Record Locked", "Confidential student vault re-sealed under Zero Trust policy.", "🔒");
+    }
+
+    function triggerExhibitionStepUpTest() {
+      if (!isStudentLoggedIn) {
+        showToast("Please Sign In First", "Sign in as legitimate student to demonstrate exhibition step-up.", "ℹ️");
+        openStudentSignInModal();
+        return;
+      }
+      lockAcademicVault();
+      if (window.cognisec && typeof window.cognisec.openStepUpModal === 'function') {
+        window.cognisec.openStepUpModal({
+          forceNew: true,
+          reason: "[EXHIBITION TEST] Simulated motor anomaly in academic session: Step-Up verification required."
+        });
+      }
     }
 
     function syncPortalAuthState() {
       const isAuth = window.cognisec ? window.cognisec.isAuthenticated() : false;
+      const isVerified = window.cognisec ? window.cognisec.isFullyVerified() : false;
       const user = window.cognisec ? window.cognisec.getUser() : null;
       isStudentLoggedIn = isAuth;
 
+      const welcomeName = document.getElementById('welcome-student-name');
+      const examStudent = document.getElementById('exam-student-label');
+
       if (isAuth && user) {
-        document.getElementById('student-status-label').textContent = 'Student Roll No: 2021BCE0492';
-        document.getElementById('student-name-label').textContent = `${user.name} (CGPA: 9.42 / 10)`;
+        const statusBadge = isVerified ? '' : ' (Observing)';
+        document.getElementById('student-status-label').textContent = `${user.email || ''}` + statusBadge;
+        document.getElementById('student-name-label').textContent = `${user.name || 'Student'}`;
+        if (welcomeName) welcomeName.textContent = user.name || user.email?.split('@')[0] || 'Student';
+        if (examStudent) examStudent.textContent = `${user.name || 'Student'} (${user.email || '2021BCE0492'})`;
         document.getElementById('btn-header-signout').classList.remove('hidden');
         document.getElementById('btn-header-signin').classList.add('hidden');
-        document.getElementById('student-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+        document.getElementById('btn-header-mfa')?.classList.remove('hidden');
+        document.getElementById('student-status-dot').className = isVerified
+          ? 'w-2 h-2 rounded-full bg-emerald-400'
+          : 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+
+        // Check authoritative server access decision
+        if (isVerified) {
+          window.cognisec.checkResourceAccess('academic_vault').then(decision => {
+            if (decision && decision.access_granted) {
+              if (!isAcademicVaultUnlocked) {
+                loadAndDisplayAcademicVault();
+              }
+            } else if (isAcademicVaultUnlocked && decision && !decision.access_granted) {
+              lockAcademicVault();
+            }
+          }).catch(() => {});
+        }
       } else {
         document.getElementById('student-status-label').textContent = 'Guest Student';
         document.getElementById('student-name-label').textContent = 'Not Authenticated';
+        if (welcomeName) welcomeName.textContent = 'Guest Student';
+        if (examStudent) examStudent.textContent = 'Guest Student (Not Authenticated)';
         document.getElementById('btn-header-signout').classList.add('hidden');
         document.getElementById('btn-header-signin').classList.remove('hidden');
+        document.getElementById('btn-header-mfa')?.classList.add('hidden');
         document.getElementById('student-status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
       }
+
+      updateContinuousVerificationPanel();
     }
 
     window.addEventListener('cognisec:auth_change', syncPortalAuthState);
+    window.addEventListener('cognisec:step_up_success', async (e) => {
+      syncPortalAuthState();
+      const decision = await window.cognisec.checkResourceAccess('academic_vault');
+      if (decision && decision.access_granted) {
+        await loadAndDisplayAcademicVault();
+      }
+    });
+    window.addEventListener('cognisec:session_locked', () => {
+      showToast("Academic Session Restricted", "Verification failed. Exam session & vault locked.", "🔒");
+      lockAcademicVault();
+      syncPortalAuthState();
+    });
     document.addEventListener('DOMContentLoaded', syncPortalAuthState);
     setTimeout(syncPortalAuthState, 150);
 
     async function handleStudentSignOut() {
       if (window.cognisec) await window.cognisec.logout();
+      lockAcademicVault();
       syncPortalAuthState();
       showToast("Academic Session Terminated", "Signed out. Exam proctoring session locked.", "🚪");
     }
 
-    // Auto-check URL parameters for ?signin=true
+    // Auto-check URL parameters
     window.addEventListener('DOMContentLoaded', () => {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('signin') === 'true' || urlParams.get('login') === 'true') {
@@ -341,15 +1614,121 @@
       }
     });
 
+    // ================= REALISTIC COURSES DATA & INTERACTIONS =================
     const COURSES = [
-      { id: 1, code: "CS F301", name: "Data Structures & Algorithms", cat: "cs", grade: "A (10/10)", prof: "Prof. K. R. Sharma", desc: "Advanced graph theory, dynamic programming, B-trees, hashing algorithms, and time complexity analysis." },
-      { id: 2, code: "CS F402", name: "AI Security & Behavioral Biometrics", cat: "ai", grade: "A (10/10)", prof: "Dr. Anita Deshmukh", desc: "Passive keystroke dynamics, deep neural risk scoring, and zero-trust authentication protocols." },
-      { id: 3, code: "CS F360", name: "Distributed Operating Systems", cat: "cs", grade: "A- (9/10)", prof: "Prof. S. R. Iyengar", desc: "Distributed shared memory, RPC primitives, vector clocks, and Byzantine fault tolerance." },
-      { id: 4, code: "AI F420", name: "Deep Neural Reinforcement Learning", cat: "ai", grade: "A (10/10)", prof: "Dr. Vikram Sethi", desc: "Policy gradient methods, Q-learning, deep Q-networks (DQN), and agentic autonomous systems." }
+      { 
+        id: 1, 
+        code: "CS F301", 
+        name: "Data Structures & Algorithms", 
+        cat: "cs", 
+        credits: "3-1-4", 
+        attendance: 96,
+        grade: "A (10/10)", 
+        prof: "Prof. K. R. Sharma", 
+        room: "Lecture Hall LH-101",
+        desc: "Advanced graph algorithms, amortized complexity, dynamic programming on trees, B-trees, minimum spanning forests, and NP-completeness reductions.",
+        modules: [
+          "Module 1: Advanced Red-Black Trees, Splay Trees, and Fibonacci Heaps",
+          "Module 2: Flow Networks, Edmonds-Karp, and Push-Relabel Algorithms",
+          "Module 3: String Matching, KMP, Suffix Trees, and Trie Compression",
+          "Module 4: NP-Completeness, 3-SAT reductions, and Vertex Cover Approximations"
+        ]
+      },
+      { 
+        id: 2, 
+        code: "CS F402", 
+        name: "AI Security & Behavioral Biometrics", 
+        cat: "ai", 
+        credits: "3-0-3", 
+        attendance: 94,
+        grade: "A (10/10)", 
+        prof: "Dr. Anita Deshmukh", 
+        room: "CS Seminar Hall 204",
+        desc: "Passive motor telemetry, dwell/flight keystroke dynamics, Isolation Forest anomaly scoring, and Zero Trust continuous authentication protocols.",
+        modules: [
+          "Module 1: Telemetry Ingestion: Keystroke Flight, Velocity Jitter, and Dwell Physics",
+          "Module 2: Unsupervised Anomaly Detection: Isolation Forest and Mahalanobis Distances",
+          "Module 3: Anti-Replay Tokens, High-Entropy Route Graphs, and Step-Up Orchestration",
+          "Module 4: Adversarial Evasion Attacks and Defensive Distillation Techniques"
+        ]
+      },
+      { 
+        id: 3, 
+        code: "CS F360", 
+        name: "Distributed Operating Systems", 
+        cat: "cs", 
+        credits: "3-1-4", 
+        attendance: 92,
+        grade: "A- (9/10)", 
+        prof: "Prof. S. R. Iyengar", 
+        room: "Lecture Hall LH-103",
+        desc: "Distributed consensus, Raft protocol state machines, vector clocks, RPC serialization, Byzantine fault tolerance, and Paxos leases.",
+        modules: [
+          "Module 1: Logical Time, Lamport Clocks, Vector Timestamps, and Causal Delivery",
+          "Module 2: Distributed Mutual Exclusion and Chandy-Lamport Snapshotting",
+          "Module 3: Raft Consensus: Leader Election, Log Replication, and Safety Invariants",
+          "Module 4: Distributed File Systems (GFS) and Google Spanner TrueTime"
+        ]
+      },
+      { 
+        id: 4, 
+        code: "AI F420", 
+        name: "Deep Neural Reinforcement Learning", 
+        cat: "ai", 
+        credits: "3-0-3", 
+        attendance: 98,
+        grade: "A (10/10)", 
+        prof: "Dr. Vikram Sethi", 
+        room: "AI Lab 2 (New Academic Block)",
+        desc: "Markov Decision Processes, Deep Q-Networks (DQN), Proximal Policy Optimization (PPO), Actor-Critic models, and continuous control robotics.",
+        modules: [
+          "Module 1: MDPs, Bellman Optimality Equations, and Temporal Difference Learning",
+          "Module 2: Deep Q-Networks: Target Networks, Experience Replay, and Rainbow DQN",
+          "Module 3: Policy Gradients: REINFORCE, TRPO, and PPO Clipped Objective",
+          "Module 4: Model-Based RL and Exploration vs Exploitation in High Dimensions"
+        ]
+      },
+      { 
+        id: 5, 
+        code: "CS F342", 
+        name: "Computer Networks & Protocols", 
+        cat: "cs", 
+        credits: "3-1-4", 
+        attendance: 93,
+        grade: "A (10/10)", 
+        prof: "Dr. Meenakshi Sundaram", 
+        room: "Lecture Hall LH-102",
+        desc: "Congestion control (BBR, CUBIC), TCP/IP socket programming, SDN OpenFlow controllers, TLS 1.3 cryptographic handshakes, and BGP routing.",
+        modules: [
+          "Module 1: Transport Layer: Sliding Windows, Selective ACKs, and BBR Congestion Control",
+          "Module 2: Routing Protocols: Link-State Dijkstra, Distance-Vector, and BGP Peering",
+          "Module 3: Software-Defined Networking: Control Plane Separation and OpenFlow",
+          "Module 4: Network Security: TLS 1.3 Handshake, DNSSEC, and DDoS Scrubbing"
+        ]
+      },
+      { 
+        id: 6, 
+        code: "ECON F211", 
+        name: "Principles of Economics & Tech Entrepreneurship", 
+        cat: "elec", 
+        credits: "3-0-3", 
+        attendance: 95,
+        grade: "A- (9/10)", 
+        prof: "Prof. Rajiv Kapoor", 
+        room: "Auditorium Complex AUD-2",
+        desc: "Microeconomic market structures, platform economics, venture capital term sheets, unit economics, and game-theoretic mechanism design.",
+        modules: [
+          "Module 1: Market Structures, Elasticity, and Nash Equilibrium in Tech Platforms",
+          "Module 2: Cost Functions, Economies of Scale, and Network Effects",
+          "Module 3: Venture Financing: Cap Tables, SAFEs, and Valuation Multiples",
+          "Module 4: Intellectual Property, Patent Strategy, and Tech Monetization"
+        ]
+      }
     ];
 
     let currentCourseCat = 'all';
     let courseSearchQuery = '';
+    let selectedCourseForModal = null;
 
     function renderCourses() {
       const container = document.getElementById('courses-grid-container');
@@ -359,30 +1738,58 @@
         const matchCat = (currentCourseCat === 'all' || c.cat === currentCourseCat);
         const matchSearch = c.name.toLowerCase().includes(courseSearchQuery.toLowerCase()) || 
                             c.code.toLowerCase().includes(courseSearchQuery.toLowerCase()) ||
+                            c.prof.toLowerCase().includes(courseSearchQuery.toLowerCase()) ||
                             c.desc.toLowerCase().includes(courseSearchQuery.toLowerCase());
         return matchCat && matchSearch;
       });
 
+      const navCount = document.getElementById('nav-course-count');
+      if (navCount) navCount.textContent = COURSES.length;
+
       if (filtered.length === 0) {
-        container.innerHTML = `<div class="col-span-2 text-center py-12 font-mono text-slate-400">No courses found matching your filter.</div>`;
+        container.innerHTML = `
+          <div class="col-span-1 md:col-span-2 text-center py-12 px-6 rounded-2xl bg-white border border-slate-200 space-y-2">
+            <span class="text-3xl">🔍</span>
+            <h5 class="font-bold text-slate-800 text-sm">No courses found matching "${courseSearchQuery}"</h5>
+            <p class="text-xs text-slate-500 font-mono">Try adjusting your search terms or clearing the category filter.</p>
+            <button onclick="setCourseFilter('all')" class="mt-2 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold text-xs font-mono">Clear Filters</button>
+          </div>
+        `;
         return;
       }
 
       container.innerHTML = filtered.map(c => `
-        <div class="p-7 rounded-2xl bg-white border border-slate-200 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all space-y-5 flex flex-col justify-between">
-          <div class="space-y-4">
-            <div class="flex items-center justify-between">
-              <span class="px-3 py-1 rounded-lg bg-sky-50 text-sky-700 text-xs font-mono font-bold border border-sky-200">${c.code}</span>
-              <span class="text-xs font-mono text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">✓ Grade: ${c.grade}</span>
+        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-5 flex flex-col justify-between portal-card">
+          <div class="space-y-3.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 text-xs font-mono font-bold border border-sky-200">${c.code}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] font-mono text-slate-500 font-semibold">${c.credits} Cr</span>
+                <span class="text-[11px] font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Grade: ${c.grade}</span>
+              </div>
             </div>
+
             <div>
-              <h4 class="font-bold text-slate-900 text-2xl">${c.name}</h4>
-              <p class="text-xs text-slate-600 mt-2 leading-relaxed">${c.desc}</p>
+              <h4 class="font-extrabold text-slate-900 text-lg hover:text-sky-700 cursor-pointer transition-colors" onclick="openCourseDetails(${c.id})">${c.name}</h4>
+              <p class="text-xs text-slate-600 mt-1.5 leading-relaxed line-clamp-2">${c.desc}</p>
+            </div>
+
+            <div class="pt-1 flex flex-col gap-1.5 text-xs text-slate-500 font-mono">
+              <div class="flex items-center justify-between">
+                <span>Instructor: <strong class="text-slate-800">${c.prof}</strong></span>
+                <span class="text-emerald-600 font-bold">Attn: ${c.attendance}%</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-400">
+                <span>Room: ${c.room}</span>
+              </div>
             </div>
           </div>
-          <div class="pt-4 border-t border-slate-100 flex justify-between items-center text-xs font-mono">
-            <span class="text-slate-500">Instructor: ${c.prof}</span>
-            <button onclick="launchExam('${c.code} - ${c.name}')" class="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold transition-all shadow-sm cursor-pointer">
+
+          <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+            <button onclick="openCourseDetails(${c.id})" class="px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold transition-all cursor-pointer border border-slate-200">
+              Syllabus &amp; Details
+            </button>
+            <button onclick="launchExam('${c.code} - ${c.name}')" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold transition-all shadow-xs cursor-pointer">
               Launch Online Exam →
             </button>
           </div>
@@ -392,13 +1799,13 @@
 
     function setCourseFilter(cat) {
       currentCourseCat = cat;
-      ['all', 'cs', 'ai'].forEach(c => {
+      ['all', 'cs', 'ai', 'elec'].forEach(c => {
         const btn = document.getElementById(`course-${c}`);
         if (btn) {
           if (c === cat) {
-            btn.className = 'px-3.5 py-2 rounded-xl bg-sky-600 text-white font-bold cursor-pointer';
+            btn.className = 'px-3.5 py-2 rounded-xl bg-sky-600 text-white font-bold cursor-pointer transition-all';
           } else {
-            btn.className = 'px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer';
+            btn.className = 'px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer transition-all';
           }
         }
       });
@@ -410,10 +1817,664 @@
       renderCourses();
     }
 
+    function openCourseDetails(courseId) {
+      const course = COURSES.find(c => c.id === courseId);
+      if (!course) return;
+      selectedCourseForModal = course;
+
+      document.getElementById('cd-title').textContent = `${course.code}: ${course.name}`;
+      document.getElementById('cd-subtitle').textContent = `Instructor: ${course.prof} &bull; Room: ${course.room}`;
+      document.getElementById('cd-code').textContent = course.code;
+      document.getElementById('cd-credits').textContent = `${course.credits} Credits (${course.cat.toUpperCase()})`;
+      document.getElementById('cd-desc').textContent = course.desc;
+      document.getElementById('cd-prof').textContent = `${course.prof} (Office: NAB-312)`;
+
+      const modulesContainer = document.getElementById('cd-modules');
+      modulesContainer.innerHTML = (course.modules || []).map(m => `
+        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 flex items-start gap-2">
+          <span class="text-sky-600 font-bold">§</span>
+          <span>${m}</span>
+        </div>
+      `).join('');
+
+      document.getElementById('course-details-modal').classList.remove('hidden');
+    }
+
+    function closeCourseDetailsModal() {
+      document.getElementById('course-details-modal').classList.add('hidden');
+      selectedCourseForModal = null;
+    }
+
+    function launchExamFromDetails() {
+      if (selectedCourseForModal) {
+        const c = selectedCourseForModal;
+        closeCourseDetailsModal();
+        launchExam(`${c.code} - ${c.name}`);
+      }
+    }
+
+    // ================= TIMETABLE DATA & SELECTION =================
+    const TIMETABLE_DATA = {
+      Monday: [
+        { time: "08:00 – 08:50 AM", code: "CS F301", name: "Data Structures & Algorithms", type: "Lecture", room: "Lecture Hall LH-101", prof: "Prof. K. R. Sharma", status: "Completed" },
+        { time: "09:00 – 09:50 AM", code: "CS F360", name: "Distributed Operating Systems", type: "Lecture", room: "Lecture Hall LH-103", prof: "Prof. S. R. Iyengar", status: "Completed" },
+        { time: "11:00 – 11:50 AM", code: "AI F420", name: "Deep Neural Reinforcement Learning", type: "Lecture", room: "AI Lab 2", prof: "Dr. Vikram Sethi", status: "Upcoming" },
+        { time: "02:00 – 03:50 PM", code: "CS F301L", name: "Data Structures Practical Lab (Graph Alg)", type: "Practical Lab", room: "Computing Lab 3", prof: "Dr. Anita Deshmukh", status: "Upcoming" }
+      ],
+      Tuesday: [
+        { time: "09:00 – 09:50 AM", code: "CS F402", name: "AI Security & Behavioral Biometrics", type: "Lecture", room: "CS Seminar Hall 204", prof: "Dr. Anita Deshmukh", status: "Scheduled" },
+        { time: "10:00 – 10:50 AM", code: "CS F342", name: "Computer Networks & Protocols", type: "Lecture", room: "Lecture Hall LH-102", prof: "Dr. Meenakshi Sundaram", status: "Scheduled" },
+        { time: "11:30 – 12:20 PM", code: "ECON F211", name: "Principles of Economics & Tech Ventures", type: "Lecture", room: "Auditorium AUD-2", prof: "Prof. Rajiv Kapoor", status: "Scheduled" },
+        { time: "02:00 – 04:00 PM", code: "CS F360L", name: "Distributed Systems Raft Consensus Lab", type: "Practical Lab", room: "Systems Research Lab", prof: "Prof. S. R. Iyengar", status: "Scheduled" }
+      ],
+      Wednesday: [
+        { time: "08:00 – 08:50 AM", code: "CS F301", name: "Data Structures & Algorithms", type: "Lecture", room: "Lecture Hall LH-101", prof: "Prof. K. R. Sharma", status: "Scheduled" },
+        { time: "10:00 – 10:50 AM", code: "CS F360", name: "Distributed Operating Systems", type: "Lecture", room: "Lecture Hall LH-103", prof: "Prof. S. R. Iyengar", status: "Scheduled" },
+        { time: "02:00 – 03:30 PM", code: "AI F420L", name: "Deep RL PyTorch Gymnastics Lab", type: "Practical Lab", room: "AI Lab 2", prof: "Dr. Vikram Sethi", status: "Scheduled" }
+      ],
+      Thursday: [
+        { time: "09:00 – 09:50 AM", code: "CS F402", name: "AI Security & Behavioral Biometrics", type: "Lecture", room: "CS Seminar Hall 204", prof: "Dr. Anita Deshmukh", status: "Scheduled" },
+        { time: "10:00 – 10:50 AM", code: "CS F342", name: "Computer Networks & Protocols", type: "Lecture", room: "Lecture Hall LH-102", prof: "Dr. Meenakshi Sundaram", status: "Scheduled" },
+        { time: "02:00 – 03:50 PM", code: "CS F342L", name: "Socket Programming & Wireshark Lab", type: "Practical Lab", room: "Networking Lab 1", prof: "Dr. Meenakshi Sundaram", status: "Scheduled" }
+      ],
+      Friday: [
+        { time: "09:00 – 09:50 AM", code: "AI F420", name: "Deep Neural Reinforcement Learning", type: "Lecture", room: "AI Lab 2", prof: "Dr. Vikram Sethi", status: "Scheduled" },
+        { time: "10:00 – 10:50 AM", code: "ECON F211", name: "Principles of Economics & Tech Ventures", type: "Lecture", room: "Auditorium AUD-2", prof: "Prof. Rajiv Kapoor", status: "Scheduled" },
+        { time: "02:00 – 04:00 PM", code: "CS F491", name: "Senior Capstone Mentorship & Thesis", type: "Tutorial", room: "Faculty Office NAB-312", prof: "Faculty Committee", status: "Scheduled" }
+      ],
+      Saturday: [
+        { time: "10:00 – 11:30 AM", code: "SEMINAR", name: "ACM Student Chapter: GenAI & Security Talks", type: "Tutorial", room: "Main Auditorium", prof: "Guest Speakers", status: "Optional" }
+      ]
+    };
+
+    let currentTimetableDay = 'Monday';
+
+    function setTimetableDay(day) {
+      currentTimetableDay = day;
+      ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].forEach(d => {
+        const btn = document.getElementById(`tt-day-${d}`);
+        if (btn) {
+          if (d === day) {
+            btn.className = 'px-4 py-2 rounded-xl bg-sky-600 text-white font-bold cursor-pointer shadow-xs';
+          } else {
+            btn.className = 'px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer';
+          }
+        }
+      });
+      renderTimetable();
+    }
+
+    function renderTimetable() {
+      const container = document.getElementById('timetable-slots-container');
+      if (!container) return;
+
+      const slots = TIMETABLE_DATA[currentTimetableDay] || [];
+      if (slots.length === 0) {
+        container.innerHTML = `<div class="p-8 text-center text-slate-400 font-mono text-xs bg-white rounded-2xl border border-slate-200">No scheduled classes for ${currentTimetableDay}.</div>`;
+        return;
+      }
+
+      container.innerHTML = slots.map(slot => {
+        const typeBadge = slot.type === 'Practical Lab' 
+          ? 'bg-purple-50 text-purple-700 border-purple-200'
+          : (slot.type === 'Tutorial' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-sky-50 text-sky-700 border-sky-200');
+
+        return `
+          <div class="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 portal-card">
+            <div class="flex items-start sm:items-center gap-4">
+              <div class="px-3 py-2 rounded-xl bg-slate-100 font-mono text-xs font-bold text-slate-800 text-center shrink-0 min-w-[125px]">
+                ⏰ ${slot.time}
+              </div>
+              <div class="space-y-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${typeBadge} border">${slot.type}</span>
+                  <span class="font-mono text-xs text-sky-700 font-bold">${slot.code}</span>
+                  <strong class="text-sm font-extrabold text-slate-900">${slot.name}</strong>
+                </div>
+                <div class="flex items-center gap-3 text-xs text-slate-500 font-mono">
+                  <span>📍 ${slot.room}</span>
+                  <span>&bull;</span>
+                  <span>Instructor: ${slot.prof}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+              <span class="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg ${slot.status === 'Completed' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}">
+                ${slot.status}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ================= ASSIGNMENTS DATA & SUBMISSION =================
+    const ASSIGNMENTS_DATA = [
+      {
+        id: 1,
+        courseCode: "CS F360",
+        courseName: "Distributed Operating Systems",
+        title: "Assignment 4: Raft Consensus State Machine & Leader Election",
+        dueDate: "October 19, 2026 (11:59 PM)",
+        daysLeft: "Due in 4 days",
+        points: "50 Marks (10% Weightage)",
+        status: "pending",
+        desc: "Implement heartbeat interval randomization, candidate vote requests, and RPC log catchup in Go or C++."
+      },
+      {
+        id: 2,
+        courseCode: "CS F301",
+        courseName: "Data Structures & Algorithms",
+        title: "Programming Lab 5: Maximum Flow Min-Cut using Push-Relabel Algorithm",
+        dueDate: "October 22, 2026 (05:00 PM)",
+        daysLeft: "Due in 7 days",
+        points: "30 Marks (5% Weightage)",
+        status: "pending",
+        desc: "Implement preflow-push with highest-label heuristic and compare execution benchmarks against Edmonds-Karp."
+      },
+      {
+        id: 3,
+        courseCode: "CS F402",
+        courseName: "AI Security & Biometrics",
+        title: "Term Survey Paper: Adversarial Robustness in Keystroke Telemetry",
+        dueDate: "November 02, 2026 (11:59 PM)",
+        daysLeft: "Due in 18 days",
+        points: "100 Marks (20% Weightage)",
+        status: "pending",
+        desc: "Write an IEEE format survey evaluating GAN-based bot synthesis against Isolation Forest anomaly detectors."
+      },
+      {
+        id: 4,
+        courseCode: "AI F420",
+        courseName: "Deep Reinforcement Learning",
+        title: "Problem Set 2: Deep Q-Learning on LunarLander-v2",
+        dueDate: "October 10, 2026 (Completed)",
+        daysLeft: "Submitted",
+        points: "50 Marks (Grade: 48/50)",
+        status: "submitted",
+        desc: "DQN implementation with experience replay buffer size 50,000 and target network update frequency 1000 steps."
+      },
+      {
+        id: 5,
+        courseCode: "CS F342",
+        courseName: "Computer Networks & Protocols",
+        title: "Socket Lab 3: Concurrent Multi-Threaded HTTP/1.1 Proxy Server with Caching",
+        dueDate: "October 05, 2026 (Completed)",
+        daysLeft: "Submitted",
+        points: "40 Marks (Grade: 39/40)",
+        status: "submitted",
+        desc: "POSIX sockets proxy with LRU cache eviction and connection keep-alive handling."
+      }
+    ];
+
+    let currentAssignmentFilter = 'all';
+    let selectedAssignmentForSubmit = null;
+
+    function setAssignmentFilter(filter) {
+      currentAssignmentFilter = filter;
+      ['all', 'pending', 'submitted'].forEach(f => {
+        const btn = document.getElementById(`asgn-filter-${f}`);
+        if (btn) {
+          if (f === filter) {
+            btn.className = 'px-3.5 py-1.5 rounded-xl bg-sky-600 text-white font-bold cursor-pointer';
+          } else {
+            btn.className = 'px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer';
+          }
+        }
+      });
+      renderAssignments();
+    }
+
+    function renderAssignments() {
+      const container = document.getElementById('assignments-list-container');
+      if (!container) return;
+
+      const filtered = ASSIGNMENTS_DATA.filter(a => {
+        if (currentAssignmentFilter === 'all') return true;
+        return a.status === currentAssignmentFilter;
+      });
+
+      const pendingCount = ASSIGNMENTS_DATA.filter(a => a.status === 'pending').length;
+      const navPending = document.getElementById('nav-pending-count');
+      if (navPending) navPending.textContent = `${pendingCount} Due`;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="p-8 text-center text-slate-400 font-mono text-xs bg-white rounded-2xl border border-slate-200">No ${currentAssignmentFilter} assignments found.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(a => {
+        const isSubmitted = a.status === 'submitted';
+        const badge = isSubmitted 
+          ? '<span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-mono font-bold">✓ Submitted</span>'
+          : '<span class="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-mono font-bold">⏳ ' + a.daysLeft + '</span>';
+
+        return `
+          <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 portal-card">
+            <div class="space-y-1.5">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-50 text-sky-700 border border-sky-200">${a.courseCode}</span>
+                <strong class="text-sm font-extrabold text-slate-900">${a.title}</strong>
+                ${badge}
+              </div>
+              <p class="text-xs text-slate-600">${a.desc}</p>
+              <div class="flex items-center gap-4 text-xs font-mono text-slate-500 pt-1">
+                <span>Deadline: <strong class="text-slate-700">${a.dueDate}</strong></span>
+                <span>&bull;</span>
+                <span>${a.points}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0 self-end md:self-auto font-mono text-xs">
+              ${isSubmitted ? `
+                <button onclick="viewSubmissionReceipt(${a.id})" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-all cursor-pointer">
+                  Receipt &amp; Feedback
+                </button>
+              ` : `
+                <button onclick="openSubmitAssignmentModal(${a.id})" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold shadow-xs transition-all cursor-pointer">
+                  Submit Deliverable →
+                </button>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openSubmitAssignmentModal(asgnId) {
+      const asgn = ASSIGNMENTS_DATA.find(a => a.id === asgnId);
+      if (!asgn) return;
+      selectedAssignmentForSubmit = asgn;
+      document.getElementById('asgn-modal-course').textContent = `${asgn.courseCode}: ${asgn.title}`;
+      document.getElementById('selected-file-label').classList.add('hidden');
+      document.getElementById('asgn-comments').value = '';
+      document.getElementById('assignment-submit-modal').classList.remove('hidden');
+    }
+
+    function closeSubmitAssignmentModal() {
+      document.getElementById('assignment-submit-modal').classList.add('hidden');
+      selectedAssignmentForSubmit = null;
+    }
+
+    function updateSelectedFileName(input) {
+      const label = document.getElementById('selected-file-label');
+      if (input.files && input.files[0]) {
+        label.textContent = `Selected: ${input.files[0].name} (${(input.files[0].size / 1024).toFixed(1)} KB)`;
+        label.classList.remove('hidden');
+      }
+    }
+
+    function handleAssignmentSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-submit-assignment');
+      btn.innerHTML = `<span>Uploading to Moodle...</span>`;
+      
+      setTimeout(() => {
+        if (selectedAssignmentForSubmit) {
+          selectedAssignmentForSubmit.status = 'submitted';
+          selectedAssignmentForSubmit.daysLeft = 'Submitted Just Now';
+          selectedAssignmentForSubmit.points = 'Pending Grading (Submitted)';
+        }
+        btn.innerHTML = `<span>Upload &amp; Submit →</span>`;
+        closeSubmitAssignmentModal();
+        renderAssignments();
+        showToast("Deliverable Submitted", "Demo Portal: Submission receipt #REC-MUD-9281 logged. Authenticity signed.", "✅");
+      }, 900);
+    }
+
+    function viewSubmissionReceipt(asgnId) {
+      const asgn = ASSIGNMENTS_DATA.find(a => a.id === asgnId);
+      if (!asgn) return;
+      showToast("Submission Verified", `Receipt: #${asgn.courseCode}-SUB-2026. Grade/Evaluation: ${asgn.points}`, "📜");
+    }
+
+    // ================= EXAM SCHEDULE DATA & SEARCH =================
+    const EXAMS_DATA = [
+      {
+        id: 1,
+        code: "CS F301",
+        name: "Data Structures & Algorithms",
+        type: "theory",
+        date: "November 12, 2026 (Wednesday)",
+        time: "09:00 AM – 11:30 AM",
+        venue: "Examination Hall Complex Hall A",
+        seat: "Desk A-42",
+        status: "Seating Confirmed"
+      },
+      {
+        id: 2,
+        code: "CS F402",
+        name: "AI Security & Behavioral Biometrics",
+        type: "theory",
+        date: "November 14, 2026 (Friday)",
+        time: "02:00 PM – 04:30 PM",
+        venue: "Examination Hall Complex Hall B",
+        seat: "Desk B-18",
+        status: "Seating Confirmed"
+      },
+      {
+        id: 3,
+        code: "CS F360",
+        name: "Distributed Operating Systems",
+        type: "theory",
+        date: "November 17, 2026 (Monday)",
+        time: "09:00 AM – 11:30 AM",
+        venue: "Lecture Hall Complex LH-101",
+        seat: "Desk LH-09",
+        status: "Seating Confirmed"
+      },
+      {
+        id: 4,
+        code: "AI F420",
+        name: "Deep Reinforcement Learning (Lab Viva)",
+        type: "practical",
+        date: "November 19, 2026 (Wednesday)",
+        time: "10:00 AM – 01:00 PM",
+        venue: "AI Center of Excellence Lab 2",
+        seat: "Terminal AI-04",
+        status: "Seating Confirmed"
+      },
+      {
+        id: 5,
+        code: "CS F342",
+        name: "Computer Networks Protocols (Lab Exam)",
+        type: "practical",
+        date: "November 21, 2026 (Friday)",
+        time: "02:00 PM – 05:00 PM",
+        venue: "Networking Systems Lab 1",
+        seat: "Terminal NET-22",
+        status: "Seating Confirmed"
+      }
+    ];
+
+    let currentExamFilter = 'all';
+    let examSearchQuery = '';
+
+    function filterExams(type) {
+      currentExamFilter = type;
+      ['all', 'theory', 'practical'].forEach(t => {
+        const btn = document.getElementById(`exam-filter-${t}`);
+        if (btn) {
+          if (t === type) {
+            btn.className = 'px-3.5 py-2 rounded-xl bg-sky-600 text-white font-bold cursor-pointer';
+          } else {
+            btn.className = 'px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer';
+          }
+        }
+      });
+      renderExams();
+    }
+
+    function searchExams() {
+      examSearchQuery = document.getElementById('exam-search-input')?.value || '';
+      renderExams();
+    }
+
+    function renderExams() {
+      const container = document.getElementById('exams-container');
+      if (!container) return;
+
+      const filtered = EXAMS_DATA.filter(e => {
+        const matchType = (currentExamFilter === 'all' || e.type === currentExamFilter);
+        const matchSearch = e.name.toLowerCase().includes(examSearchQuery.toLowerCase()) ||
+                            e.code.toLowerCase().includes(examSearchQuery.toLowerCase()) ||
+                            e.venue.toLowerCase().includes(examSearchQuery.toLowerCase());
+        return matchType && matchSearch;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="p-8 text-center text-slate-400 font-mono text-xs bg-white rounded-2xl border border-slate-200">No exams matching your criteria.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(e => `
+        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 portal-card">
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-50 text-sky-700 border border-sky-200">${e.code}</span>
+              <strong class="text-sm font-extrabold text-slate-900">${e.name}</strong>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${e.type === 'practical' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-slate-100 text-slate-700'}">${e.type}</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-600 pt-1">
+              <span>📅 <strong>${e.date}</strong></span>
+              <span>⏰ ${e.time}</span>
+              <span>📍 ${e.venue}</span>
+            </div>
+            <div class="text-[11px] font-mono text-slate-500">
+              Allocated Seat: <strong class="text-sky-700">${e.seat}</strong> &bull; <span class="text-emerald-600 font-semibold">DigiLocker Aadhaar ID Verified</span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0 self-end md:self-auto font-mono text-xs">
+            <button onclick="downloadDemoHallTicket('${e.code}')" class="px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold cursor-pointer">
+              📥 Hall Ticket
+            </button>
+            <button onclick="launchExam('${e.code} - ${e.name}')" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold shadow-xs cursor-pointer">
+              Launch Proctored Exam →
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function downloadDemoHallTicket(courseCode) {
+      showToast("Hall Ticket Generated", `Digital Exam Pass for ${courseCode} downloaded (PDF with cryptographic seal).`, "🎟️");
+    }
+
+    // ================= NOTICES & CIRCULARS (EXPANDABLE) =================
+    const ANNOUNCEMENTS_DATA = [
+      {
+        id: 1,
+        title: "End-Semester Examination Time Table (Nov–Dec 2026) Official Release",
+        category: "exam",
+        date: "October 14, 2026",
+        authority: "Office of the Controller of Examinations",
+        circularNo: "BITS/COE/2026/CIR-842",
+        summary: "Detailed schedule for Semester VII comprehensive theory and practical examinations has been published.",
+        details: "All registered students are advised to check their examination timetable on the student portal. Any schedule clashes must be reported to the academic division before October 25, 2026. Hall tickets with biometric seating allocation will be enabled 7 days prior to exams."
+      },
+      {
+        id: 2,
+        title: "Campus Placement Season 2026: Tier-1 Tech Registration & Slot Allocation",
+        category: "placement",
+        date: "October 11, 2026",
+        authority: "Placement & Training Cell (Pilani)",
+        circularNo: "BITS/PTC/2026/PL-109",
+        summary: "Google, Microsoft, Nvidia, and DE Shaw visiting for Day 1 software engineering and ML systems interviews.",
+        details: "Eligibility criteria: Cumulative CGPA 8.00 and above with zero backlogs. Verified DigiLocker gradebooks must be updated in the portal. Pre-placement talks will be streamed in Auditorium AUD-1 starting next Monday."
+      },
+      {
+        id: 3,
+        title: "APOGEE 2026 — Annual Technical Festival Project Demonstrations Call",
+        category: "academic",
+        date: "October 08, 2026",
+        authority: "Department of Computer Science & APOGEE Secretariat",
+        circularNo: "BITS/CS/2026/APO-03",
+        summary: "Submissions open for student research prototypes in Cybersecurity, Agentic AI, and Robotics.",
+        details: "Selected projects will be exhibited to industry mentors and venture capital evaluators during the flagship summit. Project grants up to ₹1,50,000 available for top innovations. Deadline for abstract submission: October 30, 2026."
+      },
+      {
+        id: 4,
+        title: "Mid-Term Course Feedback & Teaching Evaluation Window Open",
+        category: "academic",
+        date: "October 03, 2026",
+        authority: "Dean of Academic Affairs",
+        circularNo: "BITS/ACAD/2026/EVAL-19",
+        summary: "Mandatory student feedback for ongoing 7th semester core courses and electives.",
+        details: "Students are requested to provide candid feedback regarding lecture pace, laboratory assignments, and tutorial clarity. All responses are strictly anonymized and used for curriculum enhancement."
+      }
+    ];
+
+    let currentNoticeFilter = 'all';
+    let expandedNoticeId = null;
+
+    function filterAnnouncements(cat) {
+      currentNoticeFilter = cat;
+      ['all', 'academic', 'exam', 'placement'].forEach(c => {
+        const btn = document.getElementById(`notice-filter-${c}`);
+        if (btn) {
+          if (c === cat) {
+            btn.className = 'px-3 py-1.5 rounded-xl bg-sky-600 text-white font-bold cursor-pointer';
+          } else {
+            btn.className = 'px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer';
+          }
+        }
+      });
+      renderAnnouncements();
+    }
+
+    function toggleAnnouncement(id) {
+      expandedNoticeId = (expandedNoticeId === id) ? null : id;
+      renderAnnouncements();
+    }
+
+    function renderAnnouncements() {
+      const container = document.getElementById('announcements-container');
+      if (!container) return;
+
+      const filtered = ANNOUNCEMENTS_DATA.filter(n => {
+        if (currentNoticeFilter === 'all') return true;
+        return n.category === currentNoticeFilter;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="p-8 text-center text-slate-400 font-mono text-xs bg-white rounded-2xl border border-slate-200">No circulars in this category.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(n => {
+        const isExpanded = (expandedNoticeId === n.id);
+        const catBadge = n.category === 'exam' 
+          ? 'bg-amber-50 text-amber-800 border-amber-200' 
+          : (n.category === 'placement' ? 'bg-purple-50 text-purple-800 border-purple-200' : 'bg-sky-50 text-sky-800 border-sky-200');
+
+        return `
+          <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3 portal-card cursor-pointer" onclick="toggleAnnouncement(${n.id})">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${catBadge} border">${n.category}</span>
+                <span class="text-xs font-mono text-slate-400">${n.date}</span>
+                <span class="text-[11px] font-mono text-slate-400 hidden sm:inline">&bull; ${n.circularNo}</span>
+              </div>
+              <button class="text-slate-400 hover:text-slate-700 text-sm font-bold p-1">
+                ${isExpanded ? '▲' : '▼'}
+              </button>
+            </div>
+
+            <div class="space-y-1">
+              <h4 class="font-extrabold text-base text-slate-900">${n.title}</h4>
+              <p class="text-xs text-slate-600 leading-relaxed">${n.summary}</p>
+            </div>
+
+            ${isExpanded ? `
+              <div class="pt-3 border-t border-slate-100 space-y-2 text-xs text-slate-700 font-sans leading-relaxed animate-fade-in bg-slate-50/70 p-3.5 rounded-xl">
+                <p>${n.details}</p>
+                <div class="pt-2 flex items-center justify-between text-[11px] font-mono text-slate-500">
+                  <span>Issued By: <strong>${n.authority}</strong></span>
+                  <span class="text-sky-700 font-bold">Ref: ${n.circularNo}</span>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ================= DEMO ACTIONS & HELPER FUNCTIONS =================
+    function downloadDemoResource(resourceName) {
+      showToast("Download Initialized", `Demo download ready: ${resourceName}`, "📥");
+    }
+
+    function openServiceModal(serviceType) {
+      const modal = document.getElementById('service-contact-modal');
+      const title = document.getElementById('service-modal-title');
+      const subtitle = document.getElementById('service-modal-subtitle');
+      const icon = document.getElementById('service-modal-icon');
+      const body = document.getElementById('service-modal-body');
+
+      if (serviceType === 'library') {
+        icon.textContent = '📚';
+        title.textContent = 'Central Library Online Services';
+        subtitle.textContent = 'BITS Pilani Main Library &bull; Reading Hall 24/7';
+        body.innerHTML = `
+          <div class="p-3 rounded-xl bg-sky-50 border border-sky-100 space-y-1">
+            <strong>Active Book Loans: 2 Books</strong>
+            <p class="text-[11px] text-slate-600">1. Introduction to Algorithms (CLRS 4th Ed) &bull; Due: Nov 04, 2026</p>
+            <p class="text-[11px] text-slate-600">2. Designing Data-Intensive Applications (Kleppmann) &bull; Due: Nov 09, 2026</p>
+          </div>
+          <p class="text-slate-600 text-xs">Renewals can be processed online 48 hours before the due date. Off-campus proxy for IEEE/ACM digital library is active via student SSO.</p>
+          <div class="pt-1">
+            <button onclick="showToast('Books Renewed', 'Both active book loans extended by 14 days.', '✅'); closeServiceModal();" class="w-full py-2 rounded-xl bg-sky-600 text-white font-bold text-xs">
+              Renew All Books Now
+            </button>
+          </div>
+        `;
+      } else if (serviceType === 'faculty') {
+        icon.textContent = '👨‍🏫';
+        title.textContent = 'Faculty Consultation Hours Directory';
+        subtitle.textContent = 'Department of Computer Science & Engineering';
+        body.innerHTML = `
+          <div class="space-y-2 text-xs">
+            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+              <strong>Prof. K. R. Sharma (Head of Dept)</strong>
+              <p class="text-[11px] text-slate-500 font-mono">Tue &amp; Thu: 03:00 – 05:00 PM &bull; Room NAB-312</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+              <strong>Dr. Anita Deshmukh (AI Security)</strong>
+              <p class="text-[11px] text-slate-500 font-mono">Mon &amp; Wed: 04:00 – 05:30 PM &bull; Room NAB-319</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+              <strong>Prof. S. R. Iyengar (Distributed Systems)</strong>
+              <p class="text-[11px] text-slate-500 font-mono">Fri: 02:00 – 04:00 PM &bull; Room NAB-210</p>
+            </div>
+          </div>
+        `;
+      } else if (serviceType === 'health') {
+        icon.textContent = '🏥';
+        title.textContent = 'Campus Health Center & Counseling';
+        subtitle.textContent = 'Medical Center (Opposite Student Activity Centre)';
+        body.innerHTML = `
+          <p class="text-xs text-slate-600 leading-relaxed">
+            The Medical Center is staffed 24 hours a day with resident medical officers, emergency pharmacy, and diagnostic pathology.
+          </p>
+          <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 font-mono text-xs text-emerald-900 space-y-1">
+            <div>📞 Emergency Ambulance: <strong>+91-1596-242216</strong></div>
+            <div>🩺 Medical Superintendent: <strong>Ext. 204</strong></div>
+            <div>🧠 Student Wellness Counseling: <strong>Ext. 318</strong></div>
+          </div>
+        `;
+      } else {
+        icon.textContent = '💼';
+        title.textContent = 'Placement & Career Development Cell';
+        subtitle.textContent = 'Placement Season 2026 &bull; Tier-1 Drives';
+        body.innerHTML = `
+          <div class="p-3 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-900 space-y-1.5 font-mono">
+            <div>Student Verification: <strong>Eligible (Criteria Met)</strong></div>
+            <div>Master Resume: <strong>Signed &amp; Approved</strong></div>
+            <div>DigiLocker Records: <strong>Attached to Profile</strong></div>
+          </div>
+          <p class="text-xs text-slate-600">Company shortlists and interview slot notifications will trigger in your student notification drawer.</p>
+        `;
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeServiceModal() {
+      document.getElementById('service-contact-modal').classList.add('hidden');
+    }
+
+    // ================= EXAM MODAL LAUNCH (PRESERVED) =================
     function launchExam(courseName) {
       if (!isStudentLoggedIn) {
         showToast("Student Authentication Required", "Please sign in to launch online exams.", "🔒");
         openStudentSignInModal();
+        return;
+      }
+      if (window.cognisec && !window.cognisec.isFullyVerified()) {
+        showToast("Verification Required", "Academic exam terminal locked until mandatory identity OTP is verified.", "🔒");
+        if (window.cognisec.triggerLoginOtpModal) window.cognisec.triggerLoginOtpModal();
         return;
       }
       document.getElementById('exam-course-name').textContent = courseName;
@@ -426,6 +2487,11 @@
       if (!isStudentLoggedIn) {
         showToast("Student Authentication Required", "Please sign in to access DigiLocker credentials.", "🔒");
         openStudentSignInModal();
+        return;
+      }
+      if (window.cognisec && !window.cognisec.isFullyVerified()) {
+        showToast("Verification Required", "DigiLocker credentials locked until mandatory identity OTP is verified.", "🔒");
+        if (window.cognisec.triggerLoginOtpModal) window.cognisec.triggerLoginOtpModal();
         return;
       }
       launchExam('DigiLocker Student Verification');
@@ -450,8 +2516,19 @@
       }, 1400);
     }
 
-    // Initialize
+    // ================= INITIALIZE ALL SECTIONS =================
+    document.addEventListener('DOMContentLoaded', () => {
+      renderCourses();
+      renderTimetable();
+      renderAssignments();
+      renderExams();
+      renderAnnouncements();
+    });
     renderCourses();
+    renderTimetable();
+    renderAssignments();
+    renderExams();
+    renderAnnouncements();
   </script>
 </body>
 </html>

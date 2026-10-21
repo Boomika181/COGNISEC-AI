@@ -5,6 +5,9 @@ from app.models.session import Session
 from app.models.behavior import BehaviorLog, BehaviorProfile
 from app.models.security_event import SecurityEvent
 from app.models.alert import Alert
+from app.models.adaptive_factor import AdaptiveFactor
+from app.models.notification import DeviceNotification
+from app.models.application_grant import ApplicationGrant
 
 __all__ = [
     "Base",
@@ -15,4 +18,7 @@ __all__ = [
     "BehaviorProfile",
     "SecurityEvent",
     "Alert",
+    "AdaptiveFactor",
+    "DeviceNotification",
+    "ApplicationGrant",
 ]

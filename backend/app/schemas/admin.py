@@ -71,3 +71,27 @@ class AttackSimulationResponse(BaseModel):
     alert_created: bool
     alert_id: Optional[int]
     message: str
+
+
+class EmailDiagnosticsResponse(BaseModel):
+    smtp_enabled: bool
+    smtp_host: str
+    smtp_port: int
+    smtp_tls: bool
+    smtp_timeout_seconds: int
+    smtp_user_configured: bool
+    smtp_password_configured: bool
+    sender_configured: bool
+    sender_email: str
+    delivery_status: str
+    app_base_url: str
+    exhibition_mode: bool
+
+
+class EmailTestRequest(BaseModel):
+    recipient_email: str
+
+
+class EmailTestResponse(BaseModel):
+    success: bool
+    message: str

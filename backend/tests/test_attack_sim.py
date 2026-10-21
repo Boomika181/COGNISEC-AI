@@ -1,5 +1,14 @@
-def test_simulate_new_device_scenario(client, user_token):
+def test_normal_user_blocked_from_attack_simulation(client, user_token):
     res = client.post("/api/demo/simulate", headers={"Authorization": f"Bearer {user_token}"}, json={
+        "scenario": "SESSION_HIJACKING",
+        "application": "healthcare"
+    })
+    assert res.status_code == 403
+    assert "Administrator privileges required" in res.json()["detail"]
+
+
+def test_simulate_new_device_scenario(client, admin_token):
+    res = client.post("/api/demo/simulate", headers={"Authorization": f"Bearer {admin_token}"}, json={
         "scenario": "NEW_DEVICE",
         "application": "college"
     })
@@ -10,8 +19,8 @@ def test_simulate_new_device_scenario(client, user_token):
     assert data["alert_created"] is True
 
 
-def test_simulate_abnormal_typing_scenario(client, user_token):
-    res = client.post("/api/demo/simulate", headers={"Authorization": f"Bearer {user_token}"}, json={
+def test_simulate_abnormal_typing_scenario(client, admin_token):
+    res = client.post("/api/demo/simulate", headers={"Authorization": f"Bearer {admin_token}"}, json={
         "scenario": "ABNORMAL_TYPING",
         "application": "ecommerce"
     })
@@ -22,8 +31,8 @@ def test_simulate_abnormal_typing_scenario(client, user_token):
     assert data["risk_level"] in ["HIGH", "CRITICAL"]
 
 
-def test_simulate_session_hijacking_kill_switch(client, user_token):
-    res = client.post("/api/demo/simulate", headers={"Authorization": f"Bearer {user_token}"}, json={
+def test_simulate_session_hijacking_kill_switch(client, admin_token):
+    res = client.post("/api/demo/simulate", headers={"Authorization": f"Bearer {admin_token}"}, json={
         "scenario": "SESSION_HIJACKING",
         "application": "healthcare"
     })

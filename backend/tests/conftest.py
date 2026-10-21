@@ -12,9 +12,69 @@ from app.database.base import Base
 from app.database.connection import get_db
 from app.main import app
 from app.core.security import get_password_hash
+from app.core.config import settings
 from app.models.user import User
 from app.models.device import Device
 from app.models.behavior import BehaviorProfile
+
+# Configure test environment
+settings.ENVIRONMENT = "test"
+settings.EXHIBITION_MODE = True
+settings.VERIFIED_COGNISIC_MAILBOXES = [
+    "test.admin@cognisec.ai",
+    "test.user@cognisec.ai",
+    "admin.soc@cognisec.ai",
+    "user.portal@cognisec.ai",
+    "security@cognisec.ai",
+    "security.ops@cognisec.ai"
+]
+
+
+@pytest.fixture(autouse=True)
+def mock_smtp_in_tests(monkeypatch):
+    """Prevents tests from connecting to real Gmail SMTP unless explicitly testing live delivery."""
+    from app.services.email_service import EmailService
+    original_send_otp = getattr(EmailService, "_original_send_otp", EmailService.send_otp_email)
+    original_send_alert = getattr(EmailService, "_original_send_alert", EmailService.send_new_device_login_alert)
+    original_send_reset = getattr(EmailService, "_original_send_reset", EmailService.send_password_reset_email)
+    EmailService._original_send_otp = original_send_otp
+    EmailService._original_send_alert = original_send_alert
+    EmailService._original_send_reset = original_send_reset
+
+    def mocked_send_otp(recipient_email, otp_code, expires_in_minutes=5, *args, **kwargs):
+        if not EmailService.is_configured():
+            return original_send_otp(recipient_email, otp_code, expires_in_minutes, *args, **kwargs)
+        is_deliv, reason = EmailService.is_deliverable_recipient(recipient_email)
+        if not is_deliv:
+            return (False, f"Delivery rejected: {reason}")
+        if os.getenv("TEST_USE_REAL_SMTP", "false").lower() == "true":
+            return original_send_otp(recipient_email, otp_code, expires_in_minutes, *args, **kwargs)
+        return (True, f"Mocked email dispatched to {EmailService.mask_email(recipient_email)}")
+
+    def mocked_send_reset(recipient_email, otp_code, expires_in_minutes=5, *args, **kwargs):
+        if not EmailService.is_configured():
+            return original_send_reset(recipient_email, otp_code, expires_in_minutes, *args, **kwargs)
+        is_deliv, reason = EmailService.is_deliverable_recipient(recipient_email)
+        if not is_deliv:
+            return (False, f"Delivery rejected: {reason}")
+        if os.getenv("TEST_USE_REAL_SMTP", "false").lower() == "true":
+            return original_send_reset(recipient_email, otp_code, expires_in_minutes, *args, **kwargs)
+        return (True, f"Mocked password reset email dispatched to {EmailService.mask_email(recipient_email)}")
+
+    def mocked_send_alert(*args, **kwargs):
+        if not EmailService.is_configured():
+            return original_send_alert(*args, **kwargs)
+        recip = kwargs.get("recipient_email") or (args[0] if len(args) > 0 else "")
+        is_deliv, reason = EmailService.is_deliverable_recipient(recip)
+        if not is_deliv:
+            return (False, f"Delivery rejected: {reason}")
+        if os.getenv("TEST_USE_REAL_SMTP", "false").lower() == "true":
+            return original_send_alert(*args, **kwargs)
+        return (True, "Mocked new device alert dispatched")
+
+    monkeypatch.setattr("app.services.email_service.EmailService.send_otp_email", mocked_send_otp)
+    monkeypatch.setattr("app.services.email_service.EmailService.send_new_device_login_alert", mocked_send_alert)
+    monkeypatch.setattr("app.services.email_service.EmailService.send_password_reset_email", mocked_send_reset)
 
 TEST_DB_URL = "sqlite:///./test_cognisec.db"
 test_engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
@@ -23,6 +83,8 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
+    settings.ENVIRONMENT = "test"
+    settings.EXHIBITION_MODE = True
     Base.metadata.drop_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
     
@@ -68,6 +130,9 @@ def db_session():
 
 @pytest.fixture
 def client(db_session):
+    from app.core.rate_limit import rate_limiter
+    rate_limiter.reset()
+
     def override_get_db():
         try:
             yield db_session
@@ -78,23 +143,30 @@ def client(db_session):
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+    rate_limiter.reset()
 
 
 @pytest.fixture
-def admin_token(client):
+def admin_token(client, db_session):
     res = client.post("/api/auth/login", json={
         "email": "test.admin@cognisec.ai",
         "password": "Admin@123",
         "application": "platform"
     })
+    sid = res.json()["session_id"]
+    from app.services.session_service import SessionService
+    SessionService.activate_session_after_login_otp(db_session, sid)
     return res.json()["access_token"]
 
 
 @pytest.fixture
-def user_token(client):
+def user_token(client, db_session):
     res = client.post("/api/auth/login", json={
         "email": "test.user@cognisec.ai",
         "password": "User@123",
         "application": "ecommerce"
     })
+    sid = res.json()["session_id"]
+    from app.services.session_service import SessionService
+    SessionService.activate_session_after_login_otp(db_session, sid)
     return res.json()["access_token"]

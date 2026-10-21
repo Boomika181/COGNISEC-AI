@@ -6,10 +6,20 @@ def test_step_up_challenge_verification(client, user_token):
     })
     session_id = sess_res.json()["id"]
 
-    # Verify step-up challenge
+    # 1. Request real step-up challenge
+    chal_res = client.post("/api/security/step-up/challenge", headers={"Authorization": f"Bearer {user_token}"}, json={
+        "session_id": session_id
+    })
+    assert chal_res.status_code == 200
+    challenge_data = chal_res.json()
+    assert "otp" in challenge_data
+    assert len(challenge_data["otp"]) == 6
+    otp = challenge_data["otp"]
+
+    # 2. Verify step-up challenge with real OTP
     res = client.post("/api/security/step-up/verify", headers={"Authorization": f"Bearer {user_token}"}, json={
         "session_id": session_id,
-        "challenge_code": "123456"
+        "challenge_code": otp
     })
     assert res.status_code == 200
     data = res.json()

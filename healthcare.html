@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AyuSync MedCare Network — Protected by COGNISEC AI</title>
+  <title>AyuSync MedCare Network — Tertiary Multispecialty Hospital &amp; Patient Portal</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🩺</text></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
   <style>
@@ -11,199 +12,1421 @@
     .font-mono { font-family: 'JetBrains Mono', monospace; }
 
     @keyframes fadeInScale {
-      from { opacity: 0; transform: scale(0.95) translateY(10px); }
+      from { opacity: 0; transform: scale(0.97) translateY(8px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
     }
     .animate-fade-in {
-      animation: fadeInScale 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: fadeInScale 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
-    .patient-card {
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* Step-up modal viewport fit and internal scroll fix */
+    #modal-stepup {
+      max-height: calc(100vh - 24px) !important;
+      box-sizing: border-box !important;
     }
-    .patient-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 20px 30px -10px rgba(16, 185, 129, 0.15);
+    #stepup-modal-container {
+      max-height: calc(100vh - 40px) !important;
+      overflow-y: auto !important;
     }
+
+    .hospital-card-hover {
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .hospital-card-hover:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 32px -8px rgba(13, 148, 136, 0.12);
+    }
+
+    /* Custom scrollbar for clean UI */
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between selection:bg-emerald-500/20 selection:text-emerald-900">
-  
-  <!-- TOP COGNISEC AI CLINICAL SECURITY BANNER -->
-  <div class="bg-slate-950 text-white border-b border-slate-800 px-6 py-2.5 flex items-center justify-between text-xs font-mono shadow-md">
+<body class="min-h-screen flex flex-col justify-between selection:bg-teal-500/20 selection:text-teal-900 bg-slate-50 text-slate-900">
+
+  <!-- TOP EMERGENCY & ACCREDITATION BANNER -->
+  <div class="bg-slate-900 text-white border-b border-slate-800 px-4 sm:px-8 py-2 flex flex-wrap items-center justify-between text-xs font-mono shadow-sm gap-2">
     <div class="flex items-center gap-3">
-      <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-      <span class="text-emerald-400 font-bold">COGNISEC AI CLINICAL GUARD:</span>
-      <span class="text-slate-300">ABDM Ayushman Bharat &amp; HIPAA Proximity Active</span>
+      <span class="flex h-2 w-2 relative">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+      </span>
+      <span class="text-teal-400 font-bold">EMERGENCY 24x7:</span>
+      <span class="text-slate-200">1800-425-AYUSYNC (Toll-Free) &bull; Trauma &amp; Stroke Resuscitation Ready</span>
     </div>
     <div class="flex items-center gap-4 text-slate-400">
-      <span class="hidden sm:inline">EHR Terminal: Locked &amp; Protected</span>
-      <a href="index.html" class="px-3 py-1 rounded bg-emerald-500 text-black font-bold hover:bg-emerald-400 transition-all text-[11px] uppercase tracking-wider">
-        ← Back to Platform
+      <span class="hidden md:inline">ABDM Facility: IN-KA-BLR-004921 &bull; NABH &amp; JCI Accredited</span>
+      <a href="index.html" class="px-2.5 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white font-bold transition-all text-[11px] uppercase tracking-wider flex items-center gap-1">
+        <span>← Back to Platform</span>
       </a>
     </div>
   </div>
 
-  <!-- WHITE HEADER (UNIQUE BRAND: AYUSYNC MEDCARE NETWORK) -->
-  <header class="bg-white border-b border-slate-200 px-6 sm:px-10 py-5 flex items-center justify-between shadow-sm sticky top-0 z-30">
-    <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 font-bold text-xl">
-        🩺
-      </div>
-      <div>
-        <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">AYUSYNC MEDCARE NETWORK</h1>
-        <p class="text-xs font-mono text-emerald-700 font-bold">Bengaluru &bull; Delhi &bull; Hyderabad &bull; ABDM Compliant</p>
+  <!-- MAIN HOSPITAL BRAND HEADER -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
+      
+      <!-- Brand Logo -->
+      <a href="#" class="flex items-center gap-3 group">
+        <div class="w-11 h-11 rounded-2xl bg-teal-600 text-white flex items-center justify-center font-bold text-2xl shadow-md shadow-teal-600/20 group-hover:bg-teal-700 transition-colors">
+          🩺
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-none">AYUSYNC MEDCARE</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-teal-50 text-teal-700 border border-teal-200">HOSPITALS</span>
+          </div>
+          <p class="text-xs text-slate-500 font-medium">Tertiary Multispecialty &amp; Academic Medical Center</p>
+        </div>
+      </a>
+
+      <!-- Desktop Navigation Menu -->
+      <nav class="hidden lg:flex items-center gap-5 text-xs font-semibold text-slate-600">
+        <a href="#departments" class="hover:text-teal-600 transition-colors">Departments</a>
+        <a href="#doctors" class="hover:text-teal-600 transition-colors">Specialists</a>
+        <a href="#book-appointment" class="hover:text-teal-600 transition-colors">Book OPD</a>
+        <a href="#patient-services" class="hover:text-teal-600 transition-colors">Services &amp; Reports</a>
+        <a href="#facilities" class="hover:text-teal-600 transition-colors">Facilities</a>
+        <a href="#restricted-ehr-vault" class="text-teal-700 hover:text-teal-800 flex items-center gap-1 font-bold">
+          <span>🔒 Clinical Vault</span>
+        </a>
+      </nav>
+
+      <!-- Right Header Actions & Doctor Identity State -->
+      <div class="flex items-center gap-2.5">
+        <!-- Doctor Info Display (Preserved IDs) -->
+        <div id="doctor-header-info" class="text-right font-mono text-xs hidden xl:block whitespace-nowrap leading-tight">
+          <span id="doctor-status-label" class="text-slate-500 block text-[10px]">Guest Medical Officer</span>
+          <strong id="doctor-name-label" class="text-slate-900 font-bold text-[11px]">Not Signed In</strong>
+        </div>
+
+        <!-- Cognitive MFA Enrollment Button -->
+        <button id="btn-header-mfa" onclick="window.openFactorEnrollmentModal ? window.openFactorEnrollmentModal() : (window.cognisec && window.cognisec.openFactorEnrollmentModal())"
+          class="hidden px-3 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 border border-amber-700/60 text-amber-300 font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+          title="Configure Adaptive Multi-Factor Authenticators">
+          <span>🛡️ MFA Setup</span>
+        </button>
+
+        <!-- Sign Out Button (Preserved ID) -->
+        <button id="btn-header-signout" onclick="handleDoctorSignOut()"
+          class="hidden px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
+          <span>Sign Out</span>
+          <svg class="w-3.5 h-3.5 text-rose-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        </button>
+
+        <!-- Sign In Button (Preserved ID) -->
+        <button id="btn-header-signin" onclick="openDoctorSignInModal()"
+          class="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
+          <span>Doctor Sign In</span>
+          <svg class="w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
+        </button>
+
+        <!-- ABHA Health ID Shield Button (Preserved ID & Onclick) -->
+        <button onclick="openDoctorModal()" class="hidden md:flex px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs uppercase tracking-wider transition-all items-center gap-1.5 border border-slate-200 cursor-pointer">
+          <span>ABHA Shield</span>
+          <span id="doctor-status-dot" class="w-2 h-2 rounded-full bg-red-500"></span>
+        </button>
+
+        <!-- Quick Book Appointment CTA Button -->
+        <button onclick="openAppointmentModal()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+          <span>📅 Book Appointment</span>
+        </button>
+
+        <!-- Mobile Menu Toggle Button -->
+        <button onclick="toggleMobileMenu()" class="lg:hidden p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100" aria-label="Toggle mobile menu">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
       </div>
     </div>
-    <div class="flex items-center gap-4">
-      <div id="doctor-header-info" class="text-right font-mono text-xs hidden md:block">
-        <span id="doctor-status-label" class="text-slate-500 block">Doctor Reg No: KMC #84920</span>
-        <strong id="doctor-name-label" class="text-slate-900 font-bold">Dr. Boomika Ram, M.D. (Cardiology)</strong>
-      </div>
 
-      <!-- Sign Out Button -->
-      <button id="btn-header-signout" onclick="handleDoctorSignOut()"
-        class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
-        <span>Sign Out</span>
-        <svg class="w-3.5 h-3.5 text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
-      </button>
-
-      <!-- Sign In Button -->
-      <button id="btn-header-signin" onclick="openDoctorSignInModal()"
-        class="hidden px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-md">
-        <span>Sign In</span>
-        <svg class="w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
-      </button>
-
-      <button onclick="openDoctorModal()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center gap-2 cursor-pointer">
-        <span>ABHA Health ID Shield</span>
-        <span id="doctor-status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
-      </button>
+    <!-- Mobile Drawer Menu -->
+    <div id="mobile-nav" class="hidden lg:hidden border-t border-slate-200 bg-white px-6 py-4 space-y-3 text-sm font-semibold text-slate-700">
+      <a href="#departments" onclick="toggleMobileMenu()" class="block py-1 hover:text-teal-600">Departments</a>
+      <a href="#doctors" onclick="toggleMobileMenu()" class="block py-1 hover:text-teal-600">Find a Doctor</a>
+      <a href="#book-appointment" onclick="toggleMobileMenu()" class="block py-1 hover:text-teal-600">Book Appointment</a>
+      <a href="#patient-services" onclick="toggleMobileMenu()" class="block py-1 hover:text-teal-600">Patient Services</a>
+      <a href="#lab-reports-section" onclick="toggleMobileMenu()" class="block py-1 hover:text-teal-600">Lab Reports</a>
+      <a href="#facilities" onclick="toggleMobileMenu()" class="block py-1 hover:text-teal-600">Visiting &amp; Facilities</a>
+      <a href="#restricted-ehr-vault" onclick="toggleMobileMenu()" class="block py-1 text-teal-700 font-bold">🔒 Restricted Clinical EHR Vault</a>
     </div>
   </header>
 
-  <!-- MAIN HERO & CLINICAL RECORDS -->
-  <main class="max-w-6xl mx-auto px-6 py-10 flex-1 w-full space-y-8">
-    
-    <!-- LIGHT HERO BANNER -->
-    <div class="p-8 rounded-3xl bg-white border border-slate-200 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
-      <div class="space-y-4 max-w-xl relative z-10">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono font-bold">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            WORKSTATION PROXIMITY GUARD ACTIVE
-          </span>
-          <span class="px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-[11px] font-mono font-bold">
-            ✓ ABHA Health Card Verified
-          </span>
+  <!-- MAIN BODY CONTENT -->
+  <main class="w-full flex-1 space-y-16 pb-16">
+
+    <!-- HOSPITAL HERO & FAST ACTIONS -->
+    <section class="relative bg-gradient-to-b from-teal-50/70 via-white to-slate-50 pt-10 pb-16 border-b border-slate-200/80">
+      <div class="max-w-7xl mx-auto px-4 sm:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+          
+          <!-- Hero Text -->
+          <div class="lg:col-span-7 space-y-6">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-100/70 border border-teal-200 text-teal-800 text-xs font-semibold">
+              <span class="w-2 h-2 rounded-full bg-teal-600 animate-pulse"></span>
+              <span>Excellence in Healthcare &bull; 24x7 Comprehensive Care</span>
+            </div>
+            
+            <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-[1.15]">
+              World-Class Healthcare, <br class="hidden sm:inline" />
+              <span class="text-teal-700">Rooted in Compassion</span>
+            </h1>
+            
+            <p class="text-base text-slate-600 leading-relaxed max-w-2xl font-normal">
+              AyuSync MedCare Network unites over 120 senior physicians, advanced robotic surgery, 24/7 Level-1 trauma care, and Ayushman Bharat Digital Mission (ABDM) integration. Consult specialist doctors, book appointments, and access your diagnostic records securely.
+            </p>
+
+            <div class="flex flex-wrap items-center gap-3 pt-2">
+              <button onclick="openAppointmentModal()" class="px-6 py-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm shadow-lg shadow-teal-600/25 transition-all flex items-center gap-2 cursor-pointer">
+                <span>Book Doctor Consultation</span>
+                <span class="text-teal-200">→</span>
+              </button>
+              <a href="#doctors" class="px-5 py-3.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-sm border border-slate-200 shadow-sm transition-all flex items-center gap-2">
+                <span>View Specialist Doctors</span>
+              </a>
+              <a href="#lab-reports-section" class="px-5 py-3.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-sm border border-emerald-200 transition-all flex items-center gap-2">
+                <span>Download Lab Reports</span>
+              </a>
+            </div>
+
+            <!-- Quick Key Metrics -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-200/80">
+              <div>
+                <span class="text-2xl font-extrabold text-slate-900 block">500+</span>
+                <span class="text-xs text-slate-500 font-medium">Critical &amp; Ward Beds</span>
+              </div>
+              <div>
+                <span class="text-2xl font-extrabold text-teal-700 block">45+</span>
+                <span class="text-xs text-slate-500 font-medium">Specialties &amp; Clinics</span>
+              </div>
+              <div>
+                <span class="text-2xl font-extrabold text-slate-900 block">99.4%</span>
+                <span class="text-xs text-slate-500 font-medium">Intervention Success</span>
+              </div>
+              <div>
+                <span class="text-2xl font-extrabold text-emerald-700 block">24/7</span>
+                <span class="text-xs text-slate-500 font-medium">Emergency &amp; Trauma</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hero Right: Interactive Quick OPD Booking Card -->
+          <div class="lg:col-span-5">
+            <div class="bg-white rounded-3xl p-6 sm:p-7 shadow-xl border border-slate-200 relative overflow-hidden space-y-5">
+              <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center text-lg font-bold">🩺</span>
+                  <div>
+                    <h2 class="text-base font-bold text-slate-900">Instant OPD Booking</h2>
+                    <p class="text-xs text-slate-500">Confirmed slot in under 2 minutes</p>
+                  </div>
+                </div>
+                <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">No Queue</span>
+              </div>
+
+              <!-- Fast form triggering appointment modal -->
+              <div class="space-y-3.5">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Select Department</label>
+                  <select id="quick-dept-select" onchange="syncQuickDoctorOptions()" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-teal-500">
+                    <option value="cardiology">Cardiology &amp; Cardiac Surgery</option>
+                    <option value="neurology">Neurology &amp; Stroke Care</option>
+                    <option value="pediatrics">Pediatrics &amp; Child Health</option>
+                    <option value="orthopedics">Orthopedics &amp; Joint Replacement</option>
+                    <option value="dermatology">Dermatology &amp; Cosmetology</option>
+                    <option value="general_medicine">General Medicine &amp; Diabetology</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Select Specialist</label>
+                  <select id="quick-doc-select" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-teal-500">
+                    <!-- Populated dynamically -->
+                  </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Preferred Date</label>
+                    <input id="quick-date-select" type="date" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Consultation Mode</label>
+                    <select id="quick-mode-select" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500">
+                      <option value="In-Person Hospital Visit">In-Person OPD Visit</option>
+                      <option value="Video Teleconsultation">Teleconsultation</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button onclick="launchQuickBooking()" class="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-teal-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                  <span>Continue Patient Details →</span>
+                </button>
+              </div>
+
+              <!-- Trust Badges -->
+              <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span class="flex items-center gap-1">✓ Instant SMS Confirmation</span>
+                <span class="flex items-center gap-1">✓ Verified Doctor Profiles</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-          Passive Doctor Identity &amp; PHI Patient Shield
-        </h2>
-        <p class="text-sm text-slate-600 leading-relaxed">
-          Integrated with Ayushman Bharat Digital Mission (ABDM). If an attending physician steps away from the OPD terminal, Cognisec AI instantly detects motor anomaly and locks medical records in sub-seconds.
-        </p>
+      </div>
+    </section>
+
+    <!-- SECTION 1: HOSPITAL DEPARTMENTS -->
+    <section id="departments" class="max-w-7xl mx-auto px-4 sm:px-8 space-y-8 scroll-mt-20">
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold font-mono text-teal-600 uppercase tracking-wider">Clinical Centers of Excellence</span>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Specialized Medical Departments</h2>
+        </div>
+        <p class="text-xs text-slate-500 max-w-md">Our multidisciplinary institutes provide evidence-based healthcare with advanced technology and compassionate care.</p>
       </div>
 
-      <!-- LIVE SECURITY TELEMETRY CARD -->
-      <div class="p-6 rounded-2xl bg-slate-900 text-white font-mono text-xs space-y-3.5 w-full md:w-80 shadow-2xl shrink-0 border border-slate-800">
-        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
-          <span class="text-slate-400">ABHA Health ID:</span>
-          <strong class="text-emerald-400 font-bold">91-8829-4019-12</strong>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        <!-- Cardiology -->
+        <div class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm hospital-card-hover space-y-4">
+          <div class="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center text-2xl font-bold">
+            🫀
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-lg font-bold text-slate-900">Cardiology &amp; Cardiac Surgery</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">Comprehensive interventional cardiology, 24x7 Primary Angioplasty (PPCI), electrophysiology, and advanced cardiac bypass surgery.</p>
+          </div>
+          <div class="pt-2 border-t border-slate-100 text-xs font-medium space-y-1 text-slate-600">
+            <div class="flex justify-between"><span>Lead Consultant:</span><strong class="text-slate-800">Dr. Boomika Ram</strong></div>
+            <div class="flex justify-between"><span>OPD Timing:</span><span class="text-teal-700 font-semibold">Mon–Sat (9 AM–1 PM)</span></div>
+            <div class="flex justify-between"><span>Cath Lab Status:</span><span class="text-emerald-700 font-semibold">24x7 Standby</span></div>
+          </div>
+          <button onclick="filterAndScrollDoctors('cardiology')" class="w-full py-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold transition-colors cursor-pointer">
+            View Cardiology Doctors →
+          </button>
         </div>
-        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
-          <span class="text-slate-400">HIPAA Compliance:</span>
-          <strong class="text-emerald-400 font-bold">100% Compliant</strong>
+
+        <!-- Neurology -->
+        <div class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm hospital-card-hover space-y-4">
+          <div class="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center text-2xl font-bold">
+            🧠
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-lg font-bold text-slate-900">Neurology &amp; Stroke Care</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">Dedicated Comprehensive Stroke Center, epilepsy monitoring unit, Parkinson's management, and complex neurosurgical interventions.</p>
+          </div>
+          <div class="pt-2 border-t border-slate-100 text-xs font-medium space-y-1 text-slate-600">
+            <div class="flex justify-between"><span>Lead Consultant:</span><strong class="text-slate-800">Dr. Rajesh K. Nair</strong></div>
+            <div class="flex justify-between"><span>OPD Timing:</span><span class="text-teal-700 font-semibold">Mon–Fri (10 AM–2 PM)</span></div>
+            <div class="flex justify-between"><span>Thrombolysis:</span><span class="text-emerald-700 font-semibold">Golden Hour Ready</span></div>
+          </div>
+          <button onclick="filterAndScrollDoctors('neurology')" class="w-full py-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold transition-colors cursor-pointer">
+            View Neurology Doctors →
+          </button>
         </div>
-        <div class="flex justify-between items-center">
-          <span class="text-slate-400">Hospital OPD:</span>
-          <strong class="text-emerald-400 font-bold">Indiranagar, Bengaluru</strong>
+
+        <!-- Pediatrics -->
+        <div class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm hospital-card-hover space-y-4">
+          <div class="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center text-2xl font-bold">
+            👶
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-lg font-bold text-slate-900">Pediatrics &amp; Neonatology</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">Level-III Neonatal Intensive Care Unit (NICU), pediatric emergency care, developmental pediatrics, and childhood immunizations.</p>
+          </div>
+          <div class="pt-2 border-t border-slate-100 text-xs font-medium space-y-1 text-slate-600">
+            <div class="flex justify-between"><span>Lead Consultant:</span><strong class="text-slate-800">Dr. Sunita Mehra</strong></div>
+            <div class="flex justify-between"><span>OPD Timing:</span><span class="text-teal-700 font-semibold">Daily (9 AM–4 PM)</span></div>
+            <div class="flex justify-between"><span>NICU Beds:</span><span class="text-emerald-700 font-semibold">24 High-Tech Pods</span></div>
+          </div>
+          <button onclick="filterAndScrollDoctors('pediatrics')" class="w-full py-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold transition-colors cursor-pointer">
+            View Pediatrics Doctors →
+          </button>
+        </div>
+
+        <!-- Orthopedics -->
+        <div class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm hospital-card-hover space-y-4">
+          <div class="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center text-2xl font-bold">
+            🦴
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-lg font-bold text-slate-900">Orthopedics &amp; Joint Replacement</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">Computer-navigated robotic knee and hip arthroplasty, keyhole arthroscopic surgery, sports injuries, and complex trauma fractures.</p>
+          </div>
+          <div class="pt-2 border-t border-slate-100 text-xs font-medium space-y-1 text-slate-600">
+            <div class="flex justify-between"><span>Lead Consultant:</span><strong class="text-slate-800">Dr. Vikramaditya Rao</strong></div>
+            <div class="flex justify-between"><span>OPD Timing:</span><span class="text-teal-700 font-semibold">Mon, Wed, Fri (11 AM–3 PM)</span></div>
+            <div class="flex justify-between"><span>Rehab Unit:</span><span class="text-emerald-700 font-semibold">Robotic Physiotherapy</span></div>
+          </div>
+          <button onclick="filterAndScrollDoctors('orthopedics')" class="w-full py-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold transition-colors cursor-pointer">
+            View Orthopedics Doctors →
+          </button>
+        </div>
+
+        <!-- Dermatology -->
+        <div class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm hospital-card-hover space-y-4">
+          <div class="w-12 h-12 rounded-2xl bg-pink-50 border border-pink-200 text-pink-600 flex items-center justify-center text-2xl font-bold">
+            ✨
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-lg font-bold text-slate-900">Dermatology &amp; Cosmetology</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">Advanced narrow-band phototherapy, clinical dermatology for psoriasis &amp; eczema, aesthetic laser procedures, and pediatric skin care.</p>
+          </div>
+          <div class="pt-2 border-t border-slate-100 text-xs font-medium space-y-1 text-slate-600">
+            <div class="flex justify-between"><span>Lead Consultant:</span><strong class="text-slate-800">Dr. Ananya Sen</strong></div>
+            <div class="flex justify-between"><span>OPD Timing:</span><span class="text-teal-700 font-semibold">Tue, Thu, Sat (2 PM–6 PM)</span></div>
+            <div class="flex justify-between"><span>Laser Suite:</span><span class="text-emerald-700 font-semibold">US-FDA Approved</span></div>
+          </div>
+          <button onclick="filterAndScrollDoctors('dermatology')" class="w-full py-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold transition-colors cursor-pointer">
+            View Dermatology Doctors →
+          </button>
+        </div>
+
+        <!-- General Medicine -->
+        <div class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm hospital-card-hover space-y-4">
+          <div class="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 text-teal-600 flex items-center justify-center text-2xl font-bold">
+            🩺
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-lg font-bold text-slate-900">General Medicine &amp; Diabetology</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">Comprehensive management of chronic diabetes, resistant hypertension, infectious diseases, and preventive executive health checkups.</p>
+          </div>
+          <div class="pt-2 border-t border-slate-100 text-xs font-medium space-y-1 text-slate-600">
+            <div class="flex justify-between"><span>Lead Consultant:</span><strong class="text-slate-800">Dr. Sandeep Verma</strong></div>
+            <div class="flex justify-between"><span>OPD Timing:</span><span class="text-teal-700 font-semibold">Mon–Sat (8:30 AM–12:30 PM)</span></div>
+            <div class="flex justify-between"><span>Diagnostics:</span><span class="text-emerald-700 font-semibold">Same-Day Reporting</span></div>
+          </div>
+          <button onclick="filterAndScrollDoctors('general_medicine')" class="w-full py-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold transition-colors cursor-pointer">
+            View Medicine Doctors →
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SECTION 2: DOCTOR DIRECTORY & CARDS -->
+    <section id="doctors" class="max-w-7xl mx-auto px-4 sm:px-8 space-y-8 scroll-mt-20">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold font-mono text-teal-600 uppercase tracking-wider">Medical Faculty</span>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Our Senior Medical Specialists</h2>
+          <p class="text-xs text-slate-500 mt-1">Find consultant doctors by name or department and schedule your in-person or teleconsultation appointment.</p>
+        </div>
+
+        <!-- Doctor Search Bar -->
+        <div class="w-full md:w-80 relative">
+          <input 
+            id="doctor-search-input" 
+            type="text" 
+            placeholder="Search doctor name or specialty..." 
+            oninput="handleDoctorSearch(this.value)"
+            class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-teal-500 bg-white"
+          />
+          <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">🔍</span>
         </div>
       </div>
-    </div>
 
-    <!-- FRONTEND SEARCH & DEPARTMENT FILTERS -->
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-      <div class="relative w-full sm:w-80">
-        <input 
-          id="patient-search-input" 
-          type="text" 
-          placeholder="Search patient name, ABHA ID or diagnosis..." 
-          oninput="filterPatients()"
-          class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-emerald-500"
-        />
-        <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">🔍</span>
+      <!-- Department Filter Pills -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-2 text-xs font-semibold">
+        <button onclick="setDoctorDeptFilter('all')" id="doc-filter-all" class="px-4 py-2 rounded-xl bg-teal-600 text-white font-bold shrink-0 cursor-pointer transition-colors">All Specialists (6)</button>
+        <button onclick="setDoctorDeptFilter('cardiology')" id="doc-filter-cardiology" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 shrink-0 cursor-pointer transition-colors">Cardiology</button>
+        <button onclick="setDoctorDeptFilter('neurology')" id="doc-filter-neurology" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 shrink-0 cursor-pointer transition-colors">Neurology</button>
+        <button onclick="setDoctorDeptFilter('pediatrics')" id="doc-filter-pediatrics" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 shrink-0 cursor-pointer transition-colors">Pediatrics</button>
+        <button onclick="setDoctorDeptFilter('orthopedics')" id="doc-filter-orthopedics" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 shrink-0 cursor-pointer transition-colors">Orthopedics</button>
+        <button onclick="setDoctorDeptFilter('dermatology')" id="doc-filter-dermatology" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 shrink-0 cursor-pointer transition-colors">Dermatology</button>
+        <button onclick="setDoctorDeptFilter('general_medicine')" id="doc-filter-general_medicine" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 shrink-0 cursor-pointer transition-colors">General Medicine</button>
       </div>
 
-      <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto text-xs font-mono">
-        <button onclick="setDeptFilter('all')" id="dept-all" class="px-3.5 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer">All Units</button>
-        <button onclick="setDeptFilter('cardiology')" id="dept-cardiology" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Cardiology ICU</button>
-        <button onclick="setDeptFilter('neurology')" id="dept-neurology" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Neurology OPD</button>
-        <button onclick="setDeptFilter('oncology')" id="dept-oncology" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Oncology Ward</button>
+      <!-- Doctor Cards Container -->
+      <div id="doctors-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Rendered dynamically -->
       </div>
-    </div>
+    </section>
 
-    <!-- PATIENT EHR LIST CONTAINER -->
-    <div id="patient-list-container" class="space-y-4">
-      <!-- Dynamically Rendered Patients -->
-    </div>
+    <!-- SECTION 3: INTERACTIVE APPOINTMENT BOOKING WIZARD -->
+    <section id="book-appointment" class="max-w-7xl mx-auto px-4 sm:px-8 scroll-mt-20">
+      <div class="bg-gradient-to-br from-teal-900 to-slate-900 rounded-3xl p-8 sm:p-12 text-white shadow-2xl relative overflow-hidden">
+        <div class="max-w-3xl space-y-6">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-800/80 border border-teal-600/50 text-teal-300 text-xs font-mono font-bold">
+            <span>📅 WORKING APPOINTMENT SCHEDULER</span>
+          </div>
+          
+          <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Schedule Your Specialist Consultation</h2>
+          <p class="text-slate-300 text-sm leading-relaxed">
+            Select your preferred department, doctor, and consultation slot. All appointments receive immediate reference generation, calendar export, and automated reminders.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 text-xs">
+            <div class="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+              <strong class="text-teal-400 block font-bold text-sm">Step 1: Doctor &amp; Date</strong>
+              <span class="text-slate-300">Choose verified consultant and real-time slot</span>
+            </div>
+            <div class="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+              <strong class="text-teal-400 block font-bold text-sm">Step 2: Contact Details</strong>
+              <span class="text-slate-300">Enter patient name, phone &amp; consultation mode</span>
+            </div>
+            <div class="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+              <strong class="text-teal-400 block font-bold text-sm">Step 3: Instant Slip</strong>
+              <span class="text-slate-300">Get official reference code #AYU-APT-XXXX</span>
+            </div>
+          </div>
+
+          <div class="pt-4 flex flex-wrap gap-4">
+            <button onclick="openAppointmentModal()" class="px-7 py-4 rounded-2xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-extrabold text-sm uppercase tracking-wider transition-all shadow-lg hover:shadow-teal-500/25 flex items-center gap-2 cursor-pointer">
+              <span>Open Appointment Booking Wizard →</span>
+            </button>
+            <a href="#patient-services" class="px-6 py-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/20 transition-all flex items-center gap-2">
+              <span>View Your Active Bookings</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 4: PATIENT SERVICES, REPORTS & RECORDS -->
+    <section id="patient-services" class="max-w-7xl mx-auto px-4 sm:px-8 space-y-8 scroll-mt-20">
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold font-mono text-teal-600 uppercase tracking-wider">Patient Self-Service Hub</span>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Patient Appointments, Reports &amp; Guidance</h2>
+        </div>
+        <div class="flex items-center gap-2 border border-slate-200 bg-white p-1 rounded-2xl text-xs font-semibold">
+          <button onclick="switchPatientTab('tab-appointments')" id="btn-tab-appointments" class="px-3.5 py-1.5 rounded-xl bg-teal-600 text-white font-bold cursor-pointer transition-colors">Upcoming Appointments</button>
+          <button onclick="switchPatientTab('tab-reports')" id="btn-tab-reports" class="px-3.5 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer transition-colors">Diagnostic Reports</button>
+          <button onclick="switchPatientTab('tab-faqs')" id="btn-tab-faqs" class="px-3.5 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer transition-colors">Patient Guidance &amp; FAQ</button>
+        </div>
+      </div>
+
+      <!-- TAB 1: APPOINTMENTS LIST -->
+      <div id="tab-appointments" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <span>📅</span> Active &amp; Upcoming Outpatient Appointments
+          </h3>
+          <span class="text-xs font-mono text-slate-500">Demo Records Synced Live</span>
+        </div>
+
+        <div id="patient-appointments-list" class="space-y-3">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- TAB 2: LAB REPORTS & ARCHIVES (id for link target) -->
+      <div id="tab-reports" class="hidden space-y-4">
+        <div id="lab-reports-section" class="scroll-mt-24 flex items-center justify-between">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <span>🔬</span> Diagnostic Laboratory Reports &amp; Imaging Summaries
+          </h3>
+          <span class="text-xs font-mono text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200">ABDM Digital Signature Verified</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          
+          <!-- Report 1 -->
+          <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3 hospital-card-hover">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-teal-700 font-bold">CARDIOLOGY LAB</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">NORMAL SINUS</span>
+            </div>
+            <div>
+              <strong class="text-slate-900 text-sm font-bold block">12-Lead Electrocardiogram (ECG)</strong>
+              <span class="text-xs text-slate-500">Specimen ID: #ECG-8921 &bull; Performed Today</span>
+            </div>
+            <div class="pt-2 border-t border-slate-100 text-xs font-mono space-y-1 text-slate-600">
+              <div class="flex justify-between"><span>Heart Rate:</span><strong class="text-slate-800">72 bpm</strong></div>
+              <div class="flex justify-between"><span>ST Segment:</span><strong class="text-emerald-700">Normal Ischemia-Free</strong></div>
+              <div class="flex justify-between"><span>Signing Doctor:</span><span class="text-slate-800">Dr. Boomika Ram</span></div>
+            </div>
+            <div class="pt-2 flex gap-2">
+              <button onclick="previewDemoReport('ecg')" class="flex-1 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-xs transition-colors cursor-pointer">
+                View Report Summary
+              </button>
+              <button onclick="downloadDemoReportPdf('12-Lead-ECG-Summary')" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer" title="Download sample report slip">
+                📥
+              </button>
+            </div>
+          </div>
+
+          <!-- Report 2 -->
+          <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3 hospital-card-hover">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-teal-700 font-bold">PATHOLOGY &amp; BIOCHEMISTRY</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">OPTIMAL</span>
+            </div>
+            <div>
+              <strong class="text-slate-900 text-sm font-bold block">Comprehensive Lipid Panel &amp; Troponin-I</strong>
+              <span class="text-xs text-slate-500">Specimen ID: #LIP-4820 &bull; Fasting Serum</span>
+            </div>
+            <div class="pt-2 border-t border-slate-100 text-xs font-mono space-y-1 text-slate-600">
+              <div class="flex justify-between"><span>Total Cholesterol:</span><strong class="text-slate-800">164 mg/dL</strong></div>
+              <div class="flex justify-between"><span>LDL Cholesterol:</span><strong class="text-emerald-700">68 mg/dL (&lt;70)</strong></div>
+              <div class="flex justify-between"><span>Cardiac Trop-I:</span><strong class="text-emerald-700">&lt;0.02 ng/mL (Normal)</strong></div>
+            </div>
+            <div class="pt-2 flex gap-2">
+              <button onclick="previewDemoReport('lipid')" class="flex-1 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-xs transition-colors cursor-pointer">
+                View Report Summary
+              </button>
+              <button onclick="downloadDemoReportPdf('Comprehensive-Lipid-Panel')" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer" title="Download sample report slip">
+                📥
+              </button>
+            </div>
+          </div>
+
+          <!-- Report 3 -->
+          <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3 hospital-card-hover">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-teal-700 font-bold">HEMATOLOGY LAB</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">CLEARED</span>
+            </div>
+            <div>
+              <strong class="text-slate-900 text-sm font-bold block">Complete Blood Count (CBC with ESR)</strong>
+              <span class="text-xs text-slate-500">Specimen ID: #CBC-1192 &bull; Whole Blood EDTA</span>
+            </div>
+            <div class="pt-2 border-t border-slate-100 text-xs font-mono space-y-1 text-slate-600">
+              <div class="flex justify-between"><span>Hemoglobin:</span><strong class="text-slate-800">14.8 g/dL (Normal)</strong></div>
+              <div class="flex justify-between"><span>Total WBC Count:</span><strong class="text-slate-800">7,200 /μL</strong></div>
+              <div class="flex justify-between"><span>Platelet Count:</span><strong class="text-slate-800">2.45 Lakhs /μL</strong></div>
+            </div>
+            <div class="pt-2 flex gap-2">
+              <button onclick="previewDemoReport('cbc')" class="flex-1 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-xs transition-colors cursor-pointer">
+                View Report Summary
+              </button>
+              <button onclick="downloadDemoReportPdf('Complete-Blood-Count-CBC')" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer" title="Download sample report slip">
+                📥
+              </button>
+            </div>
+          </div>
+
+          <!-- Report 4 -->
+          <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3 hospital-card-hover">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-teal-700 font-bold">DIABETOLOGY LAB</span>
+              <span class="px-2 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-bold">WELL CONTROLLED</span>
+            </div>
+            <div>
+              <strong class="text-slate-900 text-sm font-bold block">Glycated Hemoglobin (HbA1c) &amp; Glucose</strong>
+              <span class="text-xs text-slate-500">Specimen ID: #GLU-9912 &bull; Fluoride &amp; EDTA</span>
+            </div>
+            <div class="pt-2 border-t border-slate-100 text-xs font-mono space-y-1 text-slate-600">
+              <div class="flex justify-between"><span>HbA1c (NGSP):</span><strong class="text-emerald-700">6.1% (Good Control)</strong></div>
+              <div class="flex justify-between"><span>Fasting Blood Sugar:</span><strong class="text-slate-800">96 mg/dL</strong></div>
+              <div class="flex justify-between"><span>Estimated Avg Glucose:</span><strong class="text-slate-800">128 mg/dL</strong></div>
+            </div>
+            <div class="pt-2 flex gap-2">
+              <button onclick="previewDemoReport('hba1c')" class="flex-1 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-xs transition-colors cursor-pointer">
+                View Report Summary
+              </button>
+              <button onclick="downloadDemoReportPdf('Glycated-Hemoglobin-HbA1c')" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer" title="Download sample report slip">
+                📥
+              </button>
+            </div>
+          </div>
+
+          <!-- Report 5 -->
+          <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3 hospital-card-hover">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-teal-700 font-bold">RADIOLOGY &amp; IMAGING</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">NORMAL CHEST</span>
+            </div>
+            <div>
+              <strong class="text-slate-900 text-sm font-bold block">Digital Chest Radiograph (X-Ray PA View)</strong>
+              <span class="text-xs text-slate-500">Image ID: #XR-4019 &bull; Digital DICOM 4K</span>
+            </div>
+            <div class="pt-2 border-t border-slate-100 text-xs font-mono space-y-1 text-slate-600">
+              <div class="flex justify-between"><span>Cardiothoracic Ratio:</span><strong class="text-slate-800">&lt; 0.5 (Normal Size)</strong></div>
+              <div class="flex justify-between"><span>Costophrenic Angles:</span><strong class="text-emerald-700">Clear &amp; Sharp</strong></div>
+              <div class="flex justify-between"><span>Lung Parenchyma:</span><strong class="text-slate-800">No focal consolidation</strong></div>
+            </div>
+            <div class="pt-2 flex gap-2">
+              <button onclick="previewDemoReport('xray')" class="flex-1 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-xs transition-colors cursor-pointer">
+                View Report Summary
+              </button>
+              <button onclick="downloadDemoReportPdf('Digital-Chest-XRay-Summary')" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer" title="Download sample report slip">
+                📥
+              </button>
+            </div>
+          </div>
+
+          <!-- Report 6 -->
+          <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3 hospital-card-hover">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-teal-700 font-bold">BIOCHEMISTRY LAB</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">NORMAL PROFILE</span>
+            </div>
+            <div>
+              <strong class="text-slate-900 text-sm font-bold block">Renal &amp; Liver Function Tests (KFT / LFT)</strong>
+              <span class="text-xs text-slate-500">Specimen ID: #KFT-8830 &bull; Automated Analyzer</span>
+            </div>
+            <div class="pt-2 border-t border-slate-100 text-xs font-mono space-y-1 text-slate-600">
+              <div class="flex justify-between"><span>Serum Creatinine:</span><strong class="text-slate-800">0.9 mg/dL</strong></div>
+              <div class="flex justify-between"><span>eGFR (MDRD):</span><strong class="text-emerald-700">&gt; 90 mL/min/1.73m²</strong></div>
+              <div class="flex justify-between"><span>SGPT / ALT:</span><strong class="text-slate-800">24 U/L</strong></div>
+            </div>
+            <div class="pt-2 flex gap-2">
+              <button onclick="previewDemoReport('kft')" class="flex-1 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-xs transition-colors cursor-pointer">
+                View Report Summary
+              </button>
+              <button onclick="downloadDemoReportPdf('Renal-Liver-Function-Panel')" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer" title="Download sample report slip">
+                📥
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- TAB 3: FAQ ACCORDION -->
+      <div id="tab-faqs" class="hidden space-y-3 max-w-4xl mx-auto">
+        
+        <div class="border border-slate-200 bg-white rounded-2xl overflow-hidden">
+          <button onclick="toggleFaq('faq-1')" class="w-full p-5 text-left font-bold text-sm text-slate-900 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors">
+            <span>What documents should I carry for my first hospital OPD visit?</span>
+            <span id="faq-1-icon" class="text-teal-600 font-bold text-lg">+</span>
+          </button>
+          <div id="faq-1-content" class="hidden p-5 pt-0 text-xs text-slate-600 leading-relaxed border-t border-slate-100">
+            Please carry a valid government-issued photo ID (Aadhaar / Voter ID / Passport), your Ayushman Bharat Health Account (ABHA) ID card if available, prior medical prescriptions, recent imaging films or CD-ROMs, and existing health insurance e-cards if availing cashless TPA facilities.
+          </div>
+        </div>
+
+        <div class="border border-slate-200 bg-white rounded-2xl overflow-hidden">
+          <button onclick="toggleFaq('faq-2')" class="w-full p-5 text-left font-bold text-sm text-slate-900 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors">
+            <span>How do Cashless Health Insurance &amp; TPA admissions work at AyuSync?</span>
+            <span id="faq-2-icon" class="text-teal-600 font-bold text-lg">+</span>
+          </button>
+          <div id="faq-2-content" class="hidden p-5 pt-0 text-xs text-slate-600 leading-relaxed border-t border-slate-100">
+            Our 24x7 TPA Helpdesk directly coordinates with leading insurance providers and government schemes. For planned admissions, please submit the doctor's hospitalization advice letter 48 hours prior to admission for pre-authorization clearance. For emergency admissions, pre-authorization requests are dispatched within 4 hours.
+          </div>
+        </div>
+
+        <div class="border border-slate-200 bg-white rounded-2xl overflow-hidden">
+          <button onclick="toggleFaq('faq-3')" class="w-full p-5 text-left font-bold text-sm text-slate-900 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors">
+            <span>What are the patient visiting hours for ICU and Inpatient wards?</span>
+            <span id="faq-3-icon" class="text-teal-600 font-bold text-lg">+</span>
+          </button>
+          <div id="faq-3-content" class="hidden p-5 pt-0 text-xs text-slate-600 leading-relaxed border-t border-slate-100">
+            To prevent cross-infection and ensure patient recovery, Intensive Care Units (ICU / CCU / NICU) permit one visitor between 4:00 PM and 5:00 PM daily with sanitization protocols. Inpatient private rooms permit visitors from 10:00 AM to 1:00 PM and 4:00 PM to 7:00 PM. General wards permit visiting from 5:00 PM to 7:00 PM.
+          </div>
+        </div>
+
+        <div class="border border-slate-200 bg-white rounded-2xl overflow-hidden">
+          <button onclick="toggleFaq('faq-4')" class="w-full p-5 text-left font-bold text-sm text-slate-900 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors">
+            <span>How does AyuSync MedCare safeguard patient confidential health records?</span>
+            <span id="faq-4-icon" class="text-teal-600 font-bold text-lg">+</span>
+          </button>
+          <div id="faq-4-content" class="hidden p-5 pt-0 text-xs text-slate-600 leading-relaxed border-t border-slate-100">
+            All electronic health records (EHR) comply strictly with Ayushman Bharat Digital Mission (ABDM) standards and HIPAA privacy guidelines. Physician workstations are secured via server-authoritative Zero Trust continuous behavioral verification and NeuralTrace step-up challenges to prevent unauthorized unmasking of confidential diagnostic notes.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SECTION 5: HOSPITAL FACILITIES & VISITING GUIDANCE -->
+    <section id="facilities" class="max-w-7xl mx-auto px-4 sm:px-8 space-y-8 scroll-mt-20">
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold font-mono text-teal-600 uppercase tracking-wider">Hospital Infrastructure</span>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Facilities, Visiting Hours &amp; Patient Support</h2>
+        </div>
+        <p class="text-xs text-slate-500 max-w-md">Our hospital campus is designed to provide comfortable, safe, and efficient clinical support for patients and families.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        
+        <div class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center text-xl font-bold">💊</div>
+          <h3 class="text-base font-bold text-slate-900">24x7 In-House Pharmacy</h3>
+          <p class="text-xs text-slate-500 leading-relaxed">Fully stocked with critical care therapeutics, specialized oncology medications, vaccines, and home delivery support.</p>
+          <span class="text-[11px] font-bold text-teal-700 block pt-1">Ground Floor, Tower A &bull; Ext: 104</span>
+        </div>
+
+        <div class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-xl font-bold">🚑</div>
+          <h3 class="text-base font-bold text-slate-900">Advanced Life Support (ALS)</h3>
+          <p class="text-xs text-slate-500 leading-relaxed">Fleet of GPS-enabled mobile ICUs equipped with transport ventilators, defibrillators, and trained paramedics.</p>
+          <span class="text-[11px] font-bold text-emerald-700 block pt-1">Toll Free: 1800-425-AYU</span>
+        </div>
+
+        <div class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center text-xl font-bold">🩸</div>
+          <h3 class="text-base font-bold text-slate-900">Automated Blood Bank</h3>
+          <p class="text-xs text-slate-500 leading-relaxed">Round-the-clock component separation (Packed RBC, Fresh Frozen Plasma, Cryoprecipitate, Single Donor Platelets).</p>
+          <span class="text-[11px] font-bold text-indigo-700 block pt-1">NABH Certified &bull; Ext: 208</span>
+        </div>
+
+        <div class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-xl font-bold">🛡️</div>
+          <h3 class="text-base font-bold text-slate-900">Patient Care Coordination</h3>
+          <p class="text-xs text-slate-500 leading-relaxed">Dedicated concierge desk for senior citizens, wheelchair escorts, foreign medical travel desks, and ABHA registration.</p>
+          <span class="text-[11px] font-bold text-amber-700 block pt-1">Main Atrium Desk &bull; Ext: 100</span>
+        </div>
+
+      </div>
+
+      <!-- Visiting Hours Table -->
+      <div class="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-4">
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <span>🕒</span> Standard Hospital Visiting Hours &amp; Family Guidelines
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="border-b border-slate-200 text-slate-500 uppercase font-mono text-[11px]">
+                <th class="py-3 px-4">Hospital Unit</th>
+                <th class="py-3 px-4">Visiting Hours</th>
+                <th class="py-3 px-4">Permitted Visitors</th>
+                <th class="py-3 px-4">Clinical Guidelines</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-700 font-medium">
+              <tr>
+                <td class="py-3.5 px-4 font-bold text-slate-900">Intensive Care Units (ICU / CCU)</td>
+                <td class="py-3.5 px-4 font-mono text-teal-700">04:00 PM – 05:00 PM</td>
+                <td class="py-3.5 px-4">1 Family Member at a time</td>
+                <td class="py-3.5 px-4 text-slate-500">Sterile gown &amp; mask mandatory. No mobile phones.</td>
+              </tr>
+              <tr>
+                <td class="py-3.5 px-4 font-bold text-slate-900">Private &amp; Semi-Private Rooms</td>
+                <td class="py-3.5 px-4 font-mono text-teal-700">10:00 AM – 01:00 PM &bull; 04:00 PM – 07:00 PM</td>
+                <td class="py-3.5 px-4">2 Visitors per session</td>
+                <td class="py-3.5 px-4 text-slate-500">Visitor pass issued at reception atrium.</td>
+              </tr>
+              <tr>
+                <td class="py-3.5 px-4 font-bold text-slate-900">General Patient Wards</td>
+                <td class="py-3.5 px-4 font-mono text-teal-700">05:00 PM – 07:00 PM</td>
+                <td class="py-3.5 px-4">1 Visitor pass allowed</td>
+                <td class="py-3.5 px-4 text-slate-500">Quiet hours maintained after 08:00 PM.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 6: HEALTH ANNOUNCEMENTS & WELLNESS ARTICLES -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-8 space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <span class="text-xs font-bold font-mono text-teal-600 uppercase tracking-wider">Health Information Desk</span>
+          <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight mt-1">Health Advisories &amp; Wellness Updates</h2>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <article class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3 hospital-card-hover flex flex-col justify-between">
+          <div class="space-y-2">
+            <span class="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold font-mono">SEASONAL ADVISORY</span>
+            <h3 class="text-base font-bold text-slate-900">Monsoon Viral &amp; Dengue Fever: Early Warning Indicators</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">Recognize early drop in platelet counts, persistent high-grade fevers, and when to seek emergency OPD evaluation.</p>
+          </div>
+          <button onclick="showToast('Advisory Document', 'Hydration protocols and platelet count guidelines available at hospital OPD.', '📰')" class="text-xs font-bold text-teal-700 hover:text-teal-800 text-left pt-2 cursor-pointer">
+            Read Clinical Advisory →
+          </button>
+        </article>
+
+        <article class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3 hospital-card-hover flex flex-col justify-between">
+          <div class="space-y-2">
+            <span class="px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-bold font-mono">PREVENTIVE CARDIOLOGY</span>
+            <h3 class="text-base font-bold text-slate-900">Atherosclerosis Prevention in Urban Working Professionals</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">Dr. Boomika Ram breaks down calcium scoring, hs-CRP inflammation markers, and optimal daily cardiac exercise.</p>
+          </div>
+          <button onclick="showToast('Cardiology Article', 'Published by AyuSync Institute of Cardiovascular Sciences.', '🫀')" class="text-xs font-bold text-teal-700 hover:text-teal-800 text-left pt-2 cursor-pointer">
+            Read Wellness Guide →
+          </button>
+        </article>
+
+        <article class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3 hospital-card-hover flex flex-col justify-between">
+          <div class="space-y-2">
+            <span class="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold font-mono">HEALTH PACKAGES</span>
+            <h3 class="text-base font-bold text-slate-900">Executive Comprehensive Annual Health Screening 2026</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">Comprehensive 65+ parameter screening including 2D-Echocardiography, whole-abdomen ultrasound, HbA1c, and cancer markers.</p>
+          </div>
+          <button onclick="openAppointmentModal(null, 'general_medicine')" class="text-xs font-bold text-teal-700 hover:text-teal-800 text-left pt-2 cursor-pointer">
+            Book Health Checkup →
+          </button>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- SECTION 7: CONTINUOUS ZERO TRUST BEHAVIORAL MONITORING PANEL (PRESERVED ALL ORIGINAL IDs) -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-8">
+      <div id="continuous-verification-panel" class="p-6 rounded-3xl bg-slate-900 border border-teal-900/60 shadow-xl text-white font-mono space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 font-bold text-lg">
+              🩺
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-base font-bold font-sans text-white">Continuous Zero Trust Behavioral Monitoring</h3>
+                <span id="cv-status-badge" class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-teal-950 text-teal-300 border border-teal-700">LIVE</span>
+              </div>
+              <p class="text-xs text-slate-400 font-sans">AyuSync Clinical Shield &bull; ABDM Proximity &amp; Motor Dynamics Engine</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="triggerExhibitionStepUpTest()" 
+              class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-teal-600/40 text-teal-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Demonstrate step-up verification challenge during project exhibition">
+              <span>⚡ Test Verification Challenge</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Real Telemetry & Authorization State Grid (Preserved exact IDs) -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div class="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+            <span class="text-slate-400 text-[11px] block">Behavioral Observation</span>
+            <div class="flex items-center gap-1.5 pt-0.5">
+              <span id="status-obs-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+              <strong id="status-observation-state" class="text-slate-300 font-bold truncate"><span id="cv-observation-state">Inactive (Sign In Required)</span></strong>
+            </div>
+          </div>
+
+          <div class="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+            <span class="text-slate-400 text-[11px] block">Telemetry Connection</span>
+            <div class="flex items-center gap-1.5 pt-0.5">
+              <span id="status-telemetry-dot" class="w-2 h-2 rounded-full bg-teal-400"></span>
+              <strong id="status-telemetry-badge" class="text-teal-300 font-bold truncate"><span id="cv-telemetry-state">Telemetry SDK Connected</span></strong>
+            </div>
+          </div>
+
+          <div class="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+            <span class="text-slate-400 text-[11px] block">Protected EHR Vault</span>
+            <div class="flex items-center gap-1.5 pt-0.5">
+              <span id="status-vault-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+              <strong id="status-vault-badge" class="text-amber-300 font-bold truncate"><span id="cv-resource-state">Locked (PHI Masked)</span></strong>
+            </div>
+          </div>
+
+          <div class="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+            <span class="text-slate-400 text-[11px] block">Zero Trust Decision</span>
+            <div class="flex items-center gap-1.5 pt-0.5">
+              <span id="status-decision-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+              <strong id="status-decision-badge" class="text-slate-300 font-bold truncate"><span id="cv-server-decision">Pending Authentication</span></strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-2 flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-400 gap-2 border-t border-slate-800/60">
+          <div class="flex items-center gap-2">
+            <span>Privacy Safe: Passive physics vectors only (Dwell/Flight/Velocity). No PHI, forms, or passwords captured.</span>
+          </div>
+          <div class="flex items-center gap-1 text-slate-400">
+            <span>Last Server Auth:</span>
+            <strong id="status-last-auth-time" class="text-teal-400 font-mono"><span id="cv-last-auth-time">None</span></strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 8: RESTRICTED EHR CLINICAL VAULT (PRESERVED ALL ORIGINAL IDs & MARKUP) -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-8 space-y-6">
+      <div id="restricted-ehr-vault" class="rounded-3xl bg-white border border-slate-200 shadow-xl overflow-hidden font-sans scroll-mt-20">
+        
+        <!-- MASKED / RESTRICTED PREVIEW STATE (Default before server authorization) -->
+        <div id="ehr-vault-masked" class="p-6 sm:p-8 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200 text-xs font-mono font-bold">RESTRICTED CLINICAL VAULT</span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-mono bg-amber-50 text-amber-800 border border-amber-200 font-bold">🔒 MASKED (ACCESS PROTECTED)</span>
+              </div>
+              <h3 class="text-2xl font-extrabold text-slate-900 tracking-tight">Confidential Patient EHR, Longitudinal Notes &amp; Diagnostics</h3>
+              <p class="text-xs text-slate-500 font-mono">Protected Health Information (PHI) governed by ABDM &amp; HIPAA Zero Trust continuous verification policy.</p>
+            </div>
+            <button onclick="requestEhrVaultAccess()" 
+              class="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-mono font-bold text-xs uppercase tracking-wider shadow-lg hover:shadow-teal-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0">
+              <span>Unlock Restricted EHR →</span>
+            </button>
+          </div>
+
+          <!-- Blurred / Masked Synthetic Cards Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+            <!-- Glassmorphism overlay banner -->
+            <div class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-900/10 backdrop-blur-[3px] rounded-2xl p-6 text-center border border-slate-200/50">
+              <div class="w-12 h-12 rounded-2xl bg-white shadow-xl flex items-center justify-center text-teal-600 text-xl font-bold mb-3 border border-teal-100">
+                🔒
+              </div>
+              <h4 class="text-base font-bold text-slate-900">Protected Clinical Data Sealed</h4>
+              <p class="text-xs text-slate-600 max-w-md mt-1 mb-4 font-mono">
+                Server-authoritative behavioral rhythm verification required to unmask clinical charts, cardiology vitals, and diagnostic pathology.
+              </p>
+              <button id="btn-request-ehr" onclick="requestEhrVaultAccess()" 
+                class="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-mono font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+                Authenticate &amp; Unlock Restricted EHR →
+              </button>
+            </div>
+
+            <!-- Teaser Card 1: Masked Patient Vitals -->
+            <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3 filter blur-[2px] select-none pointer-events-none">
+              <div class="flex items-center justify-between text-xs text-slate-500 font-mono">
+                <span>Patient Chart</span>
+                <span class="text-teal-700 font-bold">ABDM Sync</span>
+              </div>
+              <div class="space-y-1">
+                <strong class="text-slate-900 block font-bold text-sm">Patient Chart Sealed</strong>
+                <span class="text-slate-500 text-xs font-mono">ABHA: ••-••••-••••-••</span>
+              </div>
+              <div class="pt-2 border-t border-slate-200 space-y-1.5 text-xs font-mono">
+                <div class="flex justify-between"><span class="text-slate-500">Heart Rate:</span><span class="font-bold text-slate-700">•• bpm</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Blood Pressure:</span><span class="font-bold text-slate-700">•••/•• mmHg</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Oxygen SpO2:</span><span class="font-bold text-teal-700">••% Room Air</span></div>
+              </div>
+            </div>
+
+            <!-- Teaser Card 2: Masked Clinical Notes -->
+            <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3 filter blur-[2px] select-none pointer-events-none">
+              <div class="flex items-center justify-between text-xs text-slate-500 font-mono">
+                <span>Attending Physician</span>
+                <span class="text-teal-700 font-bold">ICU Bay 4</span>
+              </div>
+              <div class="space-y-1">
+                <strong class="text-slate-900 block font-bold text-sm">Clinical Charts Sealed</strong>
+                <span class="text-slate-500 text-xs font-mono">Confidential PHI Record</span>
+              </div>
+              <div class="pt-2 border-t border-slate-200 space-y-1.5 text-xs font-mono">
+                <div class="flex justify-between"><span class="text-slate-500">Medication Regimen:</span><span class="font-bold text-slate-700">•••••••• + •••••••••</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Cardiac Biomarker:</span><span class="font-bold text-slate-700">Trop-I ••• ng/mL</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Ambulatory Status:</span><span class="font-bold text-teal-700">••••••••••</span></div>
+              </div>
+            </div>
+
+            <!-- Teaser Card 3: Masked Diagnostic Reports -->
+            <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3 filter blur-[2px] select-none pointer-events-none">
+              <div class="flex items-center justify-between text-xs text-slate-500 font-mono">
+                <span>Diagnostic Archive</span>
+                <span class="text-teal-700 font-bold">Signed Digital Digest</span>
+              </div>
+              <div class="space-y-1">
+                <strong class="text-slate-900 block font-bold text-sm">Diagnostic Archive Sealed</strong>
+                <span class="text-slate-500 text-xs font-mono">Diagnostic Panel Protected</span>
+              </div>
+              <div class="pt-2 border-t border-slate-200 space-y-1.5 text-xs font-mono">
+                <div class="flex justify-between"><span class="text-slate-500">Rhythm Pattern:</span><span class="font-bold text-slate-700">•••••• Sinus Rhythm</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Total Cholesterol:</span><span class="font-bold text-slate-700">••• mg/dL</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Report Hash:</span><span class="font-bold text-teal-700">SHA-256: ••••••••••</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- UNLOCKED / AUTHORIZED RESTRICTED EHR STATE (Shown after server authorization) -->
+        <div id="ehr-vault-unlocked" class="p-6 sm:p-8 space-y-8 hidden">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-mono font-bold flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  SERVER AUTHORIZED &bull; ZERO TRUST ACCESS GRANTED
+                </span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-mono bg-sky-50 text-sky-800 border border-sky-200 font-bold">ABDM ENCLAVE ACTIVE</span>
+              </div>
+              <h3 class="text-2xl font-extrabold text-slate-900 tracking-tight">Restricted Patient Health Record &amp; Clinical Vitals</h3>
+              <p class="text-xs text-slate-500 font-mono">Verified Doctor Session &bull; Telemetry rhythm baseline verified by Cognisec Zero Trust Engine.</p>
+            </div>
+            <button onclick="lockEhrVault()" 
+              class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-mono font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shrink-0">
+              <span>🔒 Lock Record &amp; End Access</span>
+            </button>
+          </div>
+
+          <!-- Loading State Container -->
+          <div id="ehr-vault-loading" class="hidden text-center py-12 font-mono">
+            <div class="w-8 h-8 border-3 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+            <p class="text-xs text-teal-700 font-bold">Retrieving protected EHR records from ABDM clinical vault...</p>
+          </div>
+
+          <!-- Dynamic EHR Vault Content Container (Empty before server authorization) -->
+          <div id="ehr-vault-dynamic-content" class="space-y-8"></div>
+        </div>
+      </div>
+
+      <!-- FRONTEND SEARCH & DEPARTMENT FILTERS FOR PATIENT LIST (PRESERVED ALL IDs) -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div class="relative w-full sm:w-80">
+          <input 
+            id="patient-search-input" 
+            type="text" 
+            placeholder="Search patient name, ABHA ID or diagnosis..." 
+            oninput="filterPatients()"
+            class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-teal-500"
+          />
+          <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">🔍</span>
+        </div>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto text-xs font-mono">
+          <button onclick="setDeptFilter('all')" id="dept-all" class="px-3.5 py-2 rounded-xl bg-teal-600 text-white font-bold cursor-pointer">All Units</button>
+          <button onclick="setDeptFilter('cardiology')" id="dept-cardiology" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Cardiology ICU</button>
+          <button onclick="setDeptFilter('neurology')" id="dept-neurology" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Neurology OPD</button>
+          <button onclick="setDeptFilter('oncology')" id="dept-oncology" class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Oncology Ward</button>
+        </div>
+      </div>
+
+      <!-- PATIENT EHR LIST CONTAINER (PRESERVED EXACT ID) -->
+      <div id="patient-list-container" class="space-y-4">
+        <!-- Dynamically Rendered Patients -->
+      </div>
+    </section>
+
   </main>
 
-  <!-- INTERACTIVE EHR PATIENT MODAL -->
+  <!-- INTERACTIVE WORKING APPOINTMENT BOOKING MODAL -->
+  <div id="appointment-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-6 text-slate-900 relative max-h-[90vh] overflow-y-auto animate-fade-in">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center text-lg font-bold">
+            📅
+          </div>
+          <div>
+            <h3 id="modal-booking-title" class="text-lg font-extrabold text-slate-900">Book Outpatient Consultation</h3>
+            <p class="text-xs text-slate-500">AyuSync MedCare Network &bull; Verified Doctor Scheduling</p>
+          </div>
+        </div>
+        <button onclick="closeAppointmentModal()" class="text-slate-400 hover:text-slate-700 text-lg p-1 cursor-pointer">✕</button>
+      </div>
+
+      <!-- Step Progress Bar -->
+      <div class="flex items-center justify-between text-xs font-semibold text-slate-500 pb-2">
+        <div id="step-indicator-1" class="flex items-center gap-1.5 text-teal-700 font-bold">
+          <span class="w-5 h-5 rounded-full bg-teal-600 text-white flex items-center justify-center text-[10px]">1</span>
+          <span>Doctor &amp; Slot</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-slate-200 mx-3"></div>
+        <div id="step-indicator-2" class="flex items-center gap-1.5">
+          <span class="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">2</span>
+          <span>Patient Info</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-slate-200 mx-3"></div>
+        <div id="step-indicator-3" class="flex items-center gap-1.5">
+          <span class="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">3</span>
+          <span>Summary</span>
+        </div>
+      </div>
+
+      <!-- FORM VIEW: STAGE 1 & 2 -->
+      <form id="appointment-form" onsubmit="handleAppointmentSubmit(event)" class="space-y-4">
+        
+        <!-- STEP 1 CONTAINER -->
+        <div id="booking-step-1" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Department *</label>
+              <select id="modal-dept-select" onchange="syncModalDoctorOptions()" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-teal-500">
+                <option value="cardiology">Cardiology &amp; Cardiac Surgery</option>
+                <option value="neurology">Neurology &amp; Stroke Care</option>
+                <option value="pediatrics">Pediatrics &amp; Child Health</option>
+                <option value="orthopedics">Orthopedics &amp; Joint Replacement</option>
+                <option value="dermatology">Dermatology &amp; Cosmetology</option>
+                <option value="general_medicine">General Medicine &amp; Diabetology</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Consulting Specialist *</label>
+              <select id="modal-doc-select" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-teal-500">
+                <!-- Dynamically populated -->
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Appointment Date *</label>
+              <input id="modal-date-input" type="date" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500" />
+              <span class="text-[10px] text-slate-500 mt-1 block">Past dates are automatically disabled.</span>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Consultation Mode *</label>
+              <select id="modal-mode-select" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500">
+                <option value="In-Person Hospital Visit">In-Person OPD Visit</option>
+                <option value="Video Teleconsultation">Teleconsultation (Video)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Time Slot Selection Pills -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Available Time Slot *</label>
+            <div id="time-slots-container" class="grid grid-cols-3 sm:grid-cols-4 gap-2 text-xs font-mono">
+              <button type="button" onclick="selectTimeSlot('09:30 AM', this)" class="slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer">09:30 AM</button>
+              <button type="button" onclick="selectTimeSlot('10:30 AM', this)" class="slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer">10:30 AM</button>
+              <button type="button" onclick="selectTimeSlot('11:30 AM', this)" class="slot-pill py-2 px-3 rounded-xl border border-teal-500 bg-teal-50 text-teal-800 text-center font-bold cursor-pointer">11:30 AM</button>
+              <button type="button" onclick="selectTimeSlot('02:00 PM', this)" class="slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer">02:00 PM</button>
+              <button type="button" onclick="selectTimeSlot('03:30 PM', this)" class="slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer">03:30 PM</button>
+              <button type="button" onclick="selectTimeSlot('05:00 PM', this)" class="slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer">05:00 PM</button>
+              <button type="button" onclick="selectTimeSlot('06:30 PM', this)" class="slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer">06:30 PM</button>
+            </div>
+            <input type="hidden" id="modal-selected-slot" value="11:30 AM" />
+          </div>
+
+          <button type="button" onclick="goToStep2()" class="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md">
+            <span>Next: Enter Patient Details →</span>
+          </button>
+        </div>
+
+        <!-- STEP 2 CONTAINER -->
+        <div id="booking-step-2" class="space-y-4 hidden">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Patient Full Name *</label>
+              <input id="modal-patient-name" type="text" required placeholder="e.g. Ananya Sharma" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Age &amp; Gender *</label>
+              <div class="grid grid-cols-2 gap-2">
+                <input id="modal-patient-age" type="number" min="1" max="110" required placeholder="Age" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500" />
+                <select id="modal-patient-gender" class="w-full px-2.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500">
+                  <option value="Female">Female</option>
+                  <option value="Male">Male</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Mobile Phone (10 digits) *</label>
+              <input id="modal-patient-phone" type="tel" required pattern="[0-9]{10}" placeholder="e.g. 9876543210" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-800 focus:outline-none focus:border-teal-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Email Address *</label>
+              <input id="modal-patient-email" type="email" required placeholder="patient@example.com" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-800 focus:outline-none focus:border-teal-500" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Reason for Visit / Clinical Symptoms</label>
+            <textarea id="modal-patient-reason" rows="2" placeholder="e.g. Routine follow-up, palpitations, joint stiffness, rash..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500"></textarea>
+          </div>
+
+          <!-- Simulated Demo Notice -->
+          <div class="p-3.5 rounded-xl bg-teal-50 border border-teal-200 text-xs text-teal-900 flex items-start gap-2">
+            <span class="text-base leading-none">ℹ️</span>
+            <div>
+              <strong class="font-bold block">Simulated Demo Booking</strong>
+              <p class="text-[11px] text-teal-800 leading-relaxed">This frontend flow generates an official demonstration appointment reference and syncs with your patient portal for exhibition.</p>
+            </div>
+          </div>
+
+          <div class="flex gap-3 pt-2">
+            <button type="button" onclick="goToStep1()" class="py-3 px-5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer">
+              ← Back
+            </button>
+            <button type="submit" class="flex-1 py-3 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+              Review &amp; Confirm Appointment →
+            </button>
+          </div>
+        </div>
+
+      </form>
+
+      <!-- CONFIRMATION SUMMARY STATE (STEP 3) -->
+      <div id="booking-confirmation-view" class="hidden space-y-6 text-center py-2 animate-fade-in">
+        <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl font-bold mx-auto">
+          ✓
+        </div>
+        
+        <div class="space-y-1">
+          <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-bold">APPOINTMENT RESERVED</span>
+          <h4 class="text-2xl font-extrabold text-slate-900">Consultation Scheduled!</h4>
+          <p class="text-xs text-slate-500 font-mono">Reference Token: <strong id="confirm-ref-id" class="text-teal-700 font-bold">#AYU-APT-84920</strong></p>
+        </div>
+
+        <div class="bg-slate-50 rounded-2xl p-5 border border-slate-200 text-left text-xs font-mono space-y-2.5">
+          <div class="flex justify-between border-b border-slate-200 pb-2">
+            <span class="text-slate-500">Patient Name:</span>
+            <strong id="confirm-patient-name" class="text-slate-900 font-sans font-bold">Ananya Sharma</strong>
+          </div>
+          <div class="flex justify-between border-b border-slate-200 pb-2">
+            <span class="text-slate-500">Specialist Doctor:</span>
+            <strong id="confirm-doctor-name" class="text-slate-900 font-sans font-bold">Dr. Boomika Ram (Cardiology)</strong>
+          </div>
+          <div class="flex justify-between border-b border-slate-200 pb-2">
+            <span class="text-slate-500">Date &amp; Time Slot:</span>
+            <strong id="confirm-slot-time" class="text-teal-700 font-bold">Tomorrow &bull; 11:30 AM</strong>
+          </div>
+          <div class="flex justify-between border-b border-slate-200 pb-2">
+            <span class="text-slate-500">Consultation Type:</span>
+            <span id="confirm-mode" class="text-slate-800">In-Person OPD Visit</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">OPD Room:</span>
+            <span id="confirm-room" class="text-slate-800">Room 204, Tower B</span>
+          </div>
+        </div>
+
+        <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 text-left flex items-start gap-2">
+          <span>⚠️</span>
+          <p class="text-[11px] leading-relaxed"><strong>Exhibition Demonstration:</strong> This is a simulated booking for project showcase. No actual patient booking or financial transaction occurred.</p>
+        </div>
+
+        <div class="flex flex-wrap gap-3 pt-2">
+          <button onclick="downloadAppointmentSlip()" class="flex-1 py-3 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+            📥 Download Appointment Slip
+          </button>
+          <button onclick="closeAppointmentModal()" class="py-3 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer">
+            Done
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- INTERACTIVE DOCTOR PROFILE MODAL -->
+  <div id="doctor-profile-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative max-h-[90vh] overflow-y-auto animate-fade-in">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="text-teal-600 text-xl font-bold">🩺</span>
+          <h3 class="text-base font-extrabold text-slate-900">Consultant Physician Credentials</h3>
+        </div>
+        <button onclick="closeDoctorProfileModal()" class="text-slate-400 hover:text-slate-700 text-lg p-1 cursor-pointer">✕</button>
+      </div>
+
+      <div class="space-y-4">
+        <div class="flex items-center gap-4">
+          <div id="profile-modal-avatar" class="w-16 h-16 rounded-2xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center text-3xl font-bold">
+            👩‍⚕️
+          </div>
+          <div>
+            <h4 id="profile-modal-name" class="text-lg font-bold text-slate-900">Dr. Boomika Ram</h4>
+            <span id="profile-modal-degrees" class="text-xs font-mono text-teal-700 font-bold block">MBBS, MD, DM (Cardiology)</span>
+            <span id="profile-modal-dept" class="text-xs text-slate-500 block">Head of Cardiology &bull; 18+ Years Exp.</span>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
+          <div class="flex justify-between"><span class="text-slate-500">Medical Council Reg:</span><strong id="profile-modal-reg" class="font-mono text-slate-800">KMC #84920</strong></div>
+          <div class="flex justify-between"><span class="text-slate-500">OPD Consultation Room:</span><span id="profile-modal-room" class="font-mono text-slate-800">Room 204, Tower B</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">Consultation Fee:</span><span id="profile-modal-fee" class="font-bold text-emerald-700">₹1,200</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">ABDM Provider Shield:</span><span class="font-mono text-teal-700 font-bold">✓ Active &amp; Verified</span></div>
+        </div>
+
+        <div>
+          <h5 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-1">Clinical Specialties &amp; Interests</h5>
+          <p id="profile-modal-bio" class="text-xs text-slate-600 leading-relaxed">
+            Specializes in coronary interventions, primary angioplasty, transcatheter aortic valve replacement (TAVR), and cardiac electrophysiology. Member of the Cardiological Society of India (CSI).
+          </p>
+        </div>
+
+        <div class="pt-2 flex gap-3">
+          <button id="profile-modal-book-btn" onclick="" class="flex-1 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer">
+            Book Appointment with Doctor →
+          </button>
+          <button onclick="closeDoctorProfileModal()" class="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERACTIVE LAB REPORT PREVIEW MODAL -->
+  <div id="lab-report-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative max-h-[90vh] overflow-y-auto animate-fade-in font-mono text-xs">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="text-teal-600 text-lg">🔬</span>
+          <strong id="lab-modal-title" class="text-sm font-extrabold font-sans">Diagnostic Pathology Report</strong>
+        </div>
+        <button onclick="closeLabModal()" class="text-slate-400 hover:text-slate-700 text-sm p-1 cursor-pointer">✕</button>
+      </div>
+
+      <div class="p-3.5 rounded-xl bg-teal-50 border border-teal-200 text-teal-900 space-y-1">
+        <div class="flex justify-between font-bold">
+          <span>Patient: Clinical Record (Restricted Enclave)</span>
+          <span>ABHA: ••-••••-••••-••</span>
+        </div>
+        <div class="text-[11px] text-teal-800 flex justify-between">
+          <span>Facility: AyuSync Central Diagnostic Lab</span>
+          <span id="lab-modal-date">Validated Today</span>
+        </div>
+      </div>
+
+      <div id="lab-modal-body" class="space-y-3">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 space-y-1">
+        <div class="flex justify-between"><span>Digital Verification:</span><span class="text-emerald-700 font-bold">SHA-256 Digest Verified</span></div>
+        <div class="flex justify-between"><span>Signing Pathologist:</span><span class="text-slate-800">Dr. K. Srinivas, MD (Path)</span></div>
+      </div>
+
+      <div class="pt-2 flex gap-3">
+        <button onclick="downloadCurrentLabReportPdf()" class="flex-1 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer font-sans">
+          📥 Download PDF Report Slip
+        </button>
+        <button onclick="closeLabModal()" class="py-3 px-5 rounded-xl bg-slate-900 text-white font-bold text-xs transition-colors cursor-pointer font-sans">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERACTIVE EHR PATIENT MODAL (PRESERVED ALL IDs) -->
   <div id="ehr-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2">
-          <span class="text-emerald-600 text-lg">🏥</span>
+          <span class="text-teal-600 text-lg">🏥</span>
           <strong class="text-base font-extrabold font-sans">Cognisec AI Sealed EHR Record</strong>
         </div>
-        <button onclick="closeEhrModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1">✕</button>
+        <button onclick="closeEhrModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1 cursor-pointer">✕</button>
       </div>
 
       <div id="ehr-step-init" class="space-y-4">
-        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-1.5 text-xs">
+        <div class="p-4 rounded-2xl bg-teal-50 border border-teal-200 space-y-1.5 text-xs">
           <span class="text-slate-500">Patient File:</span>
-          <strong id="ehr-patient-name" class="text-slate-900 block font-bold text-sm">Rajesh Kumar (Age 52)</strong>
-          <span class="text-emerald-800 font-bold block pt-1">ABHA ID: <span id="ehr-abha-id">91-0982-1249-92</span></span>
-          <span id="ehr-diagnosis" class="text-slate-600 block text-[11px] pt-1">Diagnosis: Post-Op Coronary Angioplasty</span>
+          <strong id="ehr-patient-name" class="text-slate-900 block font-bold text-sm">Protected Patient Record</strong>
+          <span class="text-teal-800 font-bold block pt-1">ABHA ID: <span id="ehr-abha-id">••••-••••-••••</span></span>
+          <span id="ehr-diagnosis" class="text-slate-600 block text-[11px] pt-1">Diagnosis: Authorization Required</span>
         </div>
 
         <div class="p-4 rounded-2xl bg-slate-900 text-white space-y-2 text-xs">
-          <span class="text-emerald-400 font-bold">Workstation Doctor Proximity:</span>
-          <p class="text-slate-300 text-[11px] leading-relaxed">Verified Doctor: Dr. Boomika Ram (KMC #84920). Instant authorization granted without token card swipe.</p>
+          <span class="text-teal-400 font-bold">Zero Trust Clinical Enclave:</span>
+          <p class="text-slate-300 text-[11px] leading-relaxed">Protected Health Information (PHI) requires active server-validated ApplicationGrant.</p>
         </div>
 
-        <button onclick="unlockEhrRecord()" class="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+        <button onclick="unlockEhrRecord()" class="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
           Unlock Sealed Patient Record →
         </button>
       </div>
 
       <div id="ehr-step-active" class="hidden text-center py-6 space-y-4">
-        <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
+        <div class="w-14 h-14 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
           ✓
         </div>
         <div>
           <h4 class="font-extrabold text-xl text-slate-900 font-sans">EHR Clinical Records Unlocked!</h4>
-          <p class="text-xs text-slate-500 mt-1">Audit Log Entry: <strong id="audit-log-id" class="text-slate-900">#ABDM-2026-94812</strong></p>
+          <p class="text-xs text-slate-500 mt-1">Audit Log Entry: <strong id="audit-log-id" class="text-slate-900">#ABDM-2026-VAULT</strong></p>
         </div>
-        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800">
+        <div class="p-3 bg-teal-50 rounded-xl border border-teal-200 text-xs text-teal-800">
           Ayushman Bharat Compliant &bull; HIPAA Sealed &bull; Doctor Rhythm Match 99.98%
         </div>
-        <button onclick="closeEhrModal()" class="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase">
+        <button onclick="closeEhrModal()" class="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase cursor-pointer">
           Lock Record &amp; Close
         </button>
       </div>
     </div>
   </div>
 
-  <!-- INTERACTIVE DOCTOR SIGN IN MODAL -->
+  <!-- INTERACTIVE DOCTOR SIGN IN MODAL (PRESERVED ALL IDs) -->
   <div id="doctor-signin-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative animate-fade-in">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2">
-          <div class="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 font-bold text-lg">🩺</div>
+          <div class="p-2 rounded-xl bg-teal-50 border border-teal-200 text-teal-600 font-bold text-lg">🩺</div>
           <div>
             <h4 class="font-extrabold text-base text-slate-900 font-sans">Sign In to AyuSync Medcare</h4>
-            <p class="text-[11px] text-emerald-800 font-bold">ABDM &amp; HIPAA Zero Trust Network</p>
+            <p class="text-[11px] text-teal-800 font-bold">ABDM &amp; HIPAA Zero Trust Network</p>
           </div>
         </div>
         <button onclick="closeDoctorSignInModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1 cursor-pointer">✕</button>
@@ -212,32 +1435,40 @@
       <form onsubmit="handleDoctorSignInSubmit(event)" class="space-y-4">
         <div class="space-y-1">
           <label class="text-xs font-bold text-slate-700 uppercase">Doctor Registration No / Email</label>
-          <input id="doctor-signin-email" type="text" value="dr.boomika@ayusync.med.in" required
-            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500" />
+          <input id="doctor-signin-email" type="text" value="" placeholder="Enter your registered email" autocomplete="username" required
+            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-teal-500" />
         </div>
         <div class="space-y-1">
-          <label class="text-xs font-bold text-slate-700 uppercase">Password</label>
-          <input id="doctor-signin-pass" type="password" value="••••••••••••" required
-            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500" />
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-slate-700 uppercase">Password</label>
+            <button type="button" onclick="openForgotPasswordModal(document.getElementById('doctor-signin-email')?.value)" class="text-[11px] text-teal-600 hover:text-teal-800 underline font-mono cursor-pointer">Forgot Password?</button>
+          </div>
+          <div class="relative flex items-center">
+            <input id="doctor-signin-pass" type="password" value="" placeholder="Enter doctor password" autocomplete="current-password" required
+              class="w-full pl-4 pr-11 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-teal-500" />
+            <button type="button" onclick="togglePasswordVisibility('doctor-signin-pass', this)" aria-label="Show password" title="Show password" class="absolute right-3 p-1 rounded-lg text-slate-400 hover:text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 pointer-events-none" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
         </div>
 
-        <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between">
+        <div class="p-3.5 rounded-xl bg-teal-50 border border-teal-200 text-xs text-teal-900 flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
             <span>ABHA Workstation Shield</span>
           </div>
-          <span class="font-bold text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">Proximity Guard Active</span>
+          <span class="font-bold text-[10px] bg-teal-200 text-teal-900 px-2 py-0.5 rounded">Proximity Guard Active</span>
         </div>
 
         <button type="submit" id="btn-submit-doctor-signin"
-          class="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+          class="w-full py-3.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
           Sign In &amp; Authorize EHR Workstation →
         </button>
       </form>
     </div>
   </div>
 
-  <!-- NOTIFICATION TOAST CONTAINER -->
+  <!-- NOTIFICATION TOAST CONTAINER (PRESERVED ALL IDs) -->
   <div id="auth-toast" class="fixed top-16 right-6 z-50 hidden p-4 rounded-2xl bg-slate-900 text-white shadow-2xl border border-slate-700 font-mono text-xs max-w-sm animate-fade-in">
     <div class="flex items-center gap-3">
       <div id="toast-icon" class="text-lg">🟢</div>
@@ -248,17 +1479,69 @@
     </div>
   </div>
 
-  <!-- LIGHT FOOTER -->
-  <footer class="bg-white border-t border-slate-200 px-8 py-6 text-center text-xs font-mono text-slate-500">
-    AyuSync Medcare Network &bull; Protected continuously by COGNISEC AI Proximity &amp; PHI Shield.
+  <!-- PROFESSIONAL HOSPITAL FOOTER -->
+  <footer class="bg-white border-t border-slate-200 text-slate-600 text-xs font-sans">
+    <div class="max-w-7xl mx-auto px-4 sm:px-8 py-12 grid grid-cols-1 md:grid-cols-4 gap-8">
+      
+      <div class="space-y-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center font-bold text-lg">🩺</div>
+          <span class="text-base font-extrabold text-slate-900 tracking-tight">AYUSYNC MEDCARE</span>
+        </div>
+        <p class="text-xs text-slate-500 leading-relaxed">
+          Tertiary multispecialty medical institute delivering advanced surgical care, emergency response, and Ayushman Bharat Digital Mission (ABDM) integrated clinical records.
+        </p>
+        <span class="inline-block px-2.5 py-1 rounded bg-teal-50 text-teal-800 border border-teal-200 font-mono text-[10px] font-bold">
+          NABH &bull; JCI &bull; ABDM Certified
+        </span>
+      </div>
+
+      <div class="space-y-2">
+        <h4 class="font-bold text-slate-900 uppercase font-mono text-[11px] tracking-wider">Hospital Campuses</h4>
+        <ul class="space-y-1.5 text-slate-500 text-xs">
+          <li><strong>Bengaluru:</strong> Indiranagar &bull; 100 Feet Road, HAL II</li>
+          <li><strong>Delhi NCR:</strong> Vasant Kunj &bull; Institutional Area</li>
+          <li><strong>Hyderabad:</strong> HITEC City &bull; Cyberabad Hub</li>
+        </ul>
+      </div>
+
+      <div class="space-y-2">
+        <h4 class="font-bold text-slate-900 uppercase font-mono text-[11px] tracking-wider">Quick Navigation</h4>
+        <ul class="space-y-1.5 text-slate-500 text-xs">
+          <li><a href="#departments" class="hover:text-teal-600">Clinical Departments</a></li>
+          <li><a href="#doctors" class="hover:text-teal-600">Consultant Directory</a></li>
+          <li><a href="#book-appointment" class="hover:text-teal-600">Book Outpatient Visit</a></li>
+          <li><a href="#patient-services" class="hover:text-teal-600">Patient Services &amp; Reports</a></li>
+          <li><a href="#facilities" class="hover:text-teal-600">Visiting Hours &amp; Guidelines</a></li>
+        </ul>
+      </div>
+
+      <div class="space-y-2">
+        <h4 class="font-bold text-slate-900 uppercase font-mono text-[11px] tracking-wider">Emergency &amp; Helpdesk</h4>
+        <div class="space-y-1 text-slate-600 text-xs font-mono">
+          <p class="text-rose-600 font-bold">Emergency 24x7: 1800-425-AYU</p>
+          <p>Ambulance ALS: +91 80 4920 1100</p>
+          <p>OPD Helpdesk: opd@ayusync.med.in</p>
+          <p class="text-[10px] text-slate-400 pt-2 font-sans">
+            Demo Portal Notice: Patient data and appointment slots shown here are simulated for exhibition and demonstration.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="border-t border-slate-100 py-4 px-4 text-center font-mono text-[11px] text-slate-400">
+      &copy; 2026 AyuSync MedCare Network &bull; Protected continuously by COGNISEC AI Proximity &amp; PHI Shield.
+    </div>
   </footer>
 
-  <!-- FRONTEND WORKING SCRIPT -->
+  <!-- FRONTEND WORKING SCRIPTS (PRESERVED ALL COGNISEC INTEGRATIONS) -->
   <script src="cognisec-client.js"></script>
   <script>
     if (window.cognisec) window.cognisec.setApplication('healthcare');
-    let isDoctorLoggedIn = true;
+    let isDoctorLoggedIn = false;
 
+    // Toast utility
     function showToast(title, desc, icon = "🟢") {
       const toast = document.getElementById('auth-toast');
       document.getElementById('toast-title').textContent = title;
@@ -270,6 +1553,13 @@
       }, 3500);
     }
 
+    // Toggle Mobile Navigation Menu
+    function toggleMobileMenu() {
+      const nav = document.getElementById('mobile-nav');
+      if (nav) nav.classList.toggle('hidden');
+    }
+
+    // Doctor Sign-In Modal handlers
     function openDoctorSignInModal() {
       document.getElementById('doctor-signin-modal').classList.remove('hidden');
     }
@@ -284,53 +1574,514 @@
       btn.innerHTML = `<span>Authenticating ABHA Proximity Shield...</span>`;
 
       const emailInput = document.getElementById('doctor-signin-email');
-      const email = emailInput ? emailInput.value : 'dr.boomika@ayusync.med.in';
-      if (window.cognisec) {
-        await window.cognisec.login(email, 'Doctor@123', 'healthcare');
+      const email = emailInput ? emailInput.value.trim() : '';
+      const passInput = document.getElementById('doctor-signin-pass');
+      const pass = passInput ? passInput.value : '';
+      if (!email || !pass) {
+        btn.innerHTML = `<span>Sign In &amp; Authorize EHR Workstation →</span>`;
+        showToast("Sign In Failed", "Enter your registered email and password.", "⚠️");
+        return;
       }
 
-      setTimeout(() => {
-        isDoctorLoggedIn = true;
-        btn.innerHTML = `<span>Sign In &amp; Authorize EHR Workstation →</span>`;
-        closeDoctorSignInModal();
+      if (window.cognisec) {
+        const loginRes = await window.cognisec.login(email, pass, 'healthcare');
+        if (loginRes && loginRes.success && loginRes.data) {
+          closeDoctorSignInModal();
+          btn.innerHTML = `<span>Sign In &amp; Authorize EHR Workstation →</span>`;
+          syncHealthcareAuthState();
+          showToast("Clinical Identity Active", "Doctor workstation unlocked. Observation running in background (30s).", "🩺");
+          window.cognisec.startObservationFlow(loginRes.data);
+          return;
+        } else {
+          btn.innerHTML = `<span>Sign In &amp; Authorize EHR Workstation →</span>`;
+          showToast("Sign In Failed", loginRes?.error || "Invalid doctor credentials.", "⚠️");
+          return;
+        }
+      }
 
-        // Update Header UI
-        document.getElementById('doctor-status-label').textContent = 'Doctor Reg No: KMC #84920';
-        document.getElementById('doctor-name-label').textContent = 'Dr. Boomika Ram, M.D. (Cardiology)';
-        document.getElementById('btn-header-signout').classList.remove('hidden');
-        document.getElementById('btn-header-signin').classList.add('hidden');
-        document.getElementById('doctor-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+      btn.innerHTML = `<span>Sign In &amp; Authorize EHR Workstation →</span>`;
+      showToast("Backend Offline", "Cognisec AI client not connected.", "⚠️");
+    }
 
-        showToast("Workstation Authenticated", "Welcome back, Dr. Boomika Ram. ABHA Proximity Shield Active.", "🩺");
-      }, 700);
+    let isEhrVaultUnlocked = false;
+
+    // Continuous Verification Panel update handler
+    async function updateContinuousVerificationPanel(serverData = null) {
+      const isAuth = window.cognisec ? window.cognisec.isAuthenticated() : false;
+      const isFullyVer = window.cognisec ? window.cognisec.isFullyVerified() : false;
+      
+      const obsDot = document.getElementById('status-obs-dot');
+      const obsState = document.getElementById('status-observation-state');
+      const telDot = document.getElementById('status-telemetry-dot');
+      const telBadge = document.getElementById('status-telemetry-badge');
+      const vaultDot = document.getElementById('status-vault-dot');
+      const vaultBadge = document.getElementById('status-vault-badge');
+      const decDot = document.getElementById('status-decision-dot');
+      const decBadge = document.getElementById('status-decision-badge');
+      const lastAuthTime = document.getElementById('status-last-auth-time');
+
+      if (!obsDot) return;
+
+      if (!isAuth) {
+        obsDot.className = 'w-2 h-2 rounded-full bg-slate-500';
+        obsState.textContent = 'Inactive (Sign In Required)';
+        telDot.className = 'w-2 h-2 rounded-full bg-teal-400';
+        telBadge.textContent = 'Telemetry SDK Active';
+        vaultDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        vaultBadge.textContent = 'Locked (PHI Masked)';
+        decDot.className = 'w-2 h-2 rounded-full bg-slate-500';
+        decBadge.textContent = 'Pending Authentication';
+        lastAuthTime.textContent = 'None';
+        return;
+      }
+
+      // Check server authoritative status if not provided
+      let statusData = serverData;
+      if (!statusData && window.cognisec) {
+        try {
+          const res = await window.cognisec.getSessionSecurityStatus();
+          if (res && res.success) statusData = res;
+        } catch (e) {
+          console.warn("[AyuSync] Status fetch warning:", e);
+        }
+      }
+
+      const decision = statusData?.decision || (isFullyVer ? 'ALLOW' : 'OBSERVATION_PENDING');
+      const sessionStatus = statusData?.session_status || (isFullyVer ? 'ACTIVE' : 'PENDING_OBSERVATION');
+
+      // Observation State
+      if (sessionStatus === 'PENDING_OBSERVATION' || decision === 'OBSERVATION_PENDING') {
+        obsDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+        obsState.textContent = 'Active (30s Baseline Learning)';
+      } else {
+        obsDot.className = 'w-2 h-2 rounded-full bg-teal-400';
+        obsState.textContent = 'Active (Continuous Proximity Stream)';
+      }
+
+      // Telemetry Connection
+      telDot.className = 'w-2 h-2 rounded-full bg-teal-400';
+      telBadge.textContent = 'Telemetry SDK Connected (Physics Vectors)';
+
+      // Vault Lock State
+      if (isEhrVaultUnlocked) {
+        vaultDot.className = 'w-2 h-2 rounded-full bg-teal-400';
+        vaultBadge.textContent = 'Unlocked (Server Authorized)';
+      } else {
+        vaultDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        vaultBadge.textContent = 'Locked (Confidential PHI Masked)';
+      }
+
+      // Zero Trust Decision
+      if (decision === 'ALLOW' || sessionStatus === 'ACTIVE') {
+        decDot.className = 'w-2 h-2 rounded-full bg-teal-400';
+        decBadge.textContent = 'ALLOW (Access Granted)';
+      } else if (decision === 'STEP_UP_VERIFICATION' || sessionStatus === 'STEP_UP_REQUIRED') {
+        decDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+        decBadge.textContent = 'STEP_UP_VERIFICATION (OTP Challenge)';
+      } else if (decision === 'RESTRICT' || decision === 'TERMINATE_SESSION') {
+        decDot.className = 'w-2 h-2 rounded-full bg-rose-500';
+        decBadge.textContent = `${decision} (Access Denied)`;
+      } else {
+        decDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        decBadge.textContent = 'OBSERVATION_PENDING (Collecting Vectors)';
+      }
+
+      if (isFullyVer) {
+        lastAuthTime.textContent = new Date().toLocaleTimeString();
+      }
+    }
+
+    // Vault Access Request logic (Preserved original authoritative flow)
+    async function requestEhrVaultAccess() {
+      const cs = window.cognisec;
+      const ANCHOR = 'btn-request-ehr';
+      console.info('[COGNISEC-AI][vault] EHR confidential-access click', { hasClient: !!cs, modalOpen: !!(cs && cs.isStepUpModalOpen) });
+      if (cs && cs.isStepUpModalOpen) return;
+      if (cs) cs.clearVaultAccessNotice();
+
+      if (!cs || !cs.isAuthenticated()) {
+        showToast("Doctor Authentication Required", "Please sign in with your physician credentials to access restricted EHR records.", "🔒");
+        if (cs) cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'info', title: 'Sign in required', message: 'Sign in with your physician credentials to access restricted patient records.', actions: [{ label: 'Sign in', onClick: openDoctorSignInModal }] });
+        openDoctorSignInModal();
+        return;
+      }
+
+      try {
+    function renderEhrVaultContent(data) {
+      const container = document.getElementById('ehr-vault-dynamic-content');
+      if (!container) return;
+      const patient = data.patient_profile || {};
+      const vitals = data.vitals || {};
+      const meds = data.prescriptions || [];
+      const labs = data.lab_reports || [];
+      const notes = data.clinical_notes || {};
+
+      let medsHtml = meds.map(m => `
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-mono">
+          <div>
+            <strong class="text-slate-900 block">${m.medication || ''}</strong>
+            <span class="text-slate-500 text-[11px]">${m.category || ''}</span>
+          </div>
+          <span class="px-2 py-1 rounded text-[11px] bg-teal-50 text-teal-800 font-bold border border-teal-200">${m.dosage || ''}</span>
+        </div>
+      `).join('');
+
+      let labsHtml = labs.map(l => `
+        <div class="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2 text-xs font-mono">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <strong class="text-slate-900 font-sans font-bold text-sm">${l.test || ''}</strong>
+            <span class="px-2 py-0.5 rounded text-[10px] bg-teal-50 text-teal-700 border border-teal-200 font-bold">${l.status || 'NORMAL'}</span>
+          </div>
+          <div class="space-y-1 text-slate-600">
+            <p class="text-slate-800 font-bold">${l.result || ''}</p>
+            <div class="flex justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-400">
+              <span>Digest:</span>
+              <span class="font-mono text-slate-500">${l.hash || ''}</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      container.innerHTML = `
+        <!-- Section 1: Synthetic Patient Profile & Real-Time Clinical Vitals -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-extrabold text-slate-900 uppercase font-mono tracking-wider flex items-center gap-2">
+              <span>🩺</span> Synthetic Patient Profile &amp; Real-Time Vitals
+            </h4>
+            <span class="text-xs font-mono text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200">ICU Telemetry Stream Synchronized</span>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="p-4 rounded-2xl bg-teal-50/60 border border-teal-200 space-y-1 font-mono text-xs">
+              <span class="text-slate-500 block">Patient Identity</span>
+              <strong class="text-slate-900 text-sm font-bold font-sans block">${patient.name || 'Patient'}</strong>
+              <span class="text-teal-800 block text-[11px]">Age ${patient.age || '••'} &bull; ${patient.gender || '••'} &bull; Blood: ${patient.blood_group || '••'}</span>
+              <span class="text-slate-500 block text-[10px] pt-1">ABHA: ${patient.abha_id || '••'}</span>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1 font-mono text-xs">
+              <span class="text-slate-500 block">Cardiovascular Vitals</span>
+              <strong class="text-teal-700 text-sm font-bold block">${vitals.heart_rate || '•• bpm'}</strong>
+              <span class="text-slate-600 block text-[11px]">Rhythm Normal</span>
+              <span class="text-slate-500 block text-[10px] pt-1">BP: ${vitals.blood_pressure || '••/••'}</span>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1 font-mono text-xs">
+              <span class="text-slate-500 block">Respiratory &amp; Saturation</span>
+              <strong class="text-teal-700 text-sm font-bold block">${vitals.spo2 || '••%'}</strong>
+              <span class="text-slate-600 block text-[11px]">Resp: ${vitals.respiratory_rate || '••/min'}</span>
+              <span class="text-slate-500 block text-[10px] pt-1">Core Temp: ${vitals.temperature || '••°F'}</span>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1 font-mono text-xs">
+              <span class="text-slate-500 block">Care Unit &amp; Bed</span>
+              <strong class="text-slate-900 text-sm font-bold block">${patient.unit || 'ICU Bay'}</strong>
+              <span class="text-slate-600 block text-[11px]">Bengaluru Facility</span>
+              <span class="text-slate-500 block text-[10px] pt-1">Attending: ${patient.attending_physician || 'Physician'}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Longitudinal Clinical Notes & Medical History -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-extrabold text-slate-900 uppercase font-mono tracking-wider flex items-center gap-2">
+              <span>📋</span> Medical History &amp; Longitudinal Clinical Notes
+            </h4>
+            <span class="text-xs font-mono text-slate-500">ICD-10 / ABDM Standard Clinical Schema</span>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4 text-xs font-mono">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-slate-200">
+              <div>
+                <span class="text-slate-500 block text-[11px]">Primary Clinical Diagnosis:</span>
+                <strong class="text-slate-900 text-sm font-sans font-bold">${notes.diagnosis || 'Diagnosis'}</strong>
+                <p class="text-slate-600 text-[11px] mt-1 leading-relaxed">Drug-eluting stent (DES) placed in proximal LAD. Post-procedure recovery course uncomplicated.</p>
+              </div>
+              <div>
+                <span class="text-slate-500 block text-[11px]">Co-morbidities &amp; Allergies:</span>
+                <strong class="text-slate-900 text-sm font-sans font-bold">${notes.comorbidities || 'None'}</strong>
+                <p class="text-slate-600 text-[11px] mt-1 leading-relaxed">No known drug allergies (NKDA). Penicillin skin test negative.</p>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between pb-2">
+                <span class="text-slate-500 text-[11px]">Consultant Clinical Progress Note:</span>
+                <span class="text-teal-700 font-bold text-[11px]">${notes.signed_by || ''}</span>
+              </div>
+              <div class="p-3.5 rounded-xl bg-white border border-slate-200 text-slate-800 leading-relaxed font-sans text-xs">
+                "${notes.note || 'Clinical progress note.'}"
+              </div>
+            </div>
+
+            ${medsHtml.length ? `
+            <div class="pt-2">
+              <span class="text-slate-500 text-[11px] block pb-2">Active Inpatient Medication Regimen:</span>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                ${medsHtml}
+              </div>
+            </div>` : ''}
+          </div>
+        </div>
+
+        <!-- Section 3: Diagnostic Reports & Pathology Archive -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-extrabold text-slate-900 uppercase font-mono tracking-wider flex items-center gap-2">
+              <span>🔬</span> Diagnostic Reports &amp; Pathology Archive
+            </h4>
+            <span class="text-xs font-mono text-teal-700">Digital ABDM Signatures Verified</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ${labsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadAndDisplayEhrVault() {
+      const cs = window.cognisec;
+      const ANCHOR = 'btn-request-ehr';
+      const loadingEl = document.getElementById('ehr-vault-loading');
+      const dynamicEl = document.getElementById('ehr-vault-dynamic-content');
+      const unlockedEl = document.getElementById('ehr-vault-unlocked');
+      const maskedEl = document.getElementById('ehr-vault-masked');
+
+      if (maskedEl) maskedEl.classList.add('hidden');
+      if (unlockedEl) unlockedEl.classList.remove('hidden');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      if (dynamicEl) dynamicEl.innerHTML = '';
+
+      try {
+        if (!cs || typeof cs.fetchVaultData !== 'function') {
+          throw new Error('Security client vault service not available');
+        }
+        const resp = await cs.fetchVaultData('ehr_vault');
+        if (resp && resp.success && resp.data) {
+          renderEhrVaultContent(resp.data);
+          if (loadingEl) loadingEl.classList.add('hidden');
+          isEhrVaultUnlocked = true;
+          updateContinuousVerificationPanel();
+          return true;
+        } else {
+          throw new Error((resp && resp.error) || 'Server rejected confidential EHR vault request.');
+        }
+      } catch (err) {
+        console.error('[COGNISEC-AI] Failed to load EHR vault data:', err);
+        lockEhrVault();
+        if (cs && typeof cs.showVaultAccessNotice === 'function') {
+          cs.showVaultAccessNotice({
+            anchorId: ANCHOR,
+            tone: 'error',
+            title: 'EHR Authorization Failed',
+            message: err.message || 'Server Zero Trust authorization denied access to restricted clinical health records.',
+            actions: [{ label: 'Retry Authorization', onClick: requestEhrVaultAccess }]
+          });
+        }
+        showToast("Access Denied", "Protected clinical EHR vault access denied by server policy.", "🔒");
+        return false;
+      }
+    }
+
+    async function requestEhrVaultAccess() {
+      const cs = window.cognisec;
+      const ANCHOR = 'btn-request-ehr';
+      console.info('[COGNISEC-AI][vault] ehr confidential-access click', { hasClient: !!cs, modalOpen: !!(cs && cs.isStepUpModalOpen) });
+      if (cs && cs.isStepUpModalOpen) return;
+      if (cs) cs.clearVaultAccessNotice();
+
+      if (!cs || !cs.isAuthenticated()) {
+        showToast("Doctor Authentication Required", "Please sign in with your physician credentials to access restricted EHR records.", "🔒");
+        if (cs) cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'info', title: 'Sign in required', message: 'Sign in with your physician credentials to access restricted patient records.', actions: [{ label: 'Sign in', onClick: openDoctorSignInModal }] });
+        openDoctorSignInModal();
+        return;
+      }
+
+      try {
+        if (!cs) {
+          showToast("Security Engine Offline", "Cognisec AI client not connected.", "⚠️");
+          return;
+        }
+        const retry = { label: 'Retry', onClick: requestEhrVaultAccess };
+        const restart = { label: 'Sign out & start a new session', onClick: () => cs.signOutAndRestart() };
+
+        // Authoritative server check: If already authorized for ehr vault in this session, reveal immediately
+        const accessCheck = await cs.checkResourceAccess('ehr_vault');
+        if (accessCheck && accessCheck.access_granted) {
+          const loaded = await loadAndDisplayEhrVault();
+          if (loaded) {
+            showToast("EHR Access Authorized", "Zero Trust verified: Confidential clinical records accessible.", "🩺");
+          }
+          return;
+        }
+
+        if (accessCheck && (accessCheck.decision === 'TERMINATE_SESSION' || accessCheck.risk_level === 'CRITICAL')) {
+          lockEhrVault();
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'error', title: 'Access denied', message: accessCheck.message || 'Confidential access denied by server Zero Trust policy.', actions: [restart] });
+          return;
+        }
+
+        if (accessCheck && !accessCheck.verification_required && (accessCheck.decision === 'RESTRICT' || accessCheck.risk_level === 'HIGH')) {
+          lockEhrVault();
+          showToast("Elevated Risk", "Sensitive clinical operations restricted under elevated risk policy.", "⚠️");
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'warn', title: 'Elevated risk - NeuralTrace not available', message: accessCheck.message || 'Sensitive clinical operations restricted under elevated risk policy.', actions: [restart] });
+          return;
+        }
+
+        if (accessCheck && accessCheck.decision === 'OBSERVATION_PENDING') {
+          lockEhrVault();
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'info', title: 'Observation period active', message: accessCheck.message || 'Confidential access locked during behavioral observation.', actions: [retry] });
+          return;
+        }
+
+        if (accessCheck && accessCheck.decision === 'UNAUTHENTICATED') {
+          lockEhrVault();
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'warn', title: 'Please sign in again', message: accessCheck.message, actions: [{ label: 'Sign in', onClick: () => { cs.clearAuth(); syncHealthcareAuthState(); openDoctorSignInModal(); } }] });
+          return;
+        }
+
+        if (!accessCheck || accessCheck.decision === 'ERROR' || !accessCheck.verification_required) {
+          lockEhrVault();
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'error', title: 'Could not get an access decision', message: (accessCheck && accessCheck.message) || 'The security server did not return a usable decision. Records stay locked.', actions: [retry] });
+          return;
+        }
+
+        // Intercept click and open NeuralTrace step-up challenge
+        showToast("NeuralTrace Verification Required", "Reconstruct your enrolled neural route to authorize restricted EHR access.", "🛡️");
+        cs.openStepUpModal({
+          preferredFactor: 'GESTURE_PATTERN',
+          targetResource: 'ehr_vault',
+          title: 'NEURALTRACE — CONFIDENTIAL ACCESS VERIFICATION',
+          subtitle: 'Additional identity verification is required to access restricted clinical EHR records.',
+          reason: 'Zero Trust verification: Reconstruct your enrolled neural route to authorize access to restricted patient medical records.',
+          forceNew: true,
+          onSuccess: async (data) => {
+            // Verify authoritative server decision before unmasking
+            const verifyCheck = await cs.checkResourceAccess('ehr_vault');
+            if (verifyCheck && verifyCheck.access_granted) {
+              cs.clearVaultAccessNotice();
+              const loaded = await loadAndDisplayEhrVault();
+              if (loaded) {
+                showToast("EHR Access Authorized", "Zero Trust verified via NeuralTrace: Confidential clinical records revealed.", "🩺");
+              }
+            } else {
+              lockEhrVault();
+              cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'error', title: 'Access denied', message: (verifyCheck && verifyCheck.message) || 'Server rejected confidential clearance.', actions: [retry] });
+            }
+          },
+          onCancel: () => {
+            lockEhrVault();
+            cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'info', title: 'Verification cancelled', message: 'Confidential clinical EHR vault remains sealed.', actions: [retry] });
+          }
+        });
+      } catch (err) {
+        console.error('[COGNISEC-AI] Failed to authorize EHR vault:', err);
+        lockEhrVault();
+        if (window.cognisec) window.cognisec.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'error', title: 'Authorization error', message: 'Failed to contact security engine. Please retry.', actions: [{ label: 'Retry', onClick: requestEhrVaultAccess }] });
+      }
+    }
+
+    function unlockEhrVault() {
+      loadAndDisplayEhrVault();
+    }
+
+    function lockEhrVault() {
+      isEhrVaultUnlocked = false;
+      if (window.cognisec) {
+        window.cognisec.revokeResourceClearance('ehr_vault');
+      }
+      const dynamicEl = document.getElementById('ehr-vault-dynamic-content');
+      if (dynamicEl) dynamicEl.innerHTML = '';
+      const loadingEl = document.getElementById('ehr-vault-loading');
+      if (loadingEl) loadingEl.classList.add('hidden');
+      const masked = document.getElementById('ehr-vault-masked');
+      const unlocked = document.getElementById('ehr-vault-unlocked');
+      if (masked) masked.classList.remove('hidden');
+      if (unlocked) unlocked.classList.add('hidden');
+      updateContinuousVerificationPanel();
+      showToast("EHR Vault Sealed", "Confidential medical records masked under Zero Trust policy.", "🔒");
+    }
+
+    function triggerExhibitionStepUpTest() {
+      if (!window.cognisec || !window.cognisec.isAuthenticated()) {
+        showToast("Sign In Required First", "Please sign in with doctor credentials before running the exhibition simulation.", "ℹ️");
+        openDoctorSignInModal();
+        return;
+      }
+      showToast("Simulating Motor Anomaly", "Triggering server-authoritative step-up verification challenge for exhibition demonstration.", "⚡");
+      window.cognisec.openStepUpModal({
+        reason: "Exhibition Demonstration: Simulating physician motor anomaly & step-up verification for confidential clinical EHR unlock."
+      });
     }
 
     function syncHealthcareAuthState() {
       const isAuth = window.cognisec ? window.cognisec.isAuthenticated() : false;
+      const isVerified = window.cognisec ? window.cognisec.isFullyVerified() : false;
       const user = window.cognisec ? window.cognisec.getUser() : null;
       isDoctorLoggedIn = isAuth;
 
+      if (!isAuth && isEhrVaultUnlocked) {
+        lockEhrVault();
+      }
+
       if (isAuth && user) {
-        document.getElementById('doctor-status-label').textContent = 'Doctor Reg No: KMC #84920';
+        const statusBadge = isVerified ? '' : ' (Observing)';
+        document.getElementById('doctor-status-label').textContent = `${user.email || ''}` + statusBadge;
         document.getElementById('doctor-name-label').textContent = `Dr. ${user.name} (Cardiology)`;
         document.getElementById('btn-header-signout').classList.remove('hidden');
         document.getElementById('btn-header-signin').classList.add('hidden');
-        document.getElementById('doctor-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+        document.getElementById('btn-header-mfa')?.classList.remove('hidden');
+        document.getElementById('doctor-status-dot').className = isVerified
+          ? 'w-2 h-2 rounded-full bg-emerald-400'
+          : 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+
+        // Check authoritative server access decision for cross-portal synchronization
+        if (isVerified) {
+          window.cognisec.checkResourceAccess('ehr_vault').then(async decision => {
+            if (decision && decision.access_granted) {
+              if (!isEhrVaultUnlocked) {
+                await loadAndDisplayEhrVault();
+              }
+            } else if (isEhrVaultUnlocked && decision && !decision.access_granted) {
+              lockEhrVault();
+            }
+          }).catch(() => {});
+        }
       } else {
         document.getElementById('doctor-status-label').textContent = 'Guest Medical Officer';
         document.getElementById('doctor-name-label').textContent = 'Not Signed In';
         document.getElementById('btn-header-signout').classList.add('hidden');
         document.getElementById('btn-header-signin').classList.remove('hidden');
-        document.getElementById('doctor-status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
+        document.getElementById('btn-header-mfa')?.classList.add('hidden');
+        document.getElementById('doctor-status-dot').className = 'w-2 h-2 rounded-full bg-rose-500';
       }
+
+      updateContinuousVerificationPanel();
     }
 
     window.addEventListener('cognisec:auth_change', syncHealthcareAuthState);
+    window.addEventListener('cognisec:step_up_success', async (e) => {
+      syncHealthcareAuthState();
+      const decision = await window.cognisec.checkResourceAccess('ehr_vault');
+      if (decision && decision.access_granted) {
+        await loadAndDisplayEhrVault();
+        showToast("Identity Re-authenticated", "Zero Trust verified: Clinical EHR access unlocked.", "✅");
+      }
+    });
+    window.addEventListener('cognisec:session_locked', () => {
+      showToast("Clinical Workstation Locked", "Verification failed. EHR access restricted.", "🔒");
+      lockEhrVault();
+      syncHealthcareAuthState();
+    });
     document.addEventListener('DOMContentLoaded', syncHealthcareAuthState);
     setTimeout(syncHealthcareAuthState, 150);
 
     async function handleDoctorSignOut() {
       if (window.cognisec) await window.cognisec.logout();
+      lockEhrVault();
       syncHealthcareAuthState();
       showToast("Clinical Workstation Locked", "Doctor session signed out. EHR records locked.", "🚪");
     }
@@ -343,11 +2094,618 @@
       }
     });
 
+    // Password visibility toggle helper
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.setAttribute('title', 'Hide password');
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 pointer-events-none"><path d="m9.88 9.88 4.24 4.24m.02-4.24-4.24 4.24M2 12s3.6-8 10-8 10 8 10 8-3.6 8-10 8-10-8-10-8Z"/></svg>`;
+      } else {
+        input.type = 'password';
+        btn.setAttribute('title', 'Show password');
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 pointer-events-none"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>`;
+      }
+    }
+
+    // ==========================================
+    // DOCTORS DATA & DIRECTORY LOGIC
+    // ==========================================
+    const DOCTORS = [
+      {
+        id: 'doc-1',
+        name: 'Dr. Boomika Ram',
+        degrees: 'MBBS, MD, DM (Cardiology)',
+        dept: 'cardiology',
+        deptLabel: 'Cardiology & Cardiac Surgery',
+        room: 'Room 204, Tower B',
+        experience: '18+ Years',
+        reg: 'KMC #84920',
+        fee: '₹1,200',
+        availability: 'Available Today',
+        opdHours: 'Mon–Sat &bull; 09:00 AM – 01:00 PM',
+        avatar: '👩‍⚕️',
+        bio: 'Senior Consultant Cardiologist specializing in adult interventional cardiology, primary coronary angioplasty, transcatheter aortic valve implantation (TAVI), and structural heart disease.'
+      },
+      {
+        id: 'doc-2',
+        name: 'Dr. Rajesh K. Nair',
+        degrees: 'MBBS, MS, MCh (Neurosurgery)',
+        dept: 'neurology',
+        deptLabel: 'Neurology & Stroke Care',
+        room: 'Room 112, Tower A',
+        experience: '22+ Years',
+        reg: 'KMC #71294',
+        fee: '₹1,500',
+        availability: 'Next Slot: Tomorrow 10:00 AM',
+        opdHours: 'Mon–Fri &bull; 10:00 AM – 02:00 PM',
+        avatar: '👨‍⚕️',
+        bio: 'Chief Neurosurgeon and Director of Stroke Program. Specializes in minimally invasive skull-base neurosurgery, intracranial aneurysms, and epilepsy surgical therapies.'
+      },
+      {
+        id: 'doc-3',
+        name: 'Dr. Sunita Mehra',
+        degrees: 'MBBS, MD (Pediatrics), DNB',
+        dept: 'pediatrics',
+        deptLabel: 'Pediatrics & Child Health',
+        room: 'Room 305, Tower C',
+        experience: '15+ Years',
+        reg: 'KMC #90214',
+        fee: '₹900',
+        availability: 'Available Today',
+        opdHours: 'Daily &bull; 09:00 AM – 04:00 PM',
+        avatar: '👩‍⚕️',
+        bio: 'Senior Consultant Pediatrician & Neonatologist leading the Level-III NICU. Expert in childhood infectious diseases, pediatric allergy screening, and infant growth development.'
+      },
+      {
+        id: 'doc-4',
+        name: 'Dr. Vikramaditya Rao',
+        degrees: 'MBBS, MS (Orthopedics), MCh Orth (UK)',
+        dept: 'orthopedics',
+        deptLabel: 'Orthopedics & Joint Replacement',
+        room: 'Room 108, Tower B',
+        experience: '19+ Years',
+        reg: 'KMC #65812',
+        fee: '₹1,200',
+        availability: 'Available Today',
+        opdHours: 'Mon, Wed, Fri &bull; 11:00 AM – 03:00 PM',
+        avatar: '👨‍⚕️',
+        bio: 'Pioneer in robotic total knee and hip arthroplasty, arthroscopic cruciate ligament reconstructions, and sports medicine rehabilitation.'
+      },
+      {
+        id: 'doc-5',
+        name: 'Dr. Ananya Sen',
+        degrees: 'MBBS, MD (Dermatology, Venereology & Leprosy)',
+        dept: 'dermatology',
+        deptLabel: 'Dermatology & Cosmetology',
+        room: 'Room 215, Tower A',
+        experience: '12+ Years',
+        reg: 'KMC #94821',
+        fee: '₹1,000',
+        availability: 'Next Slot: Thursday 02:00 PM',
+        opdHours: 'Tue, Thu, Sat &bull; 02:00 PM – 06:00 PM',
+        avatar: '👩‍⚕️',
+        bio: 'Renowned clinical dermatologist specializing in chronic psoriasis phototherapy, pediatric atopic dermatitis, biological immunotherapy, and aesthetic laser rejuvenation.'
+      },
+      {
+        id: 'doc-6',
+        name: 'Dr. Sandeep Verma',
+        degrees: 'MBBS, MD (General Medicine), FCCP',
+        dept: 'general_medicine',
+        deptLabel: 'General Medicine & Diabetology',
+        room: 'Room 102, Tower A',
+        experience: '16+ Years',
+        reg: 'KMC #81920',
+        fee: '₹800',
+        availability: 'Available Today',
+        opdHours: 'Mon–Sat &bull; 08:30 AM – 12:30 PM',
+        avatar: '👨‍⚕️',
+        bio: 'Senior Consultant Physician specializing in diabetic metabolic management, hypertensive disorders, geriatric preventive medicine, and pre-operative cardiac evaluations.'
+      }
+    ];
+
+    let currentDoctorDeptFilter = 'all';
+    let doctorSearchQuery = '';
+
+    function renderDoctors() {
+      const container = document.getElementById('doctors-grid');
+      if (!container) return;
+
+      const filtered = DOCTORS.filter(d => {
+        const matchDept = (currentDoctorDeptFilter === 'all' || d.dept === currentDoctorDeptFilter);
+        const matchSearch = d.name.toLowerCase().includes(doctorSearchQuery.toLowerCase()) ||
+                            d.deptLabel.toLowerCase().includes(doctorSearchQuery.toLowerCase()) ||
+                            d.degrees.toLowerCase().includes(doctorSearchQuery.toLowerCase());
+        return matchDept && matchSearch;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 font-mono text-xs">No doctors found matching your criteria. Try adjusting your search or department filter.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(d => `
+        <div class="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm hospital-card-hover space-y-4 flex flex-col justify-between">
+          <div class="space-y-3">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <span class="w-14 h-14 rounded-2xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center text-3xl font-bold shrink-0">${d.avatar}</span>
+                <div>
+                  <h3 class="text-base font-bold text-slate-900">${d.name}</h3>
+                  <span class="text-xs font-mono text-teal-700 font-bold block">${d.degrees}</span>
+                  <span class="text-xs text-slate-500 font-medium">${d.deptLabel}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs font-mono space-y-1.5 text-slate-600">
+              <div class="flex justify-between"><span>OPD Room:</span><span class="font-bold text-slate-800">${d.room}</span></div>
+              <div class="flex justify-between"><span>OPD Hours:</span><span class="text-teal-700 font-semibold">${d.opdHours}</span></div>
+              <div class="flex justify-between"><span>Consultation Fee:</span><strong class="text-emerald-700">${d.fee}</strong></div>
+              <div class="flex justify-between"><span>Experience:</span><span class="text-slate-800">${d.experience}</span></div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full ${d.availability.includes('Today') ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
+              <span class="text-[11px] font-semibold text-slate-600">${d.availability}</span>
+            </div>
+          </div>
+
+          <div class="pt-2 flex gap-2">
+            <button onclick="openDoctorProfileModal('${d.id}')" class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer">
+              Profile
+            </button>
+            <button onclick="openAppointmentModal('${d.id}', '${d.dept}')" class="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer text-center">
+              Book Appointment →
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function setDoctorDeptFilter(dept) {
+      currentDoctorDeptFilter = dept;
+      ['all', 'cardiology', 'neurology', 'pediatrics', 'orthopedics', 'dermatology', 'general_medicine'].forEach(d => {
+        const btn = document.getElementById(`doc-filter-${d}`);
+        if (btn) {
+          if (d === dept) {
+            btn.className = 'px-4 py-2 rounded-xl bg-teal-600 text-white font-bold shrink-0 cursor-pointer transition-colors';
+          } else {
+            btn.className = 'px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 shrink-0 cursor-pointer transition-colors';
+          }
+        }
+      });
+      renderDoctors();
+    }
+
+    function handleDoctorSearch(query) {
+      doctorSearchQuery = query;
+      renderDoctors();
+    }
+
+    function filterAndScrollDoctors(dept) {
+      setDoctorDeptFilter(dept);
+      const section = document.getElementById('doctors');
+      if (section) section.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function openDoctorProfileModal(doctorId) {
+      const doc = DOCTORS.find(d => d.id === doctorId);
+      if (!doc) return;
+      document.getElementById('profile-modal-avatar').textContent = doc.avatar;
+      document.getElementById('profile-modal-name').textContent = doc.name;
+      document.getElementById('profile-modal-degrees').textContent = doc.degrees;
+      document.getElementById('profile-modal-dept').textContent = `${doc.deptLabel} • ${doc.experience} Experience`;
+      document.getElementById('profile-modal-reg').textContent = doc.reg;
+      document.getElementById('profile-modal-room').textContent = doc.room;
+      document.getElementById('profile-modal-fee').textContent = doc.fee;
+      document.getElementById('profile-modal-bio').textContent = doc.bio;
+      document.getElementById('profile-modal-book-btn').onclick = () => {
+        closeDoctorProfileModal();
+        openAppointmentModal(doc.id, doc.dept);
+      };
+      document.getElementById('doctor-profile-modal').classList.remove('hidden');
+    }
+
+    function closeDoctorProfileModal() {
+      document.getElementById('doctor-profile-modal').classList.add('hidden');
+    }
+
+    // ==========================================
+    // APPOINTMENT BOOKING WIZARD LOGIC
+    // ==========================================
+    const APPOINTMENTS_STORAGE_KEY = 'ayusync_patient_appointments';
+    let sampleAppointments = [
+      {
+        id: 'AYU-APT-78192',
+        doctorName: 'Dr. Boomika Ram (Cardiology)',
+        dept: 'Cardiology & Cardiac Surgery',
+        date: '2026-10-18',
+        time: '11:30 AM',
+        patientName: 'Demonstration Patient A',
+        mode: 'In-Person OPD Visit',
+        room: 'Room 204, Tower B',
+        status: 'Confirmed'
+      },
+      {
+        id: 'AYU-APT-51094',
+        doctorName: 'Dr. Sunita Mehra (Pediatrics)',
+        dept: 'Pediatrics & Child Health',
+        date: '2026-10-21',
+        time: '02:00 PM',
+        patientName: 'Demonstration Patient B',
+        mode: 'In-Person OPD Visit',
+        room: 'Room 305, Tower C',
+        status: 'Confirmed'
+      }
+    ];
+
+    function getStoredAppointments() {
+      try {
+        const stored = localStorage.getItem(APPOINTMENTS_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          return [...parsed, ...sampleAppointments];
+        }
+      } catch (e) {}
+      return sampleAppointments;
+    }
+
+    function renderPatientAppointments() {
+      const container = document.getElementById('patient-appointments-list');
+      if (!container) return;
+
+      const appointments = getStoredAppointments();
+
+      container.innerHTML = appointments.map(apt => `
+        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hospital-card-hover flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono text-xs">
+          <div class="flex items-center gap-4">
+            <span class="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center text-xl font-bold">🩺</span>
+            <div>
+              <div class="flex items-center gap-2">
+                <strong class="text-slate-900 text-sm font-sans font-bold">${apt.doctorName}</strong>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">${apt.status}</span>
+              </div>
+              <span class="text-slate-500 text-xs block pt-0.5 font-sans">${apt.dept} &bull; ${apt.mode}</span>
+              <span class="text-teal-700 text-xs font-bold block pt-0.5">📅 ${apt.date} at ${apt.time} &bull; ${apt.room} &bull; Ref: ${apt.id}</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button onclick="showToast('Appointment Details', 'Confirmed for ${apt.patientName}. Show Ref ${apt.id} at Reception.', '📄')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold transition-colors cursor-pointer">
+              View Slip
+            </button>
+            <button onclick="showToast('Reschedule Demo', 'Slot updated for exhibition demonstration.', '🔄')" class="px-3.5 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold transition-colors cursor-pointer">
+              Reschedule
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openAppointmentModal(preselectedDoctorId = null, preselectedDept = null) {
+      // Set today's date as min attribute to prevent past dates!
+      const todayStr = new Date().toISOString().split('T')[0];
+      const dateInput = document.getElementById('modal-date-input');
+      if (dateInput) {
+        dateInput.min = todayStr;
+        if (!dateInput.value) {
+          // Default to tomorrow or today
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          dateInput.value = tomorrow.toISOString().split('T')[0];
+        }
+      }
+
+      if (preselectedDept) {
+        document.getElementById('modal-dept-select').value = preselectedDept;
+      }
+      syncModalDoctorOptions();
+
+      if (preselectedDoctorId) {
+        document.getElementById('modal-doc-select').value = preselectedDoctorId;
+      }
+
+      goToStep1();
+      document.getElementById('appointment-modal').classList.remove('hidden');
+    }
+
+    function closeAppointmentModal() {
+      document.getElementById('appointment-modal').classList.add('hidden');
+    }
+
+    function syncModalDoctorOptions() {
+      const dept = document.getElementById('modal-dept-select').value;
+      const docSelect = document.getElementById('modal-doc-select');
+      const filtered = DOCTORS.filter(d => d.dept === dept);
+      
+      docSelect.innerHTML = filtered.map(d => `
+        <option value="${d.id}">${d.name} (${d.degrees}) &bull; ${d.room}</option>
+      `).join('');
+    }
+
+    function syncQuickDoctorOptions() {
+      const dept = document.getElementById('quick-dept-select').value;
+      const docSelect = document.getElementById('quick-doc-select');
+      const filtered = DOCTORS.filter(d => d.dept === dept);
+      
+      docSelect.innerHTML = filtered.map(d => `
+        <option value="${d.id}">${d.name} (${d.room})</option>
+      `).join('');
+    }
+
+    function launchQuickBooking() {
+      const dept = document.getElementById('quick-dept-select').value;
+      const docId = document.getElementById('quick-doc-select').value;
+      const dateVal = document.getElementById('quick-date-select').value;
+      const modeVal = document.getElementById('quick-mode-select').value;
+
+      openAppointmentModal(docId, dept);
+      if (dateVal) document.getElementById('modal-date-input').value = dateVal;
+      if (modeVal) document.getElementById('modal-mode-select').value = modeVal;
+    }
+
+    function selectTimeSlot(slot, btn) {
+      document.getElementById('modal-selected-slot').value = slot;
+      document.querySelectorAll('.slot-pill').forEach(el => {
+        el.className = 'slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer';
+      });
+      btn.className = 'slot-pill py-2 px-3 rounded-xl border border-teal-500 bg-teal-50 text-teal-800 text-center font-bold cursor-pointer';
+    }
+
+    function goToStep1() {
+      document.getElementById('booking-step-1').classList.remove('hidden');
+      document.getElementById('booking-step-2').classList.add('hidden');
+      document.getElementById('booking-confirmation-view').classList.add('hidden');
+      document.getElementById('appointment-form').classList.remove('hidden');
+
+      document.getElementById('step-indicator-1').className = 'flex items-center gap-1.5 text-teal-700 font-bold';
+      document.getElementById('step-indicator-2').className = 'flex items-center gap-1.5 text-slate-500 font-semibold';
+      document.getElementById('step-indicator-3').className = 'flex items-center gap-1.5 text-slate-500 font-semibold';
+    }
+
+    function goToStep2() {
+      const dateVal = document.getElementById('modal-date-input').value;
+      if (!dateVal) {
+        showToast("Select Date", "Please pick an appointment date.", "⚠️");
+        return;
+      }
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (dateVal < todayStr) {
+        showToast("Invalid Date", "Appointment date cannot be in the past.", "⚠️");
+        return;
+      }
+
+      document.getElementById('booking-step-1').classList.add('hidden');
+      document.getElementById('booking-step-2').classList.remove('hidden');
+
+      document.getElementById('step-indicator-1').className = 'flex items-center gap-1.5 text-emerald-700 font-bold';
+      document.getElementById('step-indicator-2').className = 'flex items-center gap-1.5 text-teal-700 font-bold';
+      document.getElementById('step-indicator-3').className = 'flex items-center gap-1.5 text-slate-500 font-semibold';
+    }
+
+    let lastConfirmedAppointment = null;
+
+    function handleAppointmentSubmit(e) {
+      e.preventDefault();
+
+      const name = document.getElementById('modal-patient-name').value.trim();
+      const phone = document.getElementById('modal-patient-phone').value.trim();
+      const email = document.getElementById('modal-patient-email').value.trim();
+      const docId = document.getElementById('modal-doc-select').value;
+      const date = document.getElementById('modal-date-input').value;
+      const slot = document.getElementById('modal-selected-slot').value;
+      const mode = document.getElementById('modal-mode-select').value;
+
+      if (!name || !phone || !email || !date) {
+        showToast("Incomplete Form", "Please fill in all required patient fields.", "⚠️");
+        return;
+      }
+
+      const doc = DOCTORS.find(d => d.id === docId) || DOCTORS[0];
+      const refId = '#AYU-APT-' + Math.floor(10000 + Math.random() * 90000);
+
+      lastConfirmedAppointment = {
+        id: refId,
+        doctorName: `${doc.name} (${doc.deptLabel.split(' ')[0]})`,
+        dept: doc.deptLabel,
+        date: date,
+        time: slot,
+        patientName: name,
+        mode: mode,
+        room: doc.room,
+        status: 'Confirmed'
+      };
+
+      // Save to localStorage for demo persistence
+      try {
+        const stored = JSON.parse(localStorage.getItem(APPOINTMENTS_STORAGE_KEY) || '[]');
+        stored.unshift(lastConfirmedAppointment);
+        localStorage.setItem(APPOINTMENTS_STORAGE_KEY, JSON.stringify(stored));
+      } catch (err) {}
+
+      // Update Confirmation Screen
+      document.getElementById('confirm-ref-id').textContent = refId;
+      document.getElementById('confirm-patient-name').textContent = name;
+      document.getElementById('confirm-doctor-name').textContent = `${doc.name} (${doc.degrees})`;
+      document.getElementById('confirm-slot-time').textContent = `${date} • ${slot}`;
+      document.getElementById('confirm-mode').textContent = mode;
+      document.getElementById('confirm-room').textContent = doc.room;
+
+      // Switch to Confirmation view
+      document.getElementById('appointment-form').classList.add('hidden');
+      document.getElementById('booking-confirmation-view').classList.remove('hidden');
+
+      document.getElementById('step-indicator-1').className = 'flex items-center gap-1.5 text-emerald-700 font-bold';
+      document.getElementById('step-indicator-2').className = 'flex items-center gap-1.5 text-emerald-700 font-bold';
+      document.getElementById('step-indicator-3').className = 'flex items-center gap-1.5 text-emerald-700 font-bold';
+
+      renderPatientAppointments();
+      showToast("Appointment Confirmed", `Reference ${refId} created successfully.`, "✅");
+    }
+
+    function downloadAppointmentSlip() {
+      if (!lastConfirmedAppointment) {
+        showToast("Notice", "No recent appointment found.", "ℹ️");
+        return;
+      }
+      const text = `=====================================================
+AYUSYNC MEDCARE NETWORK — OUTPATIENT APPOINTMENT SLIP
+(Simulated Demonstration Record)
+=====================================================
+Appointment Token : ${lastConfirmedAppointment.id}
+Patient Name      : ${lastConfirmedAppointment.patientName}
+Consulting Doctor : ${lastConfirmedAppointment.doctorName}
+Department        : ${lastConfirmedAppointment.dept}
+Date & Time       : ${lastConfirmedAppointment.date} at ${lastConfirmedAppointment.time}
+Consultation Mode : ${lastConfirmedAppointment.mode}
+Clinic Room       : ${lastConfirmedAppointment.room}
+Hospital Campus   : AyuSync MedCare, Bengaluru Indiranagar
+ABDM Gateway      : IN-KA-BLR-004921 (NABH Accredited)
+=====================================================
+Please arrive 15 minutes prior to your consultation slot.
+=====================================================`;
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${lastConfirmedAppointment.id}-Slip.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Slip Downloaded", "Sample appointment slip exported as text.", "📥");
+    }
+
+    // ==========================================
+    // PATIENT SERVICES TABS & LAB REPORTS
+    // ==========================================
+    function switchPatientTab(tabId) {
+      ['tab-appointments', 'tab-reports', 'tab-faqs'].forEach(t => {
+        const el = document.getElementById(t);
+        const btn = document.getElementById(`btn-${t}`);
+        if (t === tabId) {
+          if (el) el.classList.remove('hidden');
+          if (btn) btn.className = 'px-3.5 py-1.5 rounded-xl bg-teal-600 text-white font-bold cursor-pointer transition-colors';
+        } else {
+          if (el) el.classList.add('hidden');
+          if (btn) btn.className = 'px-3.5 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer transition-colors';
+        }
+      });
+    }
+
+    let activeReportDemoType = 'ecg';
+
+    function previewDemoReport(type) {
+      activeReportDemoType = type;
+      const modal = document.getElementById('lab-report-modal');
+      const title = document.getElementById('lab-modal-title');
+      const body = document.getElementById('lab-modal-body');
+
+      if (type === 'ecg') {
+        title.textContent = '12-Lead Electrocardiogram (ECG) Report';
+        body.innerHTML = `
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 text-xs">
+            <div class="flex justify-between"><span>Rhythm:</span><strong class="text-slate-800">Normal Sinus Rhythm (72 bpm)</strong></div>
+            <div class="flex justify-between"><span>PR Interval:</span><span>142 ms (Normal 120-200ms)</span></div>
+            <div class="flex justify-between"><span>QRS Complex:</span><span>88 ms (Normal &lt;100ms)</span></div>
+            <div class="flex justify-between"><span>QT / QTc:</span><span>380 ms / 412 ms</span></div>
+            <div class="flex justify-between"><span>ST-T Changes:</span><strong class="text-emerald-700">No acute ST elevation or ischemia</strong></div>
+          </div>
+          <p class="text-[11px] text-slate-600">Conclusion: Normal tracing. Post-coronary intervention stable profile.</p>
+        `;
+      } else if (type === 'lipid') {
+        title.textContent = 'Comprehensive Lipid & Cardiac Biomarker Panel';
+        body.innerHTML = `
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 text-xs">
+            <div class="flex justify-between"><span>Total Cholesterol:</span><strong>164 mg/dL (Desirable &lt;200)</strong></div>
+            <div class="flex justify-between"><span>LDL (Bad) Cholesterol:</span><strong class="text-emerald-700">68 mg/dL (Target &lt;70)</strong></div>
+            <div class="flex justify-between"><span>HDL (Good) Cholesterol:</span><strong>48 mg/dL (Target &gt;40)</strong></div>
+            <div class="flex justify-between"><span>Triglycerides:</span><strong>138 mg/dL (Normal &lt;150)</strong></div>
+            <div class="flex justify-between"><span>Cardiac Troponin-I:</span><strong class="text-emerald-700">&lt;0.02 ng/mL (Normal &lt;0.05)</strong></div>
+          </div>
+          <p class="text-[11px] text-slate-600">Interpretation: Excellent lipid control under Statin therapy.</p>
+        `;
+      } else if (type === 'cbc') {
+        title.textContent = 'Complete Blood Count (CBC) with Platelet Indices';
+        body.innerHTML = `
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 text-xs">
+            <div class="flex justify-between"><span>Hemoglobin (Hb):</span><strong>14.8 g/dL (Normal 13.0-17.0)</strong></div>
+            <div class="flex justify-between"><span>Total Leukocyte (WBC):</span><strong>7,200 /μL (4,000-11,000)</strong></div>
+            <div class="flex justify-between"><span>Platelet Count:</span><strong>2.45 Lakhs /μL (1.5-4.5)</strong></div>
+            <div class="flex justify-between"><span>RBC Count:</span><strong>4.92 mill/μL</strong></div>
+            <div class="flex justify-between"><span>Hematocrit (PCV):</span><strong>43.2%</strong></div>
+          </div>
+          <p class="text-[11px] text-slate-600">Interpretation: Normal hematopoietic indices. No cytopenia or leukocytosis.</p>
+        `;
+      } else {
+        title.textContent = 'Diagnostic Pathology Examination';
+        body.innerHTML = `
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 text-xs">
+            <div class="flex justify-between"><span>Status:</span><strong class="text-emerald-700">Clinically Stable</strong></div>
+            <div class="flex justify-between"><span>Pathology Archive:</span><span>ABDM Digilocker Connected</span></div>
+            <div class="flex justify-between"><span>Sign-off:</span><span>Attending Pathologist</span></div>
+          </div>
+        `;
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeLabModal() {
+      document.getElementById('lab-report-modal').classList.add('hidden');
+    }
+
+    function downloadDemoReportPdf(reportTitle) {
+      const text = `=====================================================
+AYUSYNC MEDCARE NETWORK — CLINICAL LABORATORY REPORT
+(Sample Diagnostic Archive Record • ABDM Verified)
+=====================================================
+Report Name  : ${reportTitle}
+Patient Name : Demonstration Record (Protected)
+ABHA ID      : 91-••••-••••-92
+Date Issued  : ${new Date().toLocaleDateString()}
+Laboratory   : AyuSync Central Diagnostic Laboratories, Bengaluru
+Verification : Cryptographic SHA-256 Digital Digest Verified
+Accreditation: NABL (ISO 15189:2012) & ABDM Compatible
+=====================================================
+This is a demonstration laboratory record for project showcase.
+=====================================================`;
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${reportTitle}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Report Exported", `Downloaded ${reportTitle}.`, "📥");
+    }
+
+    function downloadCurrentLabReportPdf() {
+      downloadDemoReportPdf(`AyuSync-Report-${activeReportDemoType.toUpperCase()}`);
+      closeLabModal();
+    }
+
+    function toggleFaq(faqId) {
+      const content = document.getElementById(`${faqId}-content`);
+      const icon = document.getElementById(`${faqId}-icon`);
+      if (content) {
+        const isHidden = content.classList.contains('hidden');
+        content.classList.toggle('hidden');
+        if (icon) icon.textContent = isHidden ? '−' : '+';
+      }
+    }
+
+    // ==========================================
+    // PATIENTS DATA & EHR RECORD MODAL (PRESERVED)
+    // ==========================================
     const PATIENTS = [
-      { id: 1, name: "Rajesh Kumar (Age 52)", dept: "cardiology", abha: "91-0982-1249-92", unit: "ICU Bay 4, Bengaluru", status: "ECG Rhythm Stable", diagnosis: "Post-Op Coronary Angioplasty", icon: "🫀" },
-      { id: 2, name: "Sunita Sharma (Age 45)", dept: "neurology", abha: "91-4820-9182-40", unit: "OPD Clinic, Bengaluru", status: "Telehealth Authorized", diagnosis: "EKG Neural Diagnostic Evaluation", icon: "🧠" },
-      { id: 3, name: "Arjun Venkat (Age 61)", dept: "cardiology", abha: "91-8840-1928-11", unit: "ICU Bay 1, Bengaluru", status: "Vitals Monitored", diagnosis: "Myocardial Infarction Recovery", icon: "🫀" },
-      { id: 4, name: "Priya Nair (Age 34)", dept: "oncology", abha: "91-7712-4091-88", unit: "Oncology Ward 3", status: "Chemo Protocol Active", diagnosis: "Targeted Immunotherapy Protocol", icon: "🔬" }
+      { id: 1, name: "Cardiology Patient Record #1", dept: "cardiology", abha: "91-••••-••••-92", unit: "ICU Bay 4, Bengaluru", status: "Protected Enclave", diagnosis: "Restricted Clinical Chart", icon: "🫀" },
+      { id: 2, name: "Neurology Patient Record #2", dept: "neurology", abha: "91-••••-••••-40", unit: "OPD Clinic, Bengaluru", status: "Protected Enclave", diagnosis: "Restricted Clinical Chart", icon: "🧠" },
+      { id: 3, name: "Cardiology Patient Record #3", dept: "cardiology", abha: "91-••••-••••-11", unit: "ICU Bay 1, Bengaluru", status: "Protected Enclave", diagnosis: "Restricted Clinical Chart", icon: "🫀" },
+      { id: 4, name: "Oncology Patient Record #4", dept: "oncology", abha: "91-••••-••••-88", unit: "Oncology Ward 3", status: "Protected Enclave", diagnosis: "Restricted Clinical Chart", icon: "🔬" }
     ];
 
     let currentDept = 'all';
@@ -371,15 +2729,15 @@
       }
 
       container.innerHTML = filtered.map(p => `
-        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-md hover:shadow-lg transition-all flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs">
+        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hospital-card-hover flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs">
           <div class="flex items-center gap-4">
-            <span class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center text-xl font-bold">${p.icon}</span>
+            <span class="w-12 h-12 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center text-xl font-bold">${p.icon}</span>
             <div>
               <strong class="text-slate-900 text-base block font-sans">${p.name}</strong>
               <span class="text-slate-500 text-xs">ABHA ID: ${p.abha} &bull; ${p.unit} &bull; ${p.status}</span>
             </div>
           </div>
-          <button onclick="viewEhr('${p.name}', '${p.abha}', '${p.diagnosis}')" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all shadow-sm shrink-0 cursor-pointer">
+          <button onclick="viewEhr('${p.name}', '${p.abha}', '${p.diagnosis}')" class="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold transition-all shadow-sm shrink-0 cursor-pointer">
             View Sealed EHR →
           </button>
         </div>
@@ -392,7 +2750,7 @@
         const btn = document.getElementById(`dept-${d}`);
         if (btn) {
           if (d === dept) {
-            btn.className = 'px-3.5 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer';
+            btn.className = 'px-3.5 py-2 rounded-xl bg-teal-600 text-white font-bold cursor-pointer';
           } else {
             btn.className = 'px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer';
           }
@@ -412,9 +2770,14 @@
         openDoctorSignInModal();
         return;
       }
+      if (window.cognisec && !window.cognisec.isFullyVerified()) {
+        showToast("Verification Required", "Confidential PHI EHR records locked until mandatory identity OTP is verified.", "🔒");
+        if (window.cognisec.triggerLoginOtpModal) window.cognisec.triggerLoginOtpModal();
+        return;
+      }
       document.getElementById('ehr-patient-name').textContent = name;
       document.getElementById('ehr-abha-id').textContent = abha;
-      document.getElementById('ehr-diagnosis').textContent = 'Diagnosis: ' + diag;
+      document.getElementById('ehr-diagnosis').textContent = diag;
       document.getElementById('ehr-step-init').classList.remove('hidden');
       document.getElementById('ehr-step-active').classList.add('hidden');
       document.getElementById('ehr-modal').classList.remove('hidden');
@@ -426,30 +2789,43 @@
         openDoctorSignInModal();
         return;
       }
-      viewEhr('Rajesh Kumar (Age 52)', '91-0982-1249-92', 'ABHA Doctor Authorization');
+      if (window.cognisec && !window.cognisec.isFullyVerified()) {
+        showToast("Verification Required", "ABHA health ID shield locked until mandatory identity OTP is verified.", "🔒");
+        if (window.cognisec.triggerLoginOtpModal) window.cognisec.triggerLoginOtpModal();
+        return;
+      }
+      requestEhrVaultAccess();
     }
 
     function closeEhrModal() {
       document.getElementById('ehr-modal').classList.add('hidden');
     }
 
-    function unlockEhrRecord() {
-      const initStep = document.getElementById('ehr-step-init');
-      initStep.innerHTML = `
-        <div class="text-center py-8 space-y-3">
-          <div class="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p class="text-xs font-bold text-slate-800">Authenticating Doctor Biometrics &amp; Unlocking ABDM EHR...</p>
-        </div>
-      `;
-      setTimeout(() => {
-        document.getElementById('audit-log-id').textContent = '#ABDM-' + Math.floor(10000 + Math.random() * 90000);
-        initStep.classList.add('hidden');
-        document.getElementById('ehr-step-active').classList.remove('hidden');
-      }, 1400);
+    async function unlockEhrRecord() {
+      closeEhrModal();
+      await requestEhrVaultAccess();
+      const vaultEl = document.getElementById('restricted-ehr-vault');
+      if (vaultEl) vaultEl.scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Initialize
-    renderPatients();
+    // Initialize all components on load
+    document.addEventListener('DOMContentLoaded', () => {
+      renderDoctors();
+      syncQuickDoctorOptions();
+      syncModalDoctorOptions();
+      renderPatientAppointments();
+      renderPatients();
+
+      // Set min date on quick date selector
+      const today = new Date().toISOString().split('T')[0];
+      const qd = document.getElementById('quick-date-select');
+      if (qd) {
+        qd.min = today;
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        qd.value = tomorrow.toISOString().split('T')[0];
+      }
+    });
   </script>
 </body>
 </html>

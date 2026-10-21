@@ -1,11 +1,11 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.schemas.session import SessionStartRequest, SessionResponse
 from app.services.session_service import SessionService
 from app.services.device_service import DeviceService
-from app.routes.deps import get_current_user
+from app.routes.deps import get_current_user, verify_session_access, require_active_session
 from app.models.user import User
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
@@ -14,10 +14,21 @@ router = APIRouter(prefix="/sessions", tags=["Sessions"])
 @router.post("/start", response_model=SessionResponse)
 def start_session(
     request: SessionStartRequest,
-    current_user: User = Depends(get_current_user),
+    request_conn: Request,
+    current_user: User = Depends(require_active_session),
     db: Session = Depends(get_db)
 ):
     """Starts an application-specific session (college, ecommerce, healthcare, platform)."""
+    # Extract client IP from connection headers
+    client_ip = request_conn.client.host if request_conn.client else "127.0.0.1"
+    forwarded = request_conn.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+    elif request.ip_address:
+        # Fallback to requested IP only if connection host is loopback
+        if client_ip in ("127.0.0.1", "localhost", "testclient"):
+            client_ip = request.ip_address
+
     device, _ = DeviceService.register_or_update_device(
         db,
         user_id=current_user.id,
@@ -31,7 +42,7 @@ def start_session(
         user_id=current_user.id,
         application=request.application.lower(),
         device_id=device.id,
-        ip_address=request.ip_address or "127.0.0.1"
+        ip_address=client_ip
     )
     return session
 
@@ -39,7 +50,7 @@ def start_session(
 @router.get("/active", response_model=List[SessionResponse])
 def get_active_sessions(
     application: Optional[str] = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_active_session),
     db: Session = Depends(get_db)
 ):
     """Returns active sessions for the current user."""
@@ -52,12 +63,9 @@ def terminate_session(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Terminates an active session."""
+    """Terminates an active session. Requires ownership or ADMIN role."""
     session = SessionService.get_session(db, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found.")
-    if session.user_id != current_user.id and current_user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="Unauthorized to terminate this session.")
+    verify_session_access(session, current_user)
     
     updated = SessionService.terminate_session(db, session_id)
     return updated

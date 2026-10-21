@@ -64,7 +64,11 @@ def seed_database():
         portal_users = [
             ("Jane Doe (VIP)", "customer.jane@auraluxe.com", "Customer@123", "ecommerce"),
             ("Alex Mercer (CS Major)", "student.alex@veritas.edu", "Student@123", "college"),
-            ("Dr. Sarah Lin, MD", "dr.sarah@aetheriahealth.org", "Doctor@123", "healthcare")
+            ("Dr. Sarah Lin, MD", "dr.sarah@aetheriahealth.org", "Doctor@123", "healthcare"),
+            ("Student Demo", "2021bce0492@bits-pilani.ac.in", "Student@123", "college"),
+            ("Dr. Boomika Ram", "dr.boomika@ayusync.med.in", "Doctor@123", "healthcare"),
+            ("Boomika Ram (Customer)", "boomika.ram@cognisec.ai", "Customer@123", "ecommerce"),
+            ("Customer Default", "customer@cognisec.ai", "Customer@123", "ecommerce")
         ]
 
         created_users = [admin, user]

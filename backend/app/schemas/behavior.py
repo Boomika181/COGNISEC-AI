@@ -22,6 +22,11 @@ class BehaviorEventCreate(BaseModel):
     # Contextual metadata
     context_signals: Optional[Dict[str, Any]] = None
 
+    # Anti-Replay / Anti-Tamper Security Controls
+    timestamp: Optional[float] = None  # Unix epoch seconds of telemetry capture
+    sequence_number: Optional[int] = None  # Monotonically increasing stream sequence
+    telemetry_nonce: Optional[str] = None  # Unique cryptographically random packet identifier
+
 
 class BehaviorLogResponse(BaseModel):
     id: int

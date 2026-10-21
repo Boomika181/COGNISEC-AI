@@ -119,15 +119,19 @@ function initHdParticles() {
 }
 initHdParticles();
 
-// Device Pixel Ratio 4K Ultra HD Supersampling & Crisp Filtering
+// Device Pixel Ratio Ultra-HD Supersampling & Crisp Filtering
+let currentDpr = Math.min(window.devicePixelRatio || 1, 2.0);
+
 function resizeCanvas() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  currentDpr = Math.min(window.devicePixelRatio || 1, 2.0);
   const width = window.innerWidth;
   const height = window.innerHeight;
 
   if (canvas && ctx) {
-    canvas.width = Math.floor(width * dpr);
-    canvas.height = Math.floor(height * dpr);
+    canvas.width = Math.round(width * currentDpr);
+    canvas.height = Math.round(height * currentDpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
   }
@@ -160,6 +164,11 @@ function renderCurrentProgress(progress) {
 
   if (!img || !img.complete || img.naturalWidth === 0) return;
 
+  if (!ctx.imageSmoothingEnabled || ctx.imageSmoothingQuality !== 'high') {
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+  }
+
   const cw = canvas.width;
   const ch = canvas.height;
 
@@ -173,13 +182,13 @@ function renderCurrentProgress(progress) {
 
   if (canvasRatio > imgRatio) {
     renderWidth = cw;
-    renderHeight = cw / imgRatio;
+    renderHeight = Math.round(cw / imgRatio);
     offsetX = 0;
-    offsetY = (ch - renderHeight) / 2;
+    offsetY = Math.round((ch - renderHeight) / 2);
   } else {
-    renderWidth = ch * imgRatio;
+    renderWidth = Math.round(ch * imgRatio);
     renderHeight = ch;
-    offsetX = (cw - renderWidth) / 2;
+    offsetX = Math.round((cw - renderWidth) / 2);
     offsetY = 0;
   }
 
@@ -217,7 +226,7 @@ function renderCurrentProgress(progress) {
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
         ctx.strokeStyle = `rgba(220, 38, 38, ${alpha})`;
-        ctx.lineWidth = 1.0;
+        ctx.lineWidth = Math.max(1, 1.0 * currentDpr);
         ctx.stroke();
       }
     }
@@ -230,16 +239,17 @@ function renderCurrentProgress(progress) {
     const py = p.y * ch;
     const pulse = Math.sin(time * 3 + p.phase) * 0.3 + 0.7;
     const currentAlpha = p.baseAlpha * pulse;
+    const scaledRadius = p.radius * currentDpr;
 
     // Outer Glow
     ctx.beginPath();
-    ctx.arc(px, py, p.radius * 2.8, 0, Math.PI * 2);
+    ctx.arc(px, py, scaledRadius * 2.8, 0, Math.PI * 2);
     ctx.fillStyle = `${p.color}${currentAlpha * 0.35})`;
     ctx.fill();
 
     // Core Particle
     ctx.beginPath();
-    ctx.arc(px, py, p.radius, 0, Math.PI * 2);
+    ctx.arc(px, py, scaledRadius, 0, Math.PI * 2);
     ctx.fillStyle = `${p.color}${currentAlpha})`;
     ctx.fill();
   }
@@ -274,11 +284,15 @@ const endCanvas = document.getElementById('end-hero-canvas');
 const endCtx = endCanvas ? endCanvas.getContext('2d', { alpha: false, colorSpace: 'srgb' }) : null;
 
 function resizeEndCanvas() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.0);
   if (endCanvas && endCtx) {
     const rect = endCanvas.parentElement ? endCanvas.parentElement.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight };
-    endCanvas.width = Math.floor((rect.width || window.innerWidth) * dpr);
-    endCanvas.height = Math.floor((rect.height || window.innerHeight) * dpr);
+    const w = Math.round(rect.width || window.innerWidth);
+    const h = Math.round(rect.height || window.innerHeight);
+    endCanvas.width = Math.round(w * dpr);
+    endCanvas.height = Math.round(h * dpr);
+    endCanvas.style.width = `${w}px`;
+    endCanvas.style.height = `${h}px`;
     endCtx.imageSmoothingEnabled = true;
     endCtx.imageSmoothingQuality = 'high';
   }
@@ -301,6 +315,11 @@ function renderEndSectionProgress() {
   const img = seq2Images[index] || seq2Images[0];
 
   if (img && img.complete && img.naturalWidth !== 0) {
+    if (!endCtx.imageSmoothingEnabled || endCtx.imageSmoothingQuality !== 'high') {
+      endCtx.imageSmoothingEnabled = true;
+      endCtx.imageSmoothingQuality = 'high';
+    }
+
     const cw = endCanvas.width;
     const ch = endCanvas.height;
     const imgRatio = img.naturalWidth / img.naturalHeight;
@@ -309,13 +328,13 @@ function renderEndSectionProgress() {
     let rw, rh, ox, oy;
     if (canvasRatio > imgRatio) {
       rw = cw;
-      rh = cw / imgRatio;
+      rh = Math.round(cw / imgRatio);
       ox = 0;
-      oy = (ch - rh) / 2;
+      oy = Math.round((ch - rh) / 2);
     } else {
-      rw = ch * imgRatio;
+      rw = Math.round(ch * imgRatio);
       rh = ch;
-      ox = (cw - rw) / 2;
+      ox = Math.round((cw - rw) / 2);
       oy = 0;
     }
     endCtx.clearRect(0, 0, cw, ch);
@@ -436,8 +455,11 @@ window.syncAuthStateUI = function() {
       navbarLogoutBtn.classList.remove('hidden');
       navbarLogoutBtn.classList.add('flex');
     }
-    if (notifBell && isAdmin) {
+    if (notifBell) {
       notifBell.classList.remove('hidden');
+    }
+    if (typeof window.refreshNotifications === 'function') {
+      window.refreshNotifications();
     }
 
     if (profName) profName.textContent = user.name;
@@ -458,6 +480,9 @@ window.syncAuthStateUI = function() {
     if (userDashSession) userDashSession.textContent = `Session ID: ${window.cognisec.sessionId || 'Active (TLS 1.3)'}`;
     if (userDashDevice) userDashDevice.textContent = `${navigator.platform || 'macOS / Desktop'} • Chrome (Desktop)`;
 
+    if (typeof refreshAdaptiveMfaStatus === 'function') {
+      refreshAdaptiveMfaStatus();
+    }
   } else {
     // Unauthenticated State
     if (navbarSigninText) navbarSigninText.textContent = 'Sign In';
@@ -472,6 +497,13 @@ window.syncAuthStateUI = function() {
     if (profSession) profSession.textContent = 'Please sign in to view active identity telemetry';
     if (profLogoutBtn) profLogoutBtn.classList.add('hidden');
     if (profActionBtn) profActionBtn.innerHTML = `<span>Sign In to Access →</span>`;
+
+    if (userDashName) userDashName.textContent = 'Enterprise User';
+    if (userDashEmail) userDashEmail.textContent = 'Sign In Required';
+    if (userDashRole) userDashRole.textContent = 'ROLE: GUEST';
+    if (userDashStatus) userDashStatus.textContent = 'ACCOUNT: UNAUTHENTICATED';
+    if (userDashSession) userDashSession.textContent = 'No Active Session';
+    if (userDashDevice) userDashDevice.textContent = `${navigator.platform || 'macOS / Desktop'} • Chrome (Desktop)`;
   }
 };
 
@@ -511,12 +543,26 @@ window.handleLogout = async function() {
   syncAuthStateUI();
 };
 
+window.showNotificationToast = function(title, message, icon = 'ℹ️') {
+  if (window.cognisec && typeof window.cognisec.showToastNotification === 'function') {
+    window.cognisec.showToastNotification(title, message, icon);
+  }
+};
+
 // Modal Open / Close
 window.openModal = function(id) {
   if (id.startsWith('portal-')) {
     const portalType = id.replace('portal-', '');
     openPortalModal(portalType);
     return;
+  }
+
+  // Zero-Trust Step-Up Re-Authentication Modal
+  if (id === 'stepup') {
+    if (window.cognisec && typeof window.cognisec.openStepUpModal === 'function') {
+      window.cognisec.openStepUpModal();
+      return;
+    }
   }
 
   // Role Protection Check for Admin SOC Dashboard
@@ -533,6 +579,30 @@ window.openModal = function(id) {
     }
   }
 
+  // Authentication Protection Check for User Dashboard
+  if (id === 'liveDemo') {
+    if (!window.cognisec || !window.cognisec.isAuthenticated()) {
+      openModal('login');
+      setLoginScreen('select');
+      return;
+    }
+  }
+
+  // Display clear alert if session expired or terminated
+  if (id === 'login' && window.cognisec && window.cognisec.sessionExpiredMessage) {
+    const errUser = document.getElementById('login-error-user');
+    const errSoc = document.getElementById('login-error-soc');
+    if (errUser) {
+      errUser.textContent = window.cognisec.sessionExpiredMessage;
+      errUser.classList.remove('hidden');
+    }
+    if (errSoc) {
+      errSoc.textContent = window.cognisec.sessionExpiredMessage;
+      errSoc.classList.remove('hidden');
+    }
+    window.cognisec.sessionExpiredMessage = null;
+  }
+
   const modal = document.getElementById(`modal-${id}`);
   if (modal) {
     modal.classList.remove('hidden');
@@ -542,9 +612,31 @@ window.openModal = function(id) {
     startDashboardTimer();
     startSocPolling();
   }
+
+  if (id === 'liveDemo') {
+    if (typeof refreshAdaptiveMfaStatus === 'function') {
+      refreshAdaptiveMfaStatus();
+    }
+    if (typeof refreshMaturityProgress === 'function') {
+      refreshMaturityProgress();
+    }
+    if (typeof refreshUserDevices === 'function') {
+      refreshUserDevices();
+    }
+    if (typeof refreshNotifications === 'function') {
+      refreshNotifications();
+    }
+  }
 };
 
 window.closeModal = function(id) {
+  if (id === 'stepup') {
+    if (window.cognisec && typeof window.cognisec.closeStepUpModal === 'function') {
+      window.cognisec.closeStepUpModal();
+      return;
+    }
+  }
+
   const modal = document.getElementById(`modal-${id}`);
   if (modal) {
     modal.classList.add('hidden');
@@ -787,9 +879,13 @@ window.setLoginScreen = function(mode) {
   const container = document.getElementById('login-modal-container');
   const errUser = document.getElementById('login-error-user');
   const errSoc = document.getElementById('login-error-soc');
+  const succUser = document.getElementById('login-success-user');
+  const errSignup = document.getElementById('signup-error-user');
 
   if (errUser) errUser.classList.add('hidden');
   if (errSoc) errSoc.classList.add('hidden');
+  if (succUser) succUser.classList.add('hidden');
+  if (errSignup) errSignup.classList.add('hidden');
 
   if (mode === 'select') {
     if (selectScreen) selectScreen.classList.remove('hidden');
@@ -804,9 +900,8 @@ window.setLoginScreen = function(mode) {
     if (userScreen) userScreen.classList.remove('hidden');
     if (socScreen) socScreen.classList.add('hidden');
     if (backBtn) backBtn.classList.remove('hidden');
-    if (titleEl) titleEl.textContent = 'USER PORTAL LOGIN';
-    if (subEl) subEl.textContent = 'Continuous identity verified user authentication';
     if (container) container.className = 'relative w-full max-w-md bg-[#08050e] border border-red-900/60 rounded-2xl shadow-[0_0_80px_rgba(220,38,38,0.4)] overflow-hidden flex flex-col transition-all duration-300';
+    switchUserAuthTab('signin');
   } else if (mode === 'soc') {
     if (selectScreen) selectScreen.classList.add('hidden');
     if (userScreen) userScreen.classList.add('hidden');
@@ -818,14 +913,540 @@ window.setLoginScreen = function(mode) {
   }
 };
 
+// User Portal Tab Switching (Sign In vs Sign Up)
+window.switchUserAuthTab = function(tab) {
+  const signinTab = document.getElementById('tab-auth-signin');
+  const signupTab = document.getElementById('tab-auth-signup');
+  const signinPane = document.getElementById('user-auth-signin-pane');
+  const signupPane = document.getElementById('user-auth-signup-pane');
+  const titleEl = document.getElementById('login-modal-title');
+  const subEl = document.getElementById('login-modal-subtitle');
+  const errUser = document.getElementById('login-error-user');
+  const errSignup = document.getElementById('signup-error-user');
+
+  if (errUser) errUser.classList.add('hidden');
+  if (errSignup) errSignup.classList.add('hidden');
+
+  if (tab === 'signup') {
+    if (signinTab) {
+      signinTab.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-mono font-semibold transition-all text-slate-400 hover:text-white cursor-pointer';
+    }
+    if (signupTab) {
+      signupTab.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-mono font-bold transition-all bg-red-600 text-white shadow-[0_0_15px_rgba(239,68,68,0.5)] cursor-pointer';
+    }
+    if (signinPane) signinPane.classList.add('hidden');
+    if (signupPane) signupPane.classList.remove('hidden');
+    if (titleEl) titleEl.textContent = 'CREATE USER ACCOUNT';
+    if (subEl) subEl.textContent = 'Register a new enterprise identity protected by Zero Trust';
+
+    const nameInput = document.getElementById('signup-user-name');
+    if (nameInput) setTimeout(() => nameInput.focus(), 50);
+  } else {
+    // Default: 'signin'
+    if (signinTab) {
+      signinTab.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-mono font-bold transition-all bg-red-600 text-white shadow-[0_0_15px_rgba(239,68,68,0.5)] cursor-pointer';
+    }
+    if (signupTab) {
+      signupTab.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-mono font-semibold transition-all text-slate-400 hover:text-white cursor-pointer';
+    }
+    if (signinPane) signinPane.classList.remove('hidden');
+    if (signupPane) signupPane.classList.add('hidden');
+    if (titleEl) titleEl.textContent = 'USER PORTAL SIGN IN';
+    if (subEl) subEl.textContent = 'Continuous identity verified user authentication';
+
+    const emailInput = document.getElementById('login-user-email');
+    if (emailInput) setTimeout(() => emailInput.focus(), 50);
+  }
+};
+
+// Inline Password Policy Validation
+window.validateSignupPasswordPolicy = function(pwd) {
+  pwd = pwd || '';
+  const reqLen = document.getElementById('req-len');
+  const reqUpper = document.getElementById('req-upper');
+  const reqLower = document.getElementById('req-lower');
+  const reqDigit = document.getElementById('req-digit');
+  const reqSpecial = document.getElementById('req-special');
+
+  const updateItem = (el, isValid, text) => {
+    if (!el) return;
+    if (isValid) {
+      el.className = 'text-emerald-400 flex items-center gap-1 font-semibold';
+      el.textContent = `✓ ${text}`;
+    } else {
+      el.className = 'text-slate-500 flex items-center gap-1';
+      el.textContent = `✕ ${text}`;
+    }
+  };
+
+  updateItem(reqLen, pwd.length >= 8, '8+ characters');
+  updateItem(reqUpper, /[A-Z]/.test(pwd), '1 uppercase');
+  updateItem(reqLower, /[a-z]/.test(pwd), '1 lowercase');
+  updateItem(reqDigit, /\d/.test(pwd), '1 number');
+  updateItem(reqSpecial, /[!@#$%^&*(),.?":{}|<>\-_=+[\]\\/;~`']/.test(pwd), '1 special (!@#$%^&*...)');
+
+  validateSignupPasswordMatch();
+};
+
+// Inline Password Confirmation Match
+window.validateSignupPasswordMatch = function() {
+  const pwdInput = document.getElementById('signup-user-password');
+  const confirmInput = document.getElementById('signup-user-confirm');
+  const errConfirm = document.getElementById('err-inline-confirm');
+  if (!confirmInput || !errConfirm) return true;
+
+  const pwd = pwdInput ? pwdInput.value : '';
+  const confirm = confirmInput.value;
+
+  if (confirm.length > 0 && confirm !== pwd) {
+    errConfirm.textContent = 'Passwords do not match.';
+    errConfirm.classList.remove('hidden');
+    return false;
+  } else {
+    errConfirm.textContent = '';
+    errConfirm.classList.add('hidden');
+    return true;
+  }
+};
+
+window.submitUserSignIn = function(e) {
+  submitLoginForm(e, 'user');
+};
+
+// ==============================================================================
+// REGISTRATION WIZARD STATE MACHINE & MULTI-FACTOR ENROLLMENT
+// ==============================================================================
+const regWizardState = {
+  currentStep: 1,
+  gestureInitial: [],
+  gestureConfirm: [],
+  gestureStage: 'initial', // 'initial' | 'confirm'
+  imageSequence: [],
+  privateQuestion: '',
+  privateResponse: '',
+  regGestureGrid: null
+};
+
+window.goToSignupStep = function(step) {
+  regWizardState.currentStep = step;
+
+  // Update stepper pills
+  for (let i = 1; i <= 4; i++) {
+    const pill = document.getElementById(`reg-step-pill-${i}`);
+    const pane = document.getElementById(`reg-step-pane-${i}`);
+    if (pill) {
+      if (i === step) {
+        pill.className = 'py-1 px-1.5 rounded-lg bg-red-600 text-white font-bold transition-all shadow-[0_0_10px_rgba(239,68,68,0.5)]';
+      } else if (i < step) {
+        pill.className = 'py-1 px-1.5 rounded-lg bg-emerald-950 text-emerald-300 font-bold border border-emerald-800 transition-all';
+      } else {
+        pill.className = 'py-1 px-1.5 rounded-lg bg-slate-900 text-slate-500 font-bold border border-slate-800 transition-all';
+      }
+    }
+    if (pane) {
+      if (i === step) pane.classList.remove('hidden');
+      else pane.classList.add('hidden');
+    }
+  }
+
+  // Hook step initialization
+  if (step === 2) {
+    initRegGestureGrid();
+  } else if (step === 3) {
+    renderRegImageGrid();
+  }
+};
+
+window.proceedSignupStep1 = function() {
+  const nameInput = document.getElementById('signup-user-name');
+  const emailInput = document.getElementById('signup-user-email');
+  const passwordInput = document.getElementById('signup-user-password');
+  const confirmInput = document.getElementById('signup-user-confirm');
+  const errBox = document.getElementById('signup-error-user');
+
+  if (errBox) errBox.classList.add('hidden');
+
+  const name = nameInput ? nameInput.value.trim() : '';
+  const email = emailInput ? emailInput.value.trim() : '';
+  const password = passwordInput ? passwordInput.value : '';
+  const confirm = confirmInput ? confirmInput.value : '';
+
+  if (!name || !email || !password || !confirm) {
+    if (errBox) {
+      errBox.textContent = 'Please fill out all account information fields.';
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (errBox) {
+      errBox.textContent = 'Please enter a valid email address.';
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+  if (password !== confirm) {
+    if (errBox) {
+      errBox.textContent = 'Passwords do not match.';
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+  if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[!@#$%^&*(),.?":{}|<>\-_=+[\]\\/;~`']/.test(password)) {
+    if (errBox) {
+      errBox.textContent = 'Password does not meet the complexity requirements.';
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  goToSignupStep(2);
+};
+
+function initRegGestureGrid() {
+  const container = document.getElementById('reg-gesture-grid');
+  if (!container) return;
+
+  if (!regWizardState.regGestureGrid) {
+    regWizardState.regGestureGrid = new NeuralTraceAuth(container, {
+      theme: 'theme-cyber',
+      minNodes: 4,
+      onPatternChange: (pattern) => {
+        const display = document.getElementById('reg-gesture-display');
+        if (display) {
+          display.textContent = pattern.length > 0 ? `${pattern.length} nodes traversed` : '(Trace route along connected edges)';
+        }
+      },
+      onPatternComplete: (pattern) => {
+        const display = document.getElementById('reg-gesture-display');
+        if (display) display.textContent = `Signal route complete (${pattern.length} nodes)`;
+        const errEl = document.getElementById('reg-gesture-error');
+        if (errEl) errEl.classList.add('hidden');
+      },
+      onPatternTooShort: (pattern) => {
+        const display = document.getElementById('reg-gesture-display');
+        if (display) display.textContent = `Insufficient route complexity: ${pattern.length} nodes (min 4 required)`;
+        const errEl = document.getElementById('reg-gesture-error');
+        if (errEl) {
+          errEl.textContent = 'Route must connect at least 4 nodes along valid network edges.';
+          errEl.classList.remove('hidden');
+        }
+      },
+      onReset: () => {
+        const display = document.getElementById('reg-gesture-display');
+        if (display) display.textContent = '(Trace route along connected edges)';
+      }
+    });
+  } else {
+    regWizardState.regGestureGrid.reset();
+  }
+}
+
+window.resetRegGesture = function() {
+  regWizardState.gestureInitial = [];
+  regWizardState.gestureConfirm = [];
+  regWizardState.gestureStage = 'initial';
+
+  if (regWizardState.regGestureGrid) {
+    regWizardState.regGestureGrid.reset();
+  }
+
+  const tag = document.getElementById('reg-gesture-step-tag');
+  if (tag) {
+    tag.textContent = 'STAGE: TRACE PRIVATE ROUTE';
+    tag.className = 'px-2 py-0.5 rounded text-[10px] bg-red-950 text-red-300 border border-red-800 font-bold';
+  }
+  const hint = document.getElementById('reg-gesture-hint');
+  if (hint) hint.textContent = 'Trace your private secret route across connected network nodes (min 4 nodes).';
+
+  const display = document.getElementById('reg-gesture-display');
+  if (display) display.textContent = '(Trace route along connected edges)';
+
+  const nextBtn = document.getElementById('reg-gesture-next-btn');
+  if (nextBtn) nextBtn.textContent = 'Confirm Route →';
+
+  const errEl = document.getElementById('reg-gesture-error');
+  if (errEl) errEl.classList.add('hidden');
+};
+
+window.proceedSignupStep2 = function() {
+  const errEl = document.getElementById('reg-gesture-error');
+  if (errEl) errEl.classList.add('hidden');
+
+  if (regWizardState.gestureStage === 'initial') {
+    const pattern = regWizardState.regGestureGrid ? regWizardState.regGestureGrid.getPattern() : [];
+    if (!pattern || pattern.length < 4) {
+      if (errEl) {
+        errEl.textContent = 'Please trace a valid initial neural route of at least 4 connected nodes.';
+        errEl.classList.remove('hidden');
+      }
+      if (regWizardState.regGestureGrid) regWizardState.regGestureGrid.triggerShake();
+      return;
+    }
+
+    regWizardState.gestureInitial = [...pattern];
+    regWizardState.gestureStage = 'confirm';
+
+    if (regWizardState.regGestureGrid) {
+      regWizardState.regGestureGrid.reset();
+    }
+
+    const tag = document.getElementById('reg-gesture-step-tag');
+    if (tag) {
+      tag.textContent = 'STAGE: RETRACE TO CONFIRM';
+      tag.className = 'px-2 py-0.5 rounded text-[10px] bg-amber-950 text-amber-300 border border-amber-800 font-bold';
+    }
+    const hint = document.getElementById('reg-gesture-hint');
+    if (hint) hint.textContent = 'Retrace the exact same route across connected nodes to verify your secret.';
+
+    const display = document.getElementById('reg-gesture-display');
+    if (display) display.textContent = '(Retrace same route to confirm)';
+
+    const nextBtn = document.getElementById('reg-gesture-next-btn');
+    if (nextBtn) nextBtn.textContent = 'Verify Confirmation Route ✓';
+
+  } else {
+    // Stage is 'confirm'
+    const confirmPattern = regWizardState.regGestureGrid ? regWizardState.regGestureGrid.getPattern() : [];
+    if (!confirmPattern || confirmPattern.length < 4) {
+      if (errEl) {
+        errEl.textContent = 'Please retrace your confirmation route (min 4 nodes).';
+        errEl.classList.remove('hidden');
+      }
+      if (regWizardState.regGestureGrid) regWizardState.regGestureGrid.triggerShake();
+      return;
+    }
+
+    const match = JSON.stringify(regWizardState.gestureInitial) === JSON.stringify(confirmPattern);
+    if (!match) {
+      if (errEl) {
+        errEl.textContent = 'Routes do not match! Please retrace confirmation route or reset.';
+        errEl.classList.remove('hidden');
+      }
+      if (regWizardState.regGestureGrid) {
+        regWizardState.regGestureGrid.triggerShake();
+        regWizardState.regGestureGrid.reset();
+      }
+      return;
+    }
+
+    regWizardState.gestureConfirm = [...confirmPattern];
+    goToSignupStep(3);
+  }
+};
+
+const REG_IMAGE_CATALOGUE = [
+  { id: 'img_shield', label: 'Shield', icon: '🛡️' },
+  { id: 'img_key', label: 'Key', icon: '🔑' },
+  { id: 'img_lock', label: 'Lock', icon: '🔒' },
+  { id: 'img_radar', label: 'Radar', icon: '📡' },
+  { id: 'img_vault', label: 'Vault', icon: '🏛️' },
+  { id: 'img_biometric', label: 'Biometric', icon: '🧬' },
+  { id: 'img_firewall', label: 'Firewall', icon: '🧱' },
+  { id: 'img_token', label: 'Token', icon: '🪙' },
+  { id: 'img_chip', label: 'Enclave', icon: '💾' }
+];
+
+window.renderRegImageGrid = function() {
+  const grid = document.getElementById('reg-image-grid');
+  if (!grid) return;
+  grid.innerHTML = REG_IMAGE_CATALOGUE.map(item => `
+    <div class="symbol-card ${regWizardState.imageSequence.includes(item.id) ? 'selected' : ''}" data-symbol="${item.id}" onclick="handleRegImageClick('${item.id}')">
+      <span class="text-2xl">${item.icon}</span>
+      <span class="text-[10px] text-slate-300 font-bold">${item.label}</span>
+      ${regWizardState.imageSequence.includes(item.id) ? `<span class="symbol-order-badge">${regWizardState.imageSequence.indexOf(item.id) + 1}</span>` : ''}
+    </div>
+  `).join('');
+  updateRegImageStrip();
+};
+
+window.handleRegImageClick = function(id) {
+  if (regWizardState.imageSequence.includes(id)) return;
+  regWizardState.imageSequence.push(id);
+  renderRegImageGrid();
+  const errEl = document.getElementById('reg-image-error');
+  if (errEl) errEl.classList.add('hidden');
+};
+
+window.clearRegImageSequence = function() {
+  regWizardState.imageSequence = [];
+  renderRegImageGrid();
+};
+
+function updateRegImageStrip() {
+  const strip = document.getElementById('reg-image-strip');
+  if (!strip) return;
+  if (regWizardState.imageSequence.length === 0) {
+    strip.innerHTML = '<span class="text-slate-500 text-[11px]">(Click symbols below)</span>';
+  } else {
+    strip.innerHTML = regWizardState.imageSequence.map((id, i) => {
+      const item = REG_IMAGE_CATALOGUE.find(c => c.id === id) || { label: id };
+      return `<span class="px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-800 text-[10px] font-bold">${i+1}. ${item.label}</span>`;
+    }).join('');
+  }
+}
+
+window.proceedSignupStep3 = function() {
+  const errEl = document.getElementById('reg-image-error');
+  if (errEl) errEl.classList.add('hidden');
+
+  if (regWizardState.imageSequence.length < 3) {
+    if (errEl) {
+      errEl.textContent = 'Please select at least 3 symbols in your cognitive sequence.';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+  goToSignupStep(4);
+};
+
+window.handleSignupWizardSubmit = async function(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const nameInput = document.getElementById('signup-user-name');
+  const emailInput = document.getElementById('signup-user-email');
+  const passwordInput = document.getElementById('signup-user-password');
+  const confirmInput = document.getElementById('signup-user-confirm');
+  const questionSelect = document.getElementById('reg-private-question');
+  const responseInput = document.getElementById('reg-private-response');
+  const confirmResponseInput = document.getElementById('reg-confirm-response');
+  const privErr = document.getElementById('reg-private-error');
+  const globalErr = document.getElementById('signup-error-user');
+  const btn = document.getElementById('btn-submit-user-signup');
+  const loginSuccessBox = document.getElementById('login-success-user');
+
+  if (privErr) privErr.classList.add('hidden');
+  if (globalErr) globalErr.classList.add('hidden');
+
+  const question = questionSelect ? questionSelect.value : '';
+  const response = responseInput ? responseInput.value.trim() : '';
+  const confirmResponse = confirmResponseInput ? confirmResponseInput.value.trim() : '';
+
+  if (!response || response.length < 3) {
+    if (privErr) {
+      privErr.textContent = 'Private answer must be at least 3 characters long.';
+      privErr.classList.remove('hidden');
+    }
+    return;
+  }
+  if (response.toLowerCase() !== confirmResponse.toLowerCase()) {
+    if (privErr) {
+      privErr.textContent = 'Private answers do not match.';
+      privErr.classList.remove('hidden');
+    }
+    return;
+  }
+
+  // Double check gesture pattern
+  if (!regWizardState.gestureInitial || regWizardState.gestureInitial.length < 4) {
+    goToSignupStep(2);
+    const errEl = document.getElementById('reg-gesture-error');
+    if (errEl) {
+      errEl.textContent = 'Gesture pattern is mandatory. Please draw your pattern.';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  // Double check image sequence
+  if (!regWizardState.imageSequence || regWizardState.imageSequence.length < 3) {
+    goToSignupStep(3);
+    const errEl = document.getElementById('reg-image-error');
+    if (errEl) {
+      errEl.textContent = 'Image sequence is mandatory. Please select at least 3 symbols.';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  const name = nameInput ? nameInput.value.trim() : '';
+  const email = emailInput ? emailInput.value.trim() : '';
+  const password = passwordInput ? passwordInput.value : '';
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Enrolling Factors & Creating Account...';
+  }
+
+  const factorData = {
+    gesture_pattern: regWizardState.gestureInitial,
+    confirm_gesture_pattern: regWizardState.gestureConfirm.length ? regWizardState.gestureConfirm : regWizardState.gestureInitial,
+    image_sequence: regWizardState.imageSequence,
+    confirm_image_sequence: regWizardState.imageSequence,
+    private_question: question,
+    private_response: response,
+    confirm_private_response: confirmResponse
+  };
+
+  try {
+    const res = await window.cognisec.register(name, email, password, 'USER', factorData);
+
+    if (!res.success) {
+      if (privErr) {
+        privErr.textContent = res.error || 'Registration failed. Please check factor inputs.';
+        privErr.classList.remove('hidden');
+      }
+      if (globalErr) {
+        globalErr.textContent = res.error || 'Registration failed.';
+        globalErr.classList.remove('hidden');
+      }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Activate Account & Enroll Factors ✓';
+      }
+      return;
+    }
+
+    // Success! Clear sensitive inputs
+    if (passwordInput) passwordInput.value = '';
+    if (confirmInput) confirmInput.value = '';
+    if (responseInput) responseInput.value = '';
+    if (confirmResponseInput) confirmResponseInput.value = '';
+    regWizardState.gestureInitial = [];
+    regWizardState.gestureConfirm = [];
+    regWizardState.imageSequence = [];
+    goToSignupStep(1);
+
+    // Switch to sign in tab
+    const loginEmailInput = document.getElementById('login-user-email');
+    if (loginEmailInput) loginEmailInput.value = email;
+
+    switchUserAuthTab('signin');
+
+    if (loginSuccessBox) {
+      loginSuccessBox.textContent = `✓ Account and factors registered successfully for ${email}! Please sign in.`;
+      loginSuccessBox.classList.remove('hidden');
+    }
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Activate Account & Enroll Factors ✓';
+    }
+
+  } catch (err) {
+    if (privErr) {
+      privErr.textContent = `Error: ${err.message}`;
+      privErr.classList.remove('hidden');
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Activate Account & Enroll Factors ✓';
+    }
+  }
+};
+
+window.submitUserSignUp = window.handleSignupWizardSubmit;
+
 window.submitLoginForm = async function(e, type) {
   e.preventDefault();
   const btn = document.getElementById(type === 'user' ? 'btn-submit-user-login' : 'btn-submit-soc-login');
   const errBox = document.getElementById(type === 'user' ? 'login-error-user' : 'login-error-soc');
+  const succBox = document.getElementById('login-success-user');
   const emailInput = document.getElementById(type === 'user' ? 'login-user-email' : 'login-soc-email');
   const passwordInput = document.getElementById(type === 'user' ? 'login-user-password' : 'login-soc-password');
 
   if (errBox) errBox.classList.add('hidden');
+  if (succBox) succBox.classList.add('hidden');
 
   const email = emailInput ? emailInput.value.trim() : '';
   const password = passwordInput ? passwordInput.value : '';
@@ -844,7 +1465,17 @@ window.submitLoginForm = async function(e, type) {
   }
 
   try {
-    const result = await window.cognisec.login(email, password, 'platform');
+    let locData = null;
+    const shareLocBox = document.getElementById('login-share-location');
+    if (shareLocBox && shareLocBox.checked) {
+      if (btn) btn.innerHTML = `<span>Requesting location permission...</span>`;
+      locData = await window.cognisec.requestDeviceLocation();
+    }
+    const nicknameInput = document.getElementById('login-device-nickname');
+    const nickname = (nicknameInput && nicknameInput.value.trim()) ? nicknameInput.value.trim() : null;
+
+    if (btn) btn.innerHTML = `<span>Authenticating with FastAPI Backend...</span>`;
+    const result = await window.cognisec.login(email, password, 'platform', null, locData, nickname);
     if (!result.success) {
       if (errBox) {
         errBox.textContent = result.error || 'Authentication failed. Please verify your credentials.';
@@ -860,13 +1491,49 @@ window.submitLoginForm = async function(e, type) {
     // Success! Clear password input for privacy
     if (passwordInput) passwordInput.value = '';
 
-    // Synchronize UI
-    syncAuthStateUI();
-    closeModal('login');
-
     if (btn) {
       btn.disabled = false;
       btn.innerHTML = type === 'user' ? 'Sign In User Portal' : 'Sign In SOC Console';
+    }
+
+    // Stage 1 complete! Transition to Stage 2: 60-Second Background Observation Period + Mandatory OTP
+    if (result.data.session_status === 'PENDING_OBSERVATION' || result.data.session_status === 'PENDING_OTP') {
+      closeModal('login');
+      syncAuthStateUI();
+
+      if (typeof window.refreshNotifications === 'function') {
+        window.refreshNotifications();
+      }
+      if (typeof window.refreshUserDevices === 'function') {
+        window.refreshUserDevices();
+      }
+
+      // Enter permitted interactive application interface without blocking countdown
+      if (result.data.role === 'ADMIN') {
+        openModal('dashboard');
+      } else {
+        openModal('liveDemo');
+      }
+
+      showNotificationToast(
+        "Signed In // Baseline Observation",
+        "Behavioral baseline observation running silently in background. Verification OTP required in 10s.",
+        "info"
+      );
+
+      startObservationFlow(result.data);
+      return;
+    }
+
+    // Synchronize UI if already active
+    syncAuthStateUI();
+    closeModal('login');
+
+    if (typeof window.refreshNotifications === 'function') {
+      window.refreshNotifications();
+    }
+    if (typeof window.refreshUserDevices === 'function') {
+      window.refreshUserDevices();
     }
 
     // Role-based routing: Admin -> SOC Dashboard, Normal User -> User Dashboard
@@ -878,7 +1545,7 @@ window.submitLoginForm = async function(e, type) {
 
   } catch (err) {
     if (errBox) {
-      errBox.textContent = 'Network error connecting to authentication server.';
+      errBox.textContent = err.message || 'Network error connecting to authentication server.';
       errBox.classList.remove('hidden');
     }
     if (btn) {
@@ -888,8 +1555,303 @@ window.submitLoginForm = async function(e, type) {
   }
 };
 
-// Global Listeners for Authentication
+// ==============================================================================
+// PASSWORD RECOVERY / FORGOT PASSWORD HANDLER & VISIBILITY TOGGLE
+// ==============================================================================
+if (!window.togglePasswordVisibility) {
+  window.togglePasswordVisibility = function(inputId, btn) {
+    const input = typeof inputId === 'string' ? document.getElementById(inputId) : inputId;
+    if (!input) return;
+    const isPass = input.type === 'password';
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    input.type = isPass ? 'text' : 'password';
+    try {
+      if (start !== null && end !== null && document.activeElement === input) {
+        input.setSelectionRange(start, end);
+      }
+    } catch (_) {}
+    if (btn) {
+      btn.setAttribute('aria-label', isPass ? 'Hide password' : 'Show password');
+      btn.setAttribute('title', isPass ? 'Hide password' : 'Show password');
+      btn.innerHTML = isPass ? (window.EYE_OFF_SVG || '✕') : (window.EYE_ON_SVG || '👁');
+    }
+  };
+}
+
+window.openForgotPasswordModal = function(prefillEmail) {
+  if (window.cognisec && window.cognisec.openForgotPasswordModal) {
+    window.cognisec.openForgotPasswordModal(prefillEmail);
+  }
+};
+
+window.closeForgotPasswordModal = function() {
+  if (window.cognisec && window.cognisec.closeForgotPasswordModal) {
+    window.cognisec.closeForgotPasswordModal();
+  }
+};
+
+window.submitPasswordResetRequest = function(e) {
+  if (window.cognisec && window.cognisec.submitPasswordResetRequestFromModal) {
+    return window.cognisec.submitPasswordResetRequestFromModal(e);
+  }
+};
+
+window.submitPasswordResetVerify = function(e) {
+  if (window.cognisec && window.cognisec.submitPasswordResetVerifyFromModal) {
+    return window.cognisec.submitPasswordResetVerifyFromModal(e);
+  }
+};
+
+window.resendPasswordReset = function() {
+  if (window.cognisec && window.cognisec.resendPasswordResetFromModal) {
+    return window.cognisec.resendPasswordResetFromModal();
+  }
+};
+
+window.resendPasswordResetFromModal = function() {
+  if (window.cognisec && window.cognisec.resendPasswordResetFromModal) {
+    return window.cognisec.resendPasswordResetFromModal();
+  }
+};
+
+// ==============================================================================
+// 60-SECOND BACKGROUND OBSERVATION & LOGIN OTP CONTROLLER
+// ==============================================================================
+
+let obsTimer = null;
+let otpExpiryInterval = null;
+let currentObsSession = null;
+let currentLoginChallenge = null;
+
+window.closeObservationOtpModal = function() {
+  if (window.cognisec && typeof window.cognisec.closeObservationOtpModal === 'function') {
+    window.cognisec.closeObservationOtpModal();
+  } else {
+    const modal = document.getElementById('modal-login-observation');
+    if (modal) modal.classList.add('hidden');
+  }
+};
+
+window.startObservationFlow = function(loginData) {
+  currentObsSession = loginData;
+  if (!loginData || !loginData.session_id) return;
+  if (window.cognisec) {
+    window.cognisec.startObservationFlow(loginData);
+  }
+};
+
+window.showLoginOtpChallengeView = async function(sessionId) {
+  if (window.cognisec) {
+    await window.cognisec.executeObservationOtpTransition(sessionId);
+  }
+};
+
+function startOtpExpiryTimer(ttlSeconds) {
+  if (otpExpiryInterval) clearInterval(otpExpiryInterval);
+  let remaining = ttlSeconds;
+  const timerEl = document.getElementById('login-otp-expiry-timer');
+
+  function updateDisplay() {
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    if (timerEl) {
+      timerEl.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+  }
+
+  updateDisplay();
+  otpExpiryInterval = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(otpExpiryInterval);
+      otpExpiryInterval = null;
+      if (timerEl) timerEl.textContent = 'EXPIRED';
+      const errBanner = document.getElementById('login-otp-error-banner');
+      if (errBanner) {
+        errBanner.textContent = 'Verification code has expired. Please click "Resend Code" to receive a fresh code.';
+        errBanner.classList.remove('hidden');
+      }
+    } else {
+      updateDisplay();
+    }
+  }, 1000);
+}
+
+window.submitLoginOtpVerification = async function(e) {
+  if (e) e.preventDefault();
+  const codeInput = document.getElementById('login-otp-code-input');
+  const otpCode = codeInput ? codeInput.value.trim() : '';
+  const errBanner = document.getElementById('login-otp-error-banner');
+  const successBanner = document.getElementById('login-otp-success-banner');
+  const verifyBtn = document.getElementById('btn-login-otp-verify');
+
+  if (errBanner) errBanner.classList.add('hidden');
+  if (successBanner) successBanner.classList.add('hidden');
+
+  if (!otpCode || otpCode.length !== 6 || !/^\d{6}$/.test(otpCode)) {
+    if (errBanner) {
+      errBanner.textContent = 'Please enter a valid 6-digit numeric verification code.';
+      errBanner.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (verifyBtn) {
+    verifyBtn.disabled = true;
+    verifyBtn.innerHTML = '<span>Verifying OTP...</span>';
+  }
+
+  try {
+    const sessionId = currentObsSession ? currentObsSession.session_id : window.cognisec.sessionId;
+    const chalId = currentLoginChallenge ? currentLoginChallenge.challenge_id : null;
+    await window.cognisec.verifyLoginOtp(otpCode, sessionId, chalId);
+
+    if (otpExpiryInterval) clearInterval(otpExpiryInterval);
+
+    if (successBanner) {
+      successBanner.textContent = '✓ Verification successful! Full session access granted. Redirecting...';
+      successBanner.classList.remove('hidden');
+    }
+
+    setTimeout(() => {
+      const modal = document.getElementById('modal-login-observation');
+      if (modal) modal.classList.add('hidden');
+
+      syncAuthStateUI();
+      if (typeof window.refreshNotifications === 'function') window.refreshNotifications();
+      if (typeof window.refreshUserDevices === 'function') window.refreshUserDevices();
+
+      const role = currentObsSession ? currentObsSession.role : 'USER';
+      if (role === 'ADMIN') {
+        openModal('dashboard');
+      } else {
+        openModal('liveDemo');
+      }
+    }, 1200);
+
+  } catch (err) {
+    if (verifyBtn) {
+      verifyBtn.disabled = true;
+      verifyBtn.innerHTML = '<span>Session Terminated</span>';
+    }
+    if (codeInput) codeInput.disabled = true;
+
+    if (errBanner) {
+      errBanner.textContent = err.message || 'Verification failed. Pending session terminated. Please sign in again.';
+      errBanner.classList.remove('hidden');
+    }
+
+    window.cognisec.clearAuth();
+    syncAuthStateUI();
+
+    setTimeout(() => {
+      const modal = document.getElementById('modal-login-observation');
+      if (modal) modal.classList.add('hidden');
+      if (verifyBtn) {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = '<span>Verify &amp; Enter Dashboard →</span>';
+      }
+      openModal('login');
+    }, 2800);
+  }
+};
+
+window.handleLoginOtpResend = async function() {
+  const resendBtn = document.getElementById('btn-login-otp-resend');
+  const errBanner = document.getElementById('login-otp-error-banner');
+  const successBanner = document.getElementById('login-otp-success-banner');
+  const sessionId = currentObsSession ? currentObsSession.session_id : window.cognisec.sessionId;
+
+  if (errBanner) {
+    errBanner.textContent = '';
+    errBanner.classList.add('hidden');
+  }
+  if (successBanner) {
+    successBanner.textContent = '';
+    successBanner.classList.add('hidden');
+  }
+
+  if (resendBtn) {
+    resendBtn.disabled = true;
+    resendBtn.textContent = 'Dispatching...';
+  }
+
+  try {
+    const challenge = await window.cognisec.resendLoginOtp(sessionId);
+    currentLoginChallenge = challenge;
+    startOtpExpiryTimer(challenge.expires_in_seconds || 300);
+
+    const destEmail = document.getElementById('login-otp-dest-email');
+    if (destEmail) {
+      destEmail.textContent = challenge.masked_email || (window.cognisec && window.cognisec.maskEmail(window.cognisec.user?.email)) || '***@***.***';
+    }
+
+    if (successBanner) {
+      successBanner.textContent = 'Fresh verification code dispatched to your registered email.';
+      successBanner.classList.remove('hidden');
+    }
+
+    let cd = 15;
+    const cdInterval = setInterval(() => {
+      cd--;
+      if (cd <= 0) {
+        clearInterval(cdInterval);
+        if (resendBtn) {
+          resendBtn.disabled = false;
+          resendBtn.textContent = 'Resend Code';
+        }
+      } else {
+        if (resendBtn) resendBtn.textContent = `Wait (${cd}s)`;
+      }
+    }, 1000);
+
+  } catch (err) {
+    if (errBanner) {
+      errBanner.textContent = err.message || 'Failed to resend code. Please wait before retrying.';
+      errBanner.classList.remove('hidden');
+    }
+    if (resendBtn) {
+      resendBtn.disabled = false;
+      resendBtn.textContent = 'Resend Code';
+    }
+  }
+};
+
+window.cancelObservationAndReturnToLogin = function() {
+  if (obsInterval) clearInterval(obsInterval);
+  if (otpExpiryInterval) clearInterval(otpExpiryInterval);
+  const modal = document.getElementById('modal-login-observation');
+  if (modal) modal.classList.add('hidden');
+  window.cognisec.clearAuth();
+  syncAuthStateUI();
+  openModal('login');
+};
+
+// Global Listeners for Authentication & Zero-Trust Step-Up
 window.addEventListener('cognisec:auth_change', () => {
+  syncAuthStateUI();
+});
+window.addEventListener('cognisec:step_up_success', () => {
+  const authBadge = document.getElementById('badge-auth-state');
+  if (authBadge) {
+    authBadge.textContent = '✓ Authenticated';
+    authBadge.className = 'px-2 py-0.5 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 rounded font-bold';
+  }
+  if (typeof addConsoleLog === 'function') {
+    addConsoleLog('Step-Up Challenge Verified: Identity re-authenticated & session access restored.');
+  }
+  syncAuthStateUI();
+});
+window.addEventListener('cognisec:session_locked', () => {
+  const authBadge = document.getElementById('badge-auth-state');
+  if (authBadge) {
+    authBadge.textContent = '🚫 LOCKED';
+    authBadge.className = 'px-2 py-0.5 text-[10px] bg-red-950 text-red-400 border border-red-800 rounded font-bold';
+  }
+  if (typeof addConsoleLog === 'function') {
+    addConsoleLog('Security Alert: Session Restricted/Locked due to step-up verification failure.');
+  }
   syncAuthStateUI();
 });
 document.addEventListener('DOMContentLoaded', () => {
@@ -899,36 +1861,55 @@ setTimeout(() => {
   syncAuthStateUI();
 }, 250);
 
-// 3. LAUNCH CONSOLE INTERACTIVE TYPING TRACKER & VERIFICATION
+// 3. GENUINE BEHAVIORAL CALIBRATION & TELEMETRY STREAM
 let consoleStartTime = Date.now();
+
 window.handleConsoleTyping = function(e) {
+  const targetPrompt = "The zero trust security architecture verifies every continuous behavioral signal without storing private keystrokes.";
   const val = e.target.value;
-  const charEl = document.getElementById('char-count');
-  const wordEl = document.getElementById('word-count');
-  const wpmEl = document.getElementById('wpm-count');
-  const badgeTyping = document.getElementById('badge-typing');
-
   const chars = val.length;
-  const words = val.trim() ? val.trim().split(/\s+/).length : 0;
-  const elapsedMinutes = (Date.now() - consoleStartTime) / 60000;
-  const wpm = elapsedMinutes > 0 ? Math.round(words / elapsedMinutes) : 0;
 
-  if (charEl) charEl.textContent = chars;
-  if (wordEl) wordEl.textContent = words;
-  if (wpmEl) wpmEl.textContent = `${wpm} WPM`;
-
-  if (chars > 5 && badgeTyping) {
-    badgeTyping.textContent = '✓ Verified';
-    badgeTyping.className = 'px-2 py-0.5 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 rounded font-bold';
+  // 1. Progress calculation against neutral calibration sentence
+  const progText = document.getElementById('calibration-progress-text');
+  if (progText) {
+    progText.textContent = `${chars} / ${targetPrompt.length} chars`;
+    if (chars >= targetPrompt.length) {
+      progText.className = 'text-emerald-400 font-bold';
+    } else {
+      progText.className = 'text-amber-400 font-bold';
+    }
   }
 
-  // Dispatch real behavioral telemetry to FastAPI on each 10-char typing burst
-  if (chars % 10 === 0 && chars > 0) {
-    if (window.cognisec) {
+  // 2. Extract genuine browser-measured physical timing dynamics
+  // (Zero storage of input text, raw characters or typed content)
+  if (window.cognisec) {
+    const snap = window.cognisec.computeTelemetrySnapshot();
+    const flightEl = document.getElementById('measured-flight-time');
+    const dwellEl = document.getElementById('measured-dwell-time');
+    const wpmEl = document.getElementById('wpm-count');
+
+    if (flightEl) {
+      flightEl.textContent = snap.avgFlight > 0 ? `${Math.round(snap.avgFlight)} ms` : '-- ms';
+    }
+    if (dwellEl) {
+      dwellEl.textContent = snap.avgDwell > 0 ? `${Math.round(snap.avgDwell)} ms` : '-- ms';
+    }
+    if (wpmEl) {
+      wpmEl.textContent = snap.wpm > 0 ? `${snap.wpm} WPM` : '-- WPM';
+    }
+  }
+
+  // 3. Dispatch genuine telemetry burst to FastAPI on 15-character cadence
+  if (chars % 15 === 0 && chars > 0) {
+    if (window.cognisec && window.cognisec.sessionToken) {
       window.cognisec.sendBehaviorTelemetry().then(res => {
         if (res && res.success && res.data) {
           const d = res.data;
-          addConsoleLog(`Typing Telemetry Transmitted (FastAPI POST /api/behavior/events | Decision: ${d.decision} | Risk: ${d.risk_score.toFixed(3)})`);
+          const riskDisplay = (d.risk_score !== undefined && d.risk_score !== null) ? d.risk_score.toFixed(3) : 'Protected';
+          addConsoleLog(`Behavioral Telemetry Transmitted (FastAPI POST /api/behavior/events | Decision: ${d.decision} | Risk: ${riskDisplay})`);
+          if (typeof refreshMaturityProgress === 'function') {
+            refreshMaturityProgress();
+          }
         } else if (res && !res.success) {
           addConsoleLog(`Telemetry Dispatch Notice: ${res.error}`);
         }
@@ -949,37 +1930,118 @@ function addConsoleLog(text) {
   logContainer.prepend(div);
 }
 
+window.refreshMaturityProgress = async function() {
+  if (!window.cognisec || !window.cognisec.sessionToken) return;
+  try {
+    const res = await window.cognisec.getBehaviorProfile();
+    if (res && res.success && res.data) {
+      const p = res.data;
+      const sampleCount = p.sample_count || 0;
+      const modelSamples = p.model_sample_count !== undefined ? p.model_sample_count : sampleCount;
+
+      // 1. Statistical Baseline (Welford 5 samples)
+      const welfordCount = document.getElementById('maturity-welford-count');
+      const welfordBar = document.getElementById('maturity-welford-bar');
+      if (welfordCount) {
+        welfordCount.textContent = `${Math.min(5, sampleCount)} / 5 samples`;
+      }
+      if (welfordBar) {
+        const pct = Math.min(100, Math.round((sampleCount / 5) * 100));
+        welfordBar.style.width = `${pct}%`;
+        welfordBar.className = pct >= 100
+          ? 'bg-emerald-500 h-1.5 rounded-full transition-all duration-300'
+          : 'bg-amber-500 h-1.5 rounded-full transition-all duration-300';
+      }
+
+      // 2. Isolation Forest Model Readiness (25 samples)
+      const ifCount = document.getElementById('maturity-if-count');
+      const ifBar = document.getElementById('maturity-if-bar');
+      if (ifCount) {
+        ifCount.textContent = `${Math.min(25, modelSamples)} / 25 samples`;
+      }
+      if (ifBar) {
+        const pct = Math.min(100, Math.round((modelSamples / 25) * 100));
+        ifBar.style.width = `${pct}%`;
+        ifBar.className = pct >= 100
+          ? 'bg-emerald-500 h-1.5 rounded-full transition-all duration-300'
+          : 'bg-emerald-600/60 h-1.5 rounded-full transition-all duration-300';
+      }
+
+      // 3. Calibration Status Badge
+      const badge = document.getElementById('calibration-maturity-badge');
+      if (badge) {
+        if (sampleCount === 0) {
+          badge.textContent = 'Calibration not started';
+          badge.className = 'px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-700 text-[11px] font-mono font-bold self-start sm:self-auto';
+        } else if (sampleCount < 5) {
+          badge.textContent = `Collecting observations (${sampleCount}/5)`;
+          badge.className = 'px-2.5 py-1 rounded-lg bg-amber-950 text-amber-300 border border-amber-800 text-[11px] font-mono font-bold self-start sm:self-auto';
+        } else if (modelSamples < 25) {
+          badge.textContent = 'Statistical baseline established (IF pending)';
+          badge.className = 'px-2.5 py-1 rounded-lg bg-blue-950 text-blue-300 border border-blue-800 text-[11px] font-mono font-bold self-start sm:self-auto';
+        } else {
+          badge.textContent = '✓ Isolation Forest trained & ready';
+          badge.className = 'px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-600 text-[11px] font-mono font-bold self-start sm:self-auto';
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to refresh maturity progress:', err);
+  }
+};
+
 window.runConsoleVerification = async function() {
   const btn = document.getElementById('btn-console-verify');
   const authBadge = document.getElementById('badge-auth-state');
   if (btn) {
-    btn.textContent = 'Verifying Session Integrity with FastAPI...';
+    btn.textContent = 'Transmitting Behavioral Telemetry...';
     btn.disabled = true;
   }
 
-  addConsoleLog('Initiating Zero-Trust Identity Verification API (POST /api/behavior/events)...');
+  addConsoleLog('Initiating Behavioral Telemetry Transmission (POST /api/behavior/events)...');
 
   try {
     const res = window.cognisec ? await window.cognisec.sendBehaviorTelemetry() : null;
     if (res && res.success && res.data) {
       const d = res.data;
-      addConsoleLog(`FastAPI Live Verification: Decision=${d.decision} | Risk=${d.risk_score.toFixed(3)} | Status=${d.session_status}`);
+      const riskDisplay = (d.risk_score !== undefined && d.risk_score !== null) ? d.risk_score.toFixed(3) : 'Protected';
+      addConsoleLog(`FastAPI Ingestion Confirmed: Decision=${d.decision} | Session=${d.session_status} | Risk=${riskDisplay}`);
       if (authBadge) {
-        authBadge.textContent = d.decision === 'ALLOW' ? '✓ Authenticated' : '⚠️ ' + d.decision;
+        authBadge.textContent = d.decision === 'ALLOW' ? '✓ Telemetry Accepted' : '⚠️ ' + d.decision;
         authBadge.className = d.decision === 'ALLOW'
           ? 'px-2 py-0.5 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 rounded font-bold'
           : 'px-2 py-0.5 text-[10px] bg-amber-950 text-amber-400 border border-amber-800 rounded font-bold';
       }
+      if (btn) {
+        btn.textContent = 'Telemetry Ingested & Verified ✓';
+        setTimeout(() => {
+          if (btn) {
+            btn.textContent = 'Send Behavioral Calibration Sample →';
+            btn.disabled = false;
+          }
+        }, 2000);
+      }
+      if (typeof refreshMaturityProgress === 'function') {
+        await refreshMaturityProgress();
+      }
     } else {
-      addConsoleLog('Zero-Trust Engine Response: Session verified & active.');
+      const errMsg = (res && res.error) || 'Ingestion failed';
+      addConsoleLog(`Telemetry Dispatch Error: ${errMsg}`);
+      if (authBadge) {
+        authBadge.textContent = 'Telemetry Failed';
+        authBadge.className = 'px-2 py-0.5 text-[10px] bg-red-950 text-red-400 border border-red-800 rounded font-bold';
+      }
+      if (btn) {
+        btn.textContent = 'Submission Failed - Retry';
+        btn.disabled = false;
+      }
     }
   } catch (err) {
-    addConsoleLog(`Verification Error: ${err.message}`);
-  }
-
-  if (btn) {
-    btn.textContent = 'Identity Verified & Telemetry Transmitted';
-    btn.disabled = false;
+    addConsoleLog(`Verification Network Error: ${err.message}`);
+    if (btn) {
+      btn.textContent = 'Network Error - Retry';
+      btn.disabled = false;
+    }
   }
 };
 
@@ -987,6 +2049,23 @@ window.runConsoleVerification = async function() {
 let activePortalType = 'shopping';
 
 function openPortalModal(type) {
+  // Prevent bypass of required security enrollment for protected actions
+  if (window.cognisec && window.cognisec.isAuthenticated() && !window.cognisec.isAdmin()) {
+    if (typeof window.cognisec.getAdaptiveStatus === 'function') {
+      window.cognisec.getAdaptiveStatus().then(status => {
+        if (status && (!status.has_gesture_pattern || !status.has_cognitive_image_sequence || !status.has_private_response)) {
+          alert('Zero-Trust Security Policy: Protected application actions require enrolled adaptive factors (Gesture Pattern, Image Sequence, and Private Response). Please complete enrollment in Security Settings.');
+          const m = document.getElementById('modal-portal');
+          if (m) m.classList.add('hidden');
+          openModal('liveDemo');
+          if (typeof scrollToAdaptiveSection === 'function') {
+            scrollToAdaptiveSection();
+          }
+        }
+      }).catch(() => {});
+    }
+  }
+
   activePortalType = type;
   const modal = document.getElementById('modal-portal');
   if (modal) modal.classList.remove('hidden');
@@ -1734,11 +2813,17 @@ window.handleAgentMessageSubmit = function(e) {
   container.scrollTop = container.scrollHeight;
 };
 
-// 8. SECURITY NOTIFICATION CENTER POPUP HANDLERS
+// 8. REAL SECURITY NOTIFICATION CENTER & DEVICE INVENTORY HANDLERS
 window.toggleNotificationCenter = function() {
   const container = document.getElementById('notif-popup-container');
   if (container) {
-    container.classList.toggle('hidden');
+    const isHidden = container.classList.contains('hidden');
+    if (isHidden) {
+      container.classList.remove('hidden');
+      window.refreshNotifications();
+    } else {
+      container.classList.add('hidden');
+    }
   }
 };
 
@@ -1749,57 +2834,299 @@ window.closeNotificationPopup = function() {
   }
 };
 
-window.handleNotificationResponse = function(answer) {
-  const actionBtns = document.getElementById('notif-action-buttons');
-  const resultBanner = document.getElementById('notif-result-banner');
-  const badge = document.getElementById('notif-badge');
-
-  if (badge) {
-    badge.textContent = '0';
-    badge.classList.remove('bg-red-600', 'animate-pulse');
-    badge.classList.add('bg-slate-700');
+window.refreshNotifications = async function() {
+  if (!window.cognisec || !window.cognisec.isAuthenticated()) {
+    const badge = document.getElementById('notif-badge');
+    if (badge) {
+      badge.textContent = '0';
+      badge.classList.add('hidden');
+    }
+    return;
   }
 
-  if (actionBtns) actionBtns.classList.add('hidden');
+  const listEl = document.getElementById('notif-list-container');
+  const badge = document.getElementById('notif-badge');
+  const countBadge = document.getElementById('notif-count-badge');
+
+  try {
+    const data = await window.cognisec.getNotifications();
+    const notifications = (data && data.notifications) ? data.notifications : [];
+    const unreadCount = (data && typeof data.unread_count === 'number') ? data.unread_count : 0;
+
+    // Update notification bell badge
+    if (badge) {
+      badge.textContent = String(unreadCount);
+      if (unreadCount > 0) {
+        badge.classList.remove('hidden');
+        badge.classList.add('bg-red-600', 'animate-pulse');
+      } else {
+        badge.classList.add('hidden');
+        badge.classList.remove('animate-pulse');
+      }
+    }
+
+    if (countBadge) {
+      countBadge.textContent = `${unreadCount} unread`;
+    }
+
+    if (!listEl) return;
+
+    if (notifications.length === 0) {
+      listEl.innerHTML = `
+        <div class="p-4 rounded-xl bg-black/60 border border-red-950 text-center text-xs text-slate-400 font-mono">
+          ✓ No security alerts recorded.<br><span class="text-[10px] text-slate-500">All registered devices are recognized.</span>
+        </div>
+      `;
+      return;
+    }
+
+    listEl.innerHTML = notifications.map(n => {
+      let statusBadge = '';
+      if (n.status === 'PENDING_CONFIRMATION') {
+        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 animate-pulse">PENDING CONFIRMATION</span>';
+      } else if (n.status === 'CONFIRMED_TRUSTED') {
+        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">TRUSTED</span>';
+      } else if (n.status === 'CONFIRMED_DENIED') {
+        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-300 border border-red-800">DENIED &amp; REVOKED</span>';
+      } else if (n.status === 'DEVICE_REVOKED') {
+        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-400 border border-red-800">REVOKED</span>';
+      } else {
+        statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-slate-400 border border-slate-700">${n.status}</span>`;
+      }
+
+      let emailStatusHtml = '';
+      if (n.email_delivery_status === 'SENT') {
+        emailStatusHtml = '<span class="text-[10px] text-emerald-400 font-mono">📧 Owner Alert: Email Sent</span>';
+      } else if (n.email_delivery_status === 'FAILED') {
+        emailStatusHtml = `<span class="text-[10px] text-red-400 font-mono" title="${n.email_error || ''}">📧 Email Failed (Recorded in SOC)</span>`;
+      } else if (n.email_delivery_status === 'SKIPPED_UNCONFIGURED') {
+        emailStatusHtml = '<span class="text-[10px] text-slate-500 font-mono">📧 SMTP Server Unconfigured</span>';
+      } else {
+        emailStatusHtml = '<span class="text-[10px] text-amber-400 font-mono">📧 Email In Queue</span>';
+      }
+
+      const timeStr = new Date(n.created_at).toLocaleString('en-US', { timeZone: 'UTC', hour12: false }) + ' UTC';
+
+      const actionButtons = (n.status === 'PENDING_CONFIRMATION') ? `
+        <div class="pt-2">
+          <div class="text-[11px] text-amber-300 font-bold pb-1.5 text-center">Was this login authorized by you?</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              onclick="handleNotificationResponse('${n.notification_id}', 'yes')"
+              class="py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(52,211,153,0.3)]"
+            >
+              ✓ Yes, This Was Me
+            </button>
+            <button
+              onclick="handleNotificationResponse('${n.notification_id}', 'no')"
+              class="py-2 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_15px_rgba(239,68,68,0.5)]"
+            >
+              ⛔ No, Secure Account
+            </button>
+          </div>
+        </div>
+      ` : '';
+
+      const markReadBtn = !n.is_read ? `
+        <button onclick="handleMarkNotificationRead('${n.notification_id}')" class="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer">
+          Mark as read
+        </button>
+      ` : '<span class="text-[10px] text-slate-600">Read</span>';
+
+      return `
+        <div class="p-3.5 rounded-xl bg-black/80 border ${n.is_read ? 'border-red-950/60' : 'border-red-800/80 shadow-[0_0_15px_rgba(220,38,38,0.2)]'} space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-white">${n.title}</span>
+            ${statusBadge}
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed font-sans">${n.message}</p>
+          <div class="text-[10px] font-mono text-slate-400 space-y-0.5">
+            <div><span class="text-slate-500">Location:</span> ${n.location_summary || 'Unknown Network'}</div>
+            <div><span class="text-slate-500">Timestamp:</span> ${timeStr}</div>
+          </div>
+          <div class="flex items-center justify-between pt-1 border-t border-red-950/60">
+            ${emailStatusHtml}
+            ${markReadBtn}
+          </div>
+          ${actionButtons}
+        </div>
+      `;
+    }).join('');
+
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to fetch notifications:', err.message);
+  }
+};
+
+window.handleMarkNotificationRead = async function(notifId) {
+  if (!window.cognisec) return;
+  await window.cognisec.markNotificationRead(notifId);
+  window.refreshNotifications();
+};
+
+window.markAllNotificationsAsRead = async function() {
+  if (!window.cognisec) return;
+  await window.cognisec.markAllNotificationsRead();
+  window.refreshNotifications();
+};
+
+window.handleNotificationResponse = async function(notifId, answer) {
+  if (window._isHandlingNotif) return;
+  window._isHandlingNotif = true;
+  const resultBanner = document.getElementById('notif-result-banner');
 
   if (resultBanner) {
     resultBanner.classList.remove('hidden');
-    if (answer === 'yes') {
-      resultBanner.className = 'p-3 rounded-xl bg-emerald-950/80 border border-emerald-500 text-emerald-300 text-xs font-bold text-center animate-fade-in';
-      resultBanner.innerHTML = '🟢 Device Confirmed as Trusted!<br><span class="text-[10px] text-slate-300">Added to Verified Hardware Inventory.</span>';
-    } else {
-      resultBanner.className = 'p-3 rounded-xl bg-red-950/90 border-2 border-red-500 text-red-300 text-xs font-bold text-center animate-fade-in shadow-[0_0_20px_#ef4444]';
-      resultBanner.innerHTML = '⛔ CRITICAL SECURITY INTERCEPT!<br><span class="text-[10px] text-white">Session Locked &amp; Unauthorized IP Blocked.</span>';
-
-      // Append log entry to SOC Dashboard
-      const logsEl = document.getElementById('soc-live-logs');
-      if (logsEl) {
-        const timeStr = new Date().toLocaleTimeString('en-US', { hour12: false });
-        const newLog = document.createElement('div');
-        newLog.className = 'p-3 rounded-xl bg-black/50 border border-red-950 flex items-center justify-between font-mono text-[11px] animate-fade-in';
-        newLog.innerHTML = `
-          <div class="flex items-center gap-3">
-            <span class="text-red-400 font-bold">🔴 [${timeStr}]</span>
-            <span class="text-white font-bold">USER DENIED LOGIN (MacBook Pro M3)</span>
-            <span class="text-slate-400 text-[10px]">&bull; IP 103.21.124.9 &bull; Zero-Trust Kill Switch Executed</span>
-          </div>
-          <span class="px-2.5 py-0.5 bg-red-950 text-red-400 border border-red-800 rounded text-[10px] font-bold">SESSION KILLED</span>
-        `;
-        logsEl.prepend(newLog);
-      }
-    }
+    resultBanner.className = 'p-3 rounded-xl bg-black/80 border border-slate-700 text-slate-300 text-xs font-bold text-center';
+    resultBanner.innerHTML = 'Communicating with zero-trust security authority...';
   }
 
-  setTimeout(() => {
-    window.closeNotificationPopup();
-  }, 2800);
+  try {
+    const res = await window.cognisec.respondToNotification(notifId, answer);
+    if (res.status === 'success') {
+      if (resultBanner) {
+        if (answer === 'yes') {
+          resultBanner.className = 'p-3 rounded-xl bg-emerald-950/80 border border-emerald-500 text-emerald-300 text-xs font-bold text-center animate-fade-in shadow-[0_0_15px_rgba(52,211,153,0.3)]';
+          resultBanner.innerHTML = '🟢 Device Confirmed &amp; Trusted!<br><span class="text-[10px] text-slate-300">Updated in verified hardware inventory.</span>';
+        } else {
+          resultBanner.className = 'p-3 rounded-xl bg-red-950/90 border-2 border-red-500 text-red-300 text-xs font-bold text-center animate-fade-in shadow-[0_0_20px_#ef4444]';
+          resultBanner.innerHTML = '⛔ UNAUTHORIZED ACCESS REJECTED!<br><span class="text-[10px] text-white">Device revoked &amp; all associated sessions terminated.</span>';
+        }
+      }
+    } else {
+      if (resultBanner) {
+        resultBanner.className = 'p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs font-bold text-center';
+        resultBanner.textContent = res.message || 'Operation could not be completed.';
+      }
+    }
+
+    setTimeout(() => {
+      if (resultBanner) resultBanner.classList.add('hidden');
+    }, 4000);
+
+    window.refreshNotifications();
+    window.refreshUserDevices();
+
+  } catch (err) {
+    if (resultBanner) {
+      resultBanner.className = 'p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs font-bold text-center';
+      resultBanner.textContent = `Error: ${err.message}`;
+    }
+  } finally {
+    window._isHandlingNotif = false;
+  }
+};
+
+window.refreshUserDevices = async function() {
+  const container = document.getElementById('user-devices-list');
+  if (!container || !window.cognisec || !window.cognisec.isAuthenticated()) return;
+
+  try {
+    const devices = await window.cognisec.getDevices();
+    if (!Array.isArray(devices) || devices.length === 0) {
+      container.innerHTML = `
+        <div class="p-4 rounded-xl bg-black/60 border border-red-950 text-center text-xs text-slate-400">
+          No hardware devices registered yet.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = devices.map(d => {
+      let trustBadge = '';
+      if (d.trust_state === 'TRUSTED') {
+        trustBadge = '<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>TRUSTED</span>';
+      } else if (d.trust_state === 'PENDING_CONFIRMATION') {
+        trustBadge = '<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 flex items-center gap-1 animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>PENDING CONFIRMATION</span>';
+      } else if (d.trust_state === 'REVOKED') {
+        trustBadge = '<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-400 border border-red-800 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>REVOKED</span>';
+      } else {
+        trustBadge = `<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-slate-400 border border-slate-700">${d.trust_state}</span>`;
+      }
+
+      let locationText = 'Location: ';
+      if (d.latitude != null && d.longitude != null) {
+        locationText += `GPS ${d.latitude.toFixed(4)}, ${d.longitude.toFixed(4)} (±${Math.round(d.location_accuracy || 0)}m, ${d.location_source})`;
+      } else if (d.city || d.country) {
+        locationText += `${d.city || ''}, ${d.region || ''}, ${d.country || ''} (${d.location_source || 'Approximate IP'})`;
+      } else {
+        locationText += `IP ${d.last_ip || '127.0.0.1'} (${d.location_source || 'Network'})`;
+      }
+
+      const firstSeen = new Date(d.first_seen).toLocaleString('en-US', { timeZone: 'UTC', hour12: false }) + ' UTC';
+      const lastSeen = new Date(d.last_seen).toLocaleString('en-US', { timeZone: 'UTC', hour12: false }) + ' UTC';
+
+      const revokeBtn = (d.trust_state !== 'REVOKED') ? `
+        <button
+          onclick="handleRevokeDevice('${d.device_id}')"
+          class="px-3 py-1.5 rounded-lg bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-300 hover:text-white text-[11px] font-bold transition-all cursor-pointer"
+        >
+          Revoke Access
+        </button>
+      ` : '<span class="text-[10px] text-red-400 font-bold uppercase">[TERMINATED]</span>';
+
+      return `
+        <div class="p-4 rounded-xl bg-black/70 border border-red-950 flex flex-col md:flex-row md:items-center justify-between gap-3 font-mono text-xs">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-white text-sm">${d.nickname || `${d.browser_name || 'Browser'} on ${d.os_name || 'OS'}`}</span>
+              <button onclick="handleUpdateNickname('${d.device_id}')" class="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer" title="Rename device">✎ Edit Name</button>
+              ${trustBadge}
+            </div>
+            <div class="text-[11px] text-slate-400 font-sans">
+              ${d.browser_name || 'Browser'} ${d.browser_version || ''} &bull; ${d.os_name || 'OS'} ${d.os_version || ''} (${d.device_type || 'Desktop'})
+            </div>
+            <div class="text-[10px] text-slate-400">
+              ${locationText}
+            </div>
+            <div class="text-[10px] text-slate-500 flex items-center gap-3">
+              <span>First: ${firstSeen}</span>
+              <span>&bull;</span>
+              <span>Last: ${lastSeen}</span>
+            </div>
+          </div>
+          <div class="shrink-0 pt-2 md:pt-0">
+            ${revokeBtn}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to fetch devices:', err.message);
+  }
+};
+
+window.handleRevokeDevice = async function(deviceId) {
+  if (!confirm('Are you sure you want to revoke trust for this device? All active sessions associated with it will be immediately terminated.')) {
+    return;
+  }
+  const res = await window.cognisec.revokeDevice(deviceId);
+  if (res.status === 'success') {
+    alert(res.message);
+  } else {
+    alert(res.message || 'Failed to revoke device.');
+  }
+  window.refreshUserDevices();
+  window.refreshNotifications();
+};
+
+window.handleUpdateNickname = async function(deviceId) {
+  const newName = prompt('Enter a recognizable nickname for this device (e.g., "My Work Laptop"):');
+  if (newName && newName.trim()) {
+    await window.cognisec.updateDeviceNickname(deviceId, newName.trim());
+    window.refreshUserDevices();
+  }
 };
 
 // DASHBOARD SECTION REDIRECT & ADMIN ACCESS CONTROL
 window.isAdminUser = true; // Boomika Ram (Security Administrator - USR-9842-X9)
 
 window.scrollToSection = function(id) {
-  const section = document.getElementById(id);
+  let section = document.getElementById(id);
+  if (!section && (id === 'plain-black-applications-section' || id === 'applications')) {
+    section = document.getElementById('interactive-applications') || document.getElementById('applications');
+  }
   if (section) {
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -1826,6 +3153,991 @@ window.openSocDashboard = function() {
     }
   }
 };
+
+// ================= ADAPTIVE AUTHENTICATION FACTOR ENROLLMENT =================
+let activeEnrollTab = 'gesture';
+let gestureEnrollState = {
+  step: 1, // 1: Initial, 2: Confirmation
+  initialPattern: [],
+  confirmPattern: []
+};
+window.gestureEnrollState = gestureEnrollState;
+
+let imageEnrollState = {
+  step: 1, // 1: Initial, 2: Confirmation
+  initialSeq: [],
+  confirmSeq: [],
+  catalogue: []
+};
+
+window.refreshAdaptiveMfaStatus = async function() {
+  if (!window.cognisec || !window.cognisec.isAuthenticated()) return;
+  try {
+    const status = await window.cognisec.getAdaptiveStatus();
+    if (!status) return;
+
+    const gestureBadge = document.getElementById('mfa-badge-gesture');
+    const imageBadge = document.getElementById('mfa-badge-image');
+    const privateBadge = document.getElementById('mfa-badge-private');
+
+    const hasGesture = !!status.has_gesture_pattern;
+    const hasImage = !!status.has_cognitive_image_sequence;
+    const hasPrivate = !!status.has_private_response;
+
+    if (gestureBadge) {
+      if (hasGesture) {
+        gestureBadge.textContent = 'Enrolled ✓';
+        gestureBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800';
+      } else {
+        gestureBadge.textContent = 'Not Enrolled';
+        gestureBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800/80';
+      }
+    }
+
+    const resetBtn = document.getElementById('btn-reset-neuraltrace');
+    if (resetBtn) {
+      if (hasGesture) {
+        resetBtn.classList.remove('hidden');
+        resetBtn.disabled = false;
+      } else {
+        resetBtn.classList.add('hidden');
+      }
+    }
+
+    if (imageBadge) {
+      if (hasImage) {
+        imageBadge.textContent = 'Enrolled ✓';
+        imageBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800';
+      } else {
+        imageBadge.textContent = 'Not Enrolled';
+        imageBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800/80';
+      }
+    }
+
+    if (privateBadge) {
+      if (hasPrivate) {
+        privateBadge.textContent = 'Enrolled ✓';
+        privateBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800';
+      } else {
+        privateBadge.textContent = 'Not Enrolled';
+        privateBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800/80';
+      }
+    }
+
+    // Update Onboarding Advisory Banner for Incomplete Enrollment
+    const banner = document.getElementById('user-dash-enrollment-banner');
+    const bannerTitle = document.getElementById('enrollment-banner-title');
+    const bannerDesc = document.getElementById('enrollment-banner-desc');
+    if (banner) {
+      if (!hasGesture || !hasImage || !hasPrivate) {
+        banner.classList.remove('hidden');
+        const missing = [];
+        if (!hasGesture) missing.push('Gesture Pattern');
+        if (!hasImage) missing.push('Image Sequence');
+        if (!hasPrivate) missing.push('Private Response');
+        if (bannerTitle) bannerTitle.textContent = `Adaptive Security Factor Enrollment Incomplete (${3 - missing.length}/3 Enrolled)`;
+        if (bannerDesc) bannerDesc.textContent = `Please configure your ${missing.join(', ')} below to enable full Zero-Trust protection and unlock portal actions.`;
+      } else {
+        banner.classList.remove('hidden');
+        banner.className = 'p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/60 text-xs font-mono flex items-center justify-between text-emerald-300';
+        banner.innerHTML = '<div class="flex items-center gap-2"><span>🛡️</span><strong>All Adaptive Factors Enrolled &amp; Protected.</strong> Zero-Trust continuous baseline monitoring active.</div>';
+      }
+    }
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to refresh adaptive status:', err);
+  }
+};
+
+window.scrollToAdaptiveSection = function() {
+  const sec = document.getElementById('user-mfa-security-section');
+  if (sec) {
+    sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
+window.switchEnrollTab = async function(tab) {
+  activeEnrollTab = tab;
+  ['gesture', 'image', 'private'].forEach(t => {
+    const btn = document.getElementById(`enroll-tab-btn-${t}`);
+    const pane = document.getElementById(`enroll-pane-${t}`);
+    if (btn) {
+      if (t === tab) {
+        btn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white cursor-pointer transition-all';
+      } else {
+        btn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-slate-400 hover:text-white cursor-pointer transition-all';
+      }
+    }
+    if (pane) {
+      if (t === tab) pane.classList.remove('hidden');
+      else pane.classList.add('hidden');
+    }
+  });
+
+  if (tab === 'gesture') {
+    initMfaGestureGrid();
+  } else if (tab === 'image' && (!imageEnrollState.catalogue || imageEnrollState.catalogue.length === 0)) {
+    await renderEnrollImageGrid();
+  }
+};
+
+// --- GESTURE PATTERN ENROLLMENT HANDLERS ---
+function initMfaGestureGrid() {
+  const container = document.getElementById('enroll-gesture-grid');
+  if (!container) return;
+
+  if (!gestureEnrollState.gridInstance) {
+    gestureEnrollState.gridInstance = new NeuralTraceAuth(container, {
+      theme: 'theme-cyber',
+      minNodes: 4,
+      onPatternChange: (pattern) => {
+        const preview = gestureEnrollState.step === 1
+          ? document.getElementById('enroll-gesture-preview')
+          : document.getElementById('enroll-gesture-confirm-preview');
+        if (preview) {
+          preview.textContent = pattern.length > 0 ? `${pattern.length} nodes traversed` : '(Trace route along connected edges)';
+        }
+      },
+      onPatternComplete: (pattern) => {
+        const preview = gestureEnrollState.step === 1
+          ? document.getElementById('enroll-gesture-preview')
+          : document.getElementById('enroll-gesture-confirm-preview');
+        if (preview) preview.textContent = `Route recorded (${pattern.length} nodes)`;
+      },
+      onPatternTooShort: (pattern) => {
+        const feedback = document.getElementById('enroll-gesture-feedback');
+        if (feedback) {
+          feedback.className = 'p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-300 text-xs font-mono block';
+          feedback.textContent = 'Neural route must contain at least 4 connected nodes.';
+        }
+      },
+      onReset: () => {
+        const preview = gestureEnrollState.step === 1
+          ? document.getElementById('enroll-gesture-preview')
+          : document.getElementById('enroll-gesture-confirm-preview');
+        if (preview) preview.textContent = '(Trace route along connected edges)';
+      }
+    });
+  } else {
+    gestureEnrollState.gridInstance.reset();
+  }
+}
+
+window.handleGestureEnrollNode = function(nodeId) {
+  if (gestureEnrollState.gridInstance) {
+    gestureEnrollState.gridInstance.addNode(nodeId);
+    return;
+  }
+  const currentList = gestureEnrollState.step === 1 ? gestureEnrollState.initialPattern : gestureEnrollState.confirmPattern;
+  if (currentList.includes(nodeId)) return;
+  currentList.push(nodeId);
+};
+
+window.resetGestureEnrollment = function() {
+  gestureEnrollState.step = 1;
+  gestureEnrollState.initialPattern = [];
+  gestureEnrollState.confirmPattern = [];
+
+  if (gestureEnrollState.gridInstance) {
+    gestureEnrollState.gridInstance.reset();
+  } else {
+    initMfaGestureGrid();
+  }
+
+  const initialLabel = document.getElementById('enroll-gesture-initial-label');
+  if (initialLabel) initialLabel.textContent = 'Route Status:';
+  const preview = document.getElementById('enroll-gesture-preview');
+  if (preview) preview.textContent = '(Trace route along connected edges)';
+  const confirmBox = document.getElementById('enroll-gesture-confirm-box');
+  if (confirmBox) confirmBox.classList.add('hidden');
+
+  const tag = document.getElementById('enroll-gesture-step-tag');
+  if (tag) {
+    tag.textContent = 'STAGE: INITIAL ROUTE';
+    tag.className = 'px-2 py-0.5 rounded text-[10px] bg-red-950 text-red-300 border border-red-800 font-bold self-start sm:self-auto';
+  }
+
+  const instr = document.getElementById('enroll-gesture-instruction');
+  if (instr) instr.textContent = 'Step 1: Trace a private neural route across at least 4 connected network nodes.';
+
+  const actionBtn = document.getElementById('enroll-gesture-action-btn');
+  if (actionBtn) {
+    actionBtn.disabled = false;
+    actionBtn.textContent = 'Proceed to Route Confirmation →';
+    actionBtn.className = 'flex-[2] py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs font-bold shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all cursor-pointer';
+  }
+
+  const feedback = document.getElementById('enroll-gesture-feedback');
+  if (feedback) feedback.className = 'hidden';
+};
+
+window.advanceOrSubmitGestureEnrollment = async function() {
+  const feedback = document.getElementById('enroll-gesture-feedback');
+  if (feedback) feedback.className = 'hidden';
+
+  if (!gestureEnrollState.gridInstance) {
+    initMfaGestureGrid();
+  }
+
+  if (gestureEnrollState.step === 1) {
+    const pattern = gestureEnrollState.gridInstance ? gestureEnrollState.gridInstance.getPattern() : [];
+    if (!pattern || pattern.length < 4) {
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-300 text-xs font-mono block';
+        feedback.textContent = 'Neural route must contain at least 4 connected nodes.';
+      }
+      if (gestureEnrollState.gridInstance) gestureEnrollState.gridInstance.triggerShake();
+      return;
+    }
+
+    gestureEnrollState.initialPattern = [...pattern];
+    gestureEnrollState.step = 2;
+    gestureEnrollState.confirmPattern = [];
+    if (gestureEnrollState.gridInstance) gestureEnrollState.gridInstance.reset();
+
+    const initialLabel = document.getElementById('enroll-gesture-initial-label');
+    if (initialLabel) initialLabel.textContent = 'Target Route:';
+
+    const preview = document.getElementById('enroll-gesture-preview');
+    if (preview) preview.textContent = `Recorded (${gestureEnrollState.initialPattern.length} nodes)`;
+
+    const confirmBox = document.getElementById('enroll-gesture-confirm-box');
+    if (confirmBox) confirmBox.classList.remove('hidden');
+    const confirmPreview = document.getElementById('enroll-gesture-confirm-preview');
+    if (confirmPreview) confirmPreview.textContent = '(Retrace same route to confirm)';
+
+    const tag = document.getElementById('enroll-gesture-step-tag');
+    if (tag) {
+      tag.textContent = 'STAGE: RETRACE TO CONFIRM';
+      tag.className = 'px-2 py-0.5 rounded text-[10px] bg-amber-950 text-amber-300 border border-amber-800 font-bold self-start sm:self-auto';
+    }
+
+    const instr = document.getElementById('enroll-gesture-instruction');
+    if (instr) instr.textContent = 'Step 2: Retrace the exact same route across network nodes to confirm enrollment.';
+
+    const actionBtn = document.getElementById('enroll-gesture-action-btn');
+    if (actionBtn) {
+      actionBtn.textContent = 'Submit & Enroll NeuralTrace Route ✓';
+      actionBtn.className = 'flex-[2] py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white text-xs font-bold shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all cursor-pointer';
+    }
+  } else {
+    const confirmPattern = gestureEnrollState.gridInstance ? gestureEnrollState.gridInstance.getPattern() : [];
+    if (!confirmPattern || confirmPattern.length < 4) {
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-300 text-xs font-mono block';
+        feedback.textContent = 'Confirmation route must have at least 4 nodes.';
+      }
+      if (gestureEnrollState.gridInstance) gestureEnrollState.gridInstance.triggerShake();
+      return;
+    }
+
+    const match = JSON.stringify(gestureEnrollState.initialPattern) === JSON.stringify(confirmPattern);
+    if (!match) {
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+        feedback.textContent = 'Confirmation route does not match initial route. Try again or reset.';
+      }
+      gestureEnrollState.confirmPattern = [];
+      if (gestureEnrollState.gridInstance) {
+        gestureEnrollState.gridInstance.triggerShake();
+        gestureEnrollState.gridInstance.reset();
+      }
+      const confirmPreview = document.getElementById('enroll-gesture-confirm-preview');
+      if (confirmPreview) confirmPreview.textContent = '(Retrace same route to confirm)';
+      return;
+    }
+
+    gestureEnrollState.confirmPattern = [...confirmPattern];
+
+    const actionBtn = document.getElementById('enroll-gesture-action-btn');
+    if (actionBtn) {
+      actionBtn.disabled = true;
+      actionBtn.textContent = 'Enrolling NeuralTrace Secret...';
+    }
+
+    try {
+      const res = await window.cognisec.enrollGesturePattern(gestureEnrollState.initialPattern, gestureEnrollState.confirmPattern);
+      if (res.success) {
+        if (feedback) {
+          feedback.className = 'p-3 rounded-xl bg-emerald-950/70 border border-emerald-600 text-emerald-300 text-xs font-mono block';
+          feedback.textContent = '✓ NeuralTrace enrolled successfully and verifier persisted!';
+        }
+        if (gestureEnrollState.gridInstance) gestureEnrollState.gridInstance.triggerSuccess();
+        await window.refreshAdaptiveMfaStatus();
+        setTimeout(() => window.resetGestureEnrollment(), 1800);
+      } else {
+        if (feedback) {
+          feedback.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+          feedback.textContent = `Enrollment failed: ${res.error}`;
+        }
+      }
+    } catch (e) {
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+        feedback.textContent = `Error: ${e.message}`;
+      }
+    } finally {
+      if (actionBtn) actionBtn.disabled = false;
+    }
+  }
+};
+
+// --- COGNITIVE IMAGE SEQUENCE ENROLLMENT HANDLERS ---
+async function renderEnrollImageGrid() {
+  const grid = document.getElementById('enroll-image-grid');
+  if (!grid) return;
+
+  let catalogue = await window.cognisec.getAdaptiveCatalogue();
+  if (!catalogue || catalogue.length === 0) {
+    catalogue = [
+      { id: 'img_shield', label: 'Shield', icon: '🛡️', category: 'security' },
+      { id: 'img_key', label: 'Key', icon: '🔑', category: 'access' },
+      { id: 'img_lock', label: 'Lock', icon: '🔒', category: 'security' },
+      { id: 'img_radar', label: 'Radar', icon: '📡', category: 'network' },
+      { id: 'img_vault', label: 'Vault', icon: '🏛️', category: 'storage' },
+      { id: 'img_biometric', label: 'Biometric', icon: '🧬', category: 'identity' },
+      { id: 'img_firewall', label: 'Firewall', icon: '🧱', category: 'defense' },
+      { id: 'img_token', label: 'Token', icon: '🪙', category: 'credential' },
+      { id: 'img_chip', label: 'Enclave', icon: '💾', category: 'hardware' }
+    ];
+  }
+  imageEnrollState.catalogue = catalogue;
+
+  grid.innerHTML = catalogue.map(item => `
+    <div class="symbol-card" data-symbol="${item.id}" onclick="handleImageEnrollSymbol('${item.id}')">
+      <span class="text-2xl">${item.icon}</span>
+      <span class="text-[10px] text-slate-300 font-bold">${item.label}</span>
+    </div>
+  `).join('');
+}
+
+window.handleImageEnrollSymbol = function(symbolId) {
+  const maxLen = imageEnrollState.step === 1 ? 5 : (imageEnrollState.initialSeq.length || 5);
+  const currentList = imageEnrollState.step === 1 ? imageEnrollState.initialSeq : imageEnrollState.confirmSeq;
+  if (currentList.length >= maxLen) return;
+  currentList.push(symbolId);
+  updateEnrollImageVisuals();
+};
+
+function updateEnrollImageVisuals() {
+  const initialStrip = document.getElementById('enroll-image-preview-strip');
+  const confirmStrip = document.getElementById('enroll-image-confirm-strip');
+  const confirmBox = document.getElementById('enroll-image-confirm-box');
+  const initialLabel = document.getElementById('enroll-image-initial-label');
+  const cards = document.querySelectorAll('#enroll-image-grid .symbol-card');
+
+  // 1. Initial Strip always displays the initial selection
+  if (initialStrip) {
+    if (imageEnrollState.initialSeq.length === 0) {
+      initialStrip.innerHTML = '<span class="text-slate-500 text-[11px]">(Click symbols below)</span>';
+    } else {
+      initialStrip.innerHTML = imageEnrollState.initialSeq.map((id, i) => {
+        return `<span class="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-700 text-[10px] font-bold">${i+1}. ${id.replace('img_', '')}</span>`;
+      }).join('');
+    }
+  }
+
+  // 2. Stage 2 Confirmation display: Keep Initial Sequence visible in Chosen/Target strip, render confirmation in confirm strip
+  if (imageEnrollState.step === 2) {
+    if (initialLabel) initialLabel.textContent = 'Target Order:';
+    if (confirmBox) confirmBox.classList.remove('hidden');
+    if (confirmStrip) {
+      if (imageEnrollState.confirmSeq.length === 0) {
+        confirmStrip.innerHTML = '<span class="text-amber-500/70 text-[11px]">(Click symbols in exact order)</span>';
+      } else {
+        confirmStrip.innerHTML = imageEnrollState.confirmSeq.map((id, i) => {
+          return `<span class="px-2 py-0.5 rounded bg-amber-900/80 text-white border border-amber-500 text-[10px] font-bold">${i+1}. ${id.replace('img_', '')}</span>`;
+        }).join('');
+      }
+    }
+  } else {
+    if (initialLabel) initialLabel.textContent = 'Chosen Order:';
+    if (confirmBox) confirmBox.classList.add('hidden');
+  }
+
+  // 3. Grid badges: in step 1 show initialSeq indices, in step 2 show confirmSeq indices
+  const activeList = imageEnrollState.step === 1 ? imageEnrollState.initialSeq : imageEnrollState.confirmSeq;
+  cards.forEach(card => {
+    const sym = card.getAttribute('data-symbol');
+    const idx = activeList.indexOf(sym);
+    const existingBadge = card.querySelector('.symbol-order-badge');
+    if (idx !== -1) {
+      card.classList.add('selected');
+      if (!existingBadge) {
+        const badge = document.createElement('span');
+        badge.className = 'symbol-order-badge';
+        badge.textContent = idx + 1;
+        card.appendChild(badge);
+      } else {
+        existingBadge.textContent = idx + 1;
+      }
+    } else {
+      card.classList.remove('selected');
+      if (existingBadge) existingBadge.remove();
+    }
+  });
+}
+
+window.resetImageEnrollment = function() {
+  imageEnrollState.step = 1;
+  imageEnrollState.initialSeq = [];
+  imageEnrollState.confirmSeq = [];
+  updateEnrollImageVisuals();
+
+  const tag = document.getElementById('enroll-image-step-tag');
+  if (tag) {
+    tag.textContent = 'STAGE: INITIAL SEQUENCE';
+    tag.className = 'px-2 py-0.5 rounded text-[10px] bg-amber-950 text-amber-300 border border-amber-800 font-bold self-start sm:self-auto';
+  }
+
+  const instr = document.getElementById('enroll-image-instruction');
+  if (instr) instr.textContent = 'Step 1: Select 3 to 5 cognitive symbols from the catalogue in your chosen sequence.';
+
+  const actionBtn = document.getElementById('enroll-image-action-btn');
+  if (actionBtn) {
+    actionBtn.textContent = 'Proceed to Confirmation →';
+    actionBtn.className = 'flex-[2] py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 text-white text-xs font-bold shadow-[0_0_20px_rgba(245,158,11,0.4)] transition-all cursor-pointer';
+  }
+
+  const feedback = document.getElementById('enroll-image-feedback');
+  if (feedback) feedback.className = 'hidden';
+};
+
+window.advanceOrSubmitImageEnrollment = async function() {
+  const feedback = document.getElementById('enroll-image-feedback');
+  if (feedback) feedback.className = 'hidden';
+
+  if (imageEnrollState.step === 1) {
+    if (imageEnrollState.initialSeq.length < 3 || imageEnrollState.initialSeq.length > 5) {
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-300 text-xs font-mono block';
+        feedback.textContent = 'Sequence must contain between 3 and 5 symbols.';
+      }
+      return;
+    }
+
+    imageEnrollState.step = 2;
+    imageEnrollState.confirmSeq = [];
+    updateEnrollImageVisuals();
+
+    const tag = document.getElementById('enroll-image-step-tag');
+    if (tag) {
+      tag.textContent = 'STAGE: CONFIRMATION';
+      tag.className = 'px-2 py-0.5 rounded text-[10px] bg-amber-950 text-amber-300 border border-amber-800 font-bold self-start sm:self-auto';
+    }
+
+    const instr = document.getElementById('enroll-image-instruction');
+    if (instr) instr.textContent = 'Step 2: Repeat your chosen sequence in the exact order to confirm.';
+
+    const actionBtn = document.getElementById('enroll-image-action-btn');
+    if (actionBtn) {
+      actionBtn.textContent = 'Submit & Enroll Image Sequence ✓';
+      actionBtn.className = 'flex-[2] py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white text-xs font-bold shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all cursor-pointer';
+    }
+  } else {
+    if (imageEnrollState.confirmSeq.length < imageEnrollState.initialSeq.length) {
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-300 text-xs font-mono block';
+        feedback.textContent = `Please enter all ${imageEnrollState.initialSeq.length} symbols to complete confirmation.`;
+      }
+      return;
+    }
+
+    const match = JSON.stringify(imageEnrollState.initialSeq) === JSON.stringify(imageEnrollState.confirmSeq);
+    if (!match) {
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+        feedback.textContent = 'Confirmation sequence does not match initial selection. Try again or reset.';
+      }
+      imageEnrollState.confirmSeq = [];
+      updateEnrollImageVisuals();
+      return;
+    }
+
+    const actionBtn = document.getElementById('enroll-image-action-btn');
+    if (actionBtn) {
+      actionBtn.disabled = true;
+      actionBtn.textContent = 'Enrolling Sequence Factor...';
+    }
+
+    try {
+      const res = await window.cognisec.enrollImageSequence(imageEnrollState.initialSeq, imageEnrollState.confirmSeq);
+      if (res.success) {
+        if (feedback) {
+          feedback.className = 'p-3 rounded-xl bg-emerald-950/70 border border-emerald-600 text-emerald-300 text-xs font-mono block';
+          feedback.textContent = '✓ Cognitive image sequence factor successfully enrolled!';
+        }
+        await window.refreshAdaptiveMfaStatus();
+        setTimeout(() => window.resetImageEnrollment(), 1800);
+      } else {
+        if (feedback) {
+          feedback.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+          feedback.textContent = `Enrollment failed: ${res.error}`;
+        }
+      }
+    } catch (e) {
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+        feedback.textContent = `Error: ${e.message}`;
+      }
+    } finally {
+      if (actionBtn) actionBtn.disabled = false;
+    }
+  }
+};
+
+// --- PRIVATE RESPONSE ENROLLMENT HANDLERS ---
+window.handlePrivateQuestionSelectChange = function(sel) {
+  const customInput = document.getElementById('enroll-private-custom-q');
+  if (!customInput) return;
+  if (sel.value === '__custom__') {
+    customInput.classList.remove('hidden');
+    customInput.focus();
+  } else {
+    customInput.classList.add('hidden');
+  }
+};
+
+window.handlePrivateEnrollSubmit = async function(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const sel = document.getElementById('enroll-private-select');
+  const customInput = document.getElementById('enroll-private-custom-q');
+  const respInput = document.getElementById('enroll-private-resp');
+  const confirmInput = document.getElementById('enroll-private-confirm');
+  const feedback = document.getElementById('enroll-private-feedback');
+  const submitBtn = document.getElementById('enroll-private-btn-submit');
+
+  const question = (sel && sel.value === '__custom__') ? (customInput ? customInput.value.trim() : '') : (sel ? sel.value : '');
+  const response = respInput ? respInput.value.trim() : '';
+  const confirmResponse = confirmInput ? confirmInput.value.trim() : '';
+
+  if (!question) {
+    if (feedback) {
+      feedback.className = 'p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-300 text-xs font-mono block';
+      feedback.textContent = 'Please choose or type a valid security question.';
+    }
+    return;
+  }
+
+  if (!response || response.length < 3) {
+    if (feedback) {
+      feedback.className = 'p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-300 text-xs font-mono block';
+      feedback.textContent = 'Private answer must be at least 3 characters long.';
+    }
+    return;
+  }
+
+  if (response.toLowerCase() !== confirmResponse.toLowerCase()) {
+    if (feedback) {
+      feedback.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+      feedback.textContent = 'Confirmation answer does not match secret answer.';
+    }
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Enrolling Private Response...';
+  }
+
+  try {
+    const res = await window.cognisec.enrollPrivateResponse(question, response, confirmResponse);
+    if (res.success) {
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-emerald-950/70 border border-emerald-600 text-emerald-300 text-xs font-mono block';
+        feedback.textContent = '✓ Private response security factor successfully enrolled!';
+      }
+      if (respInput) respInput.value = '';
+      if (confirmInput) confirmInput.value = '';
+      await window.refreshAdaptiveMfaStatus();
+    } else {
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+        feedback.textContent = `Enrollment failed: ${res.error}`;
+      }
+    }
+  } catch (err) {
+    if (feedback) {
+      feedback.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+      feedback.textContent = `Error: ${err.message}`;
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Save & Enroll Private Response →';
+    }
+  }
+};
+
+
+// ================= RESET NEURALTRACE MODAL CONTROLLER =================
+let ntResetState = {
+  challengeId: null,
+  resetTicket: null,
+  step: 1, // 1: Confirm/Request OTP, 2: Verify OTP, 3: Draw New Route
+  drawStep: 1, // 1: Initial Route, 2: Confirmation Route
+  initialPattern: [],
+  confirmPattern: [],
+  gridInstance: null
+};
+
+window.openResetNeuralTraceModal = function() {
+  const modal = document.getElementById('modal-reset-neuraltrace');
+  if (!modal) return;
+
+  ntResetState.challengeId = null;
+  ntResetState.resetTicket = null;
+  ntResetState.step = 1;
+  ntResetState.drawStep = 1;
+  ntResetState.initialPattern = [];
+  ntResetState.confirmPattern = [];
+
+  const user = window.cognisec ? window.cognisec.getUser() : null;
+  const maskedEmail = user && user.email ? (window.cognisec.maskEmail ? window.cognisec.maskEmail(user.email) : user.email) : 'registered email';
+  const emailDisplay = document.getElementById('nt-reset-masked-email');
+  if (emailDisplay) emailDisplay.textContent = maskedEmail;
+
+  // Show Step 1, hide others
+  document.getElementById('nt-reset-step1')?.classList.remove('hidden');
+  document.getElementById('nt-reset-step2')?.classList.add('hidden');
+  document.getElementById('nt-reset-step3')?.classList.add('hidden');
+
+  const fb1 = document.getElementById('nt-reset-step1-feedback');
+  if (fb1) fb1.className = 'hidden';
+  const btn1 = document.getElementById('btn-nt-reset-send-otp');
+  if (btn1) {
+    btn1.disabled = false;
+    btn1.innerHTML = '<span>Send Re-Authentication Code →</span>';
+  }
+
+  modal.classList.remove('hidden');
+};
+
+window.closeResetNeuralTraceModal = function() {
+  const modal = document.getElementById('modal-reset-neuraltrace');
+  if (modal) modal.classList.add('hidden');
+  if (ntResetState.gridInstance) {
+    ntResetState.gridInstance.reset();
+  }
+  ntResetState.challengeId = null;
+  ntResetState.resetTicket = null;
+};
+
+window.handleSendResetOtp = async function() {
+  const btn = document.getElementById('btn-nt-reset-send-otp');
+  const fb1 = document.getElementById('nt-reset-step1-feedback');
+  const fb2 = document.getElementById('nt-reset-step2-feedback');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Dispatching Re-Authentication Code...</span>';
+  }
+  if (fb1) fb1.className = 'hidden';
+  if (fb2) fb2.className = 'hidden';
+
+  try {
+    const res = await window.cognisec.requestNeuralTraceReset();
+    if (res.success) {
+      ntResetState.challengeId = res.reset_challenge_id;
+      ntResetState.step = 2;
+
+      document.getElementById('nt-reset-step1')?.classList.add('hidden');
+      document.getElementById('nt-reset-step2')?.classList.remove('hidden');
+
+      const desc = document.getElementById('nt-reset-step2-desc');
+      if (desc) desc.textContent = `A single-use verification code was dispatched to ${res.masked_email || 'your registered email'}.`;
+
+      const otpInput = document.getElementById('nt-reset-otp-input');
+      if (otpInput) {
+        otpInput.value = '';
+        otpInput.focus();
+      }
+    } else {
+      if (fb1) {
+        fb1.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+        fb1.textContent = res.error || 'Failed to dispatch verification code. Please retry.';
+      }
+    }
+  } catch (err) {
+    if (fb1) {
+      fb1.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+      fb1.textContent = `Error: ${err.message}`;
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>Send Re-Authentication Code →</span>';
+    }
+  }
+};
+
+window.handleVerifyResetOtp = async function() {
+  const otpInput = document.getElementById('nt-reset-otp-input');
+  const otp = otpInput ? otpInput.value.trim() : '';
+  const fb = document.getElementById('nt-reset-step2-feedback');
+  const btn = document.getElementById('btn-nt-reset-verify-otp');
+
+  if (!otp || otp.length !== 6 || !/^\d{6}$/.test(otp)) {
+    if (fb) {
+      fb.className = 'p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-300 text-xs font-mono block';
+      fb.textContent = 'Please enter a valid 6-digit numeric verification code.';
+    }
+    if (otpInput) otpInput.focus();
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Verifying Identity...</span>';
+  }
+  if (fb) fb.className = 'hidden';
+
+  try {
+    const res = await window.cognisec.verifyNeuralTraceReset(ntResetState.challengeId, otp);
+    if (res.success && res.reset_ticket) {
+      ntResetState.resetTicket = res.reset_ticket;
+      ntResetState.step = 3;
+
+      document.getElementById('nt-reset-step2')?.classList.add('hidden');
+      document.getElementById('nt-reset-step3')?.classList.remove('hidden');
+
+      initModalResetNeuralTraceGrid();
+    } else {
+      if (fb) {
+        fb.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+        fb.textContent = res.error || 'Verification code failed. Please check your email or retry.';
+      }
+    }
+  } catch (err) {
+    if (fb) {
+      fb.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+      fb.textContent = `Error: ${err.message}`;
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>Verify &amp; Draw New Route →</span>';
+    }
+  }
+};
+
+function initModalResetNeuralTraceGrid() {
+  const container = document.getElementById('reset-neuraltrace-grid');
+  if (!container) return;
+
+  ntResetState.drawStep = 1;
+  ntResetState.initialPattern = [];
+  ntResetState.confirmPattern = [];
+
+  const preview = document.getElementById('nt-reset-preview');
+  if (preview) preview.textContent = '(Trace route along connected edges)';
+  const confirmBox = document.getElementById('nt-reset-confirm-box');
+  if (confirmBox) confirmBox.classList.add('hidden');
+
+  const instr = document.getElementById('nt-reset-step3-instructions');
+  if (instr) instr.textContent = 'Step 1: Trace your new private neural route across at least 4 connected network nodes.';
+  const tag = document.getElementById('nt-reset-step3-tag');
+  if (tag) {
+    tag.textContent = 'STAGE: INITIAL ROUTE';
+    tag.className = 'px-2 py-0.5 rounded text-[10px] bg-red-950 text-red-300 border border-red-800 font-bold self-start sm:self-auto';
+  }
+  const actionBtn = document.getElementById('btn-nt-reset-action');
+  if (actionBtn) {
+    actionBtn.disabled = false;
+    actionBtn.textContent = 'Proceed to Route Confirmation →';
+    actionBtn.className = 'flex-[2] py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs font-bold shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all cursor-pointer';
+  }
+
+  if (!ntResetState.gridInstance || ntResetState.gridInstance.container !== container) {
+    ntResetState.gridInstance = new NeuralTraceAuth(container, {
+      theme: 'theme-cyber',
+      minNodes: 4,
+      onPatternChange: (pattern) => {
+        const p = ntResetState.drawStep === 1
+          ? document.getElementById('nt-reset-preview')
+          : document.getElementById('nt-reset-confirm-preview');
+        if (p) p.textContent = pattern.length > 0 ? `${pattern.length} nodes traversed` : '(Trace route along connected edges)';
+      },
+      onPatternComplete: (pattern) => {
+        const p = ntResetState.drawStep === 1
+          ? document.getElementById('nt-reset-preview')
+          : document.getElementById('nt-reset-confirm-preview');
+        if (p) p.textContent = `Route recorded (${pattern.length} nodes)`;
+      },
+      onPatternTooShort: () => {
+        const fb = document.getElementById('nt-reset-step3-feedback');
+        if (fb) {
+          fb.className = 'p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-300 text-xs font-mono block';
+          fb.textContent = 'Neural route must contain at least 4 connected nodes.';
+        }
+      },
+      onReset: () => {
+        const p = ntResetState.drawStep === 1
+          ? document.getElementById('nt-reset-preview')
+          : document.getElementById('nt-reset-confirm-preview');
+        if (p) p.textContent = '(Trace route along connected edges)';
+      }
+    });
+  } else {
+    ntResetState.gridInstance.reset();
+  }
+}
+
+window.resetModalNeuralTraceDrawing = function() {
+  ntResetState.drawStep = 1;
+  ntResetState.initialPattern = [];
+  ntResetState.confirmPattern = [];
+
+  if (ntResetState.gridInstance) {
+    ntResetState.gridInstance.reset();
+  }
+
+  const initialLabel = document.getElementById('nt-reset-initial-label');
+  if (initialLabel) initialLabel.textContent = 'Target Route:';
+  const preview = document.getElementById('nt-reset-preview');
+  if (preview) preview.textContent = '(Trace route along connected edges)';
+  const confirmBox = document.getElementById('nt-reset-confirm-box');
+  if (confirmBox) confirmBox.classList.add('hidden');
+
+  const tag = document.getElementById('nt-reset-step3-tag');
+  if (tag) {
+    tag.textContent = 'STAGE: INITIAL ROUTE';
+    tag.className = 'px-2 py-0.5 rounded text-[10px] bg-red-950 text-red-300 border border-red-800 font-bold self-start sm:self-auto';
+  }
+
+  const instr = document.getElementById('nt-reset-step3-instructions');
+  if (instr) instr.textContent = 'Step 1: Trace your new private neural route across at least 4 connected network nodes.';
+
+  const actionBtn = document.getElementById('btn-nt-reset-action');
+  if (actionBtn) {
+    actionBtn.disabled = false;
+    actionBtn.textContent = 'Proceed to Route Confirmation →';
+    actionBtn.className = 'flex-[2] py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs font-bold shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all cursor-pointer';
+  }
+
+  const fb = document.getElementById('nt-reset-step3-feedback');
+  if (fb) fb.className = 'hidden';
+};
+
+window.advanceOrSubmitResetRoute = async function() {
+  const fb = document.getElementById('nt-reset-step3-feedback');
+  if (fb) fb.className = 'hidden';
+
+  if (!ntResetState.gridInstance) {
+    initModalResetNeuralTraceGrid();
+  }
+
+  if (ntResetState.drawStep === 1) {
+    const pattern = ntResetState.gridInstance ? ntResetState.gridInstance.getPattern() : [];
+    if (!pattern || pattern.length < 4) {
+      if (fb) {
+        fb.className = 'p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-300 text-xs font-mono block';
+        fb.textContent = 'Neural route must contain at least 4 connected nodes.';
+      }
+      if (ntResetState.gridInstance) ntResetState.gridInstance.triggerShake();
+      return;
+    }
+
+    ntResetState.initialPattern = [...pattern];
+    ntResetState.drawStep = 2;
+    ntResetState.confirmPattern = [];
+    if (ntResetState.gridInstance) ntResetState.gridInstance.reset();
+
+    const preview = document.getElementById('nt-reset-preview');
+    if (preview) preview.textContent = `Recorded (${ntResetState.initialPattern.length} nodes)`;
+
+    const confirmBox = document.getElementById('nt-reset-confirm-box');
+    if (confirmBox) confirmBox.classList.remove('hidden');
+    const confirmPreview = document.getElementById('nt-reset-confirm-preview');
+    if (confirmPreview) confirmPreview.textContent = '(Retrace same route to confirm)';
+
+    const tag = document.getElementById('nt-reset-step3-tag');
+    if (tag) {
+      tag.textContent = 'STAGE: RETRACE TO CONFIRM';
+      tag.className = 'px-2 py-0.5 rounded text-[10px] bg-amber-950 text-amber-300 border border-amber-800 font-bold self-start sm:self-auto';
+    }
+
+    const instr = document.getElementById('nt-reset-step3-instructions');
+    if (instr) instr.textContent = 'Step 2: Retrace the exact same route across network nodes to confirm.';
+
+    const actionBtn = document.getElementById('btn-nt-reset-action');
+    if (actionBtn) {
+      actionBtn.textContent = 'Save & Protect New NeuralTrace Route ✓';
+      actionBtn.className = 'flex-[2] py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white text-xs font-bold shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all cursor-pointer';
+    }
+  } else {
+    const confirmPattern = ntResetState.gridInstance ? ntResetState.gridInstance.getPattern() : [];
+    if (!confirmPattern || confirmPattern.length < 4) {
+      if (fb) {
+        fb.className = 'p-3 rounded-xl bg-amber-950/70 border border-amber-800 text-amber-300 text-xs font-mono block';
+        fb.textContent = 'Confirmation route must have at least 4 nodes.';
+      }
+      if (ntResetState.gridInstance) ntResetState.gridInstance.triggerShake();
+      return;
+    }
+
+    const match = JSON.stringify(ntResetState.initialPattern) === JSON.stringify(confirmPattern);
+    if (!match) {
+      if (fb) {
+        fb.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+        fb.textContent = 'Confirmation route does not match initial route. Retrace or reset.';
+      }
+      ntResetState.confirmPattern = [];
+      if (ntResetState.gridInstance) {
+        ntResetState.gridInstance.triggerShake();
+        ntResetState.gridInstance.reset();
+      }
+      const confirmPreview = document.getElementById('nt-reset-confirm-preview');
+      if (confirmPreview) confirmPreview.textContent = '(Retrace same route to confirm)';
+      return;
+    }
+
+    ntResetState.confirmPattern = [...confirmPattern];
+
+    const actionBtn = document.getElementById('btn-nt-reset-action');
+    if (actionBtn) {
+      actionBtn.disabled = true;
+      actionBtn.textContent = 'Saving New NeuralTrace Verifier...';
+    }
+
+    try {
+      const res = await window.cognisec.confirmNeuralTraceReset(
+        ntResetState.resetTicket,
+        ntResetState.initialPattern,
+        ntResetState.confirmPattern
+      );
+      if (res.success) {
+        if (fb) {
+          fb.className = 'p-3 rounded-xl bg-emerald-950/70 border border-emerald-600 text-emerald-300 text-xs font-mono block';
+          fb.textContent = '✓ NeuralTrace route successfully reset and protected! Old challenges invalidated.';
+        }
+        if (ntResetState.gridInstance) ntResetState.gridInstance.triggerSuccess();
+        await window.refreshAdaptiveMfaStatus();
+        setTimeout(() => {
+          closeResetNeuralTraceModal();
+        }, 1500);
+      } else {
+        if (fb) {
+          fb.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+          fb.textContent = `Reset failed: ${res.error}`;
+        }
+        if (actionBtn) {
+          actionBtn.disabled = false;
+          actionBtn.textContent = 'Save & Protect New NeuralTrace Route ✓';
+        }
+      }
+    } catch (err) {
+      if (fb) {
+        fb.className = 'p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-mono block';
+        fb.textContent = `Error: ${err.message}`;
+      }
+      if (actionBtn) {
+        actionBtn.disabled = false;
+        actionBtn.textContent = 'Save & Protect New NeuralTrace Route ✓';
+      }
+    }
+  }
+};
+
 
 
 

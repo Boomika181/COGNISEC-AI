@@ -23,8 +23,13 @@ def get_password_hash(password: str) -> str:
     return hashed.decode("utf-8")
 
 
-def create_access_token(subject: Union[str, Any], role: str, expires_delta: Optional[timedelta] = None) -> str:
-    """Creates a signed JWT access token with user id, role, and expiration."""
+def create_access_token(
+    subject: Union[str, Any],
+    role: str,
+    session_id: Optional[str] = None,
+    expires_delta: Optional[timedelta] = None
+) -> str:
+    """Creates a signed JWT access token with user id, role, session id (sid), and expiration."""
     now_utc = datetime.now(timezone.utc)
     if expires_delta:
         expire = now_utc + expires_delta
@@ -37,8 +42,12 @@ def create_access_token(subject: Union[str, Any], role: str, expires_delta: Opti
         "exp": expire,
         "iat": now_utc
     }
+    if session_id:
+        to_encode["sid"] = str(session_id)
+
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
+
 
 
 def decode_access_token(token: str) -> Optional[dict]:

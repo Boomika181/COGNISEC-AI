@@ -12,7 +12,10 @@ from app.schemas.admin import (
     AdminMetricsResponse,
     AlertResponse,
     AlertResolveRequest,
-    SecurityEventResponse
+    SecurityEventResponse,
+    EmailDiagnosticsResponse,
+    EmailTestRequest,
+    EmailTestResponse
 )
 from app.schemas.device import DeviceResponse
 from app.schemas.session import SessionResponse
@@ -21,6 +24,8 @@ from app.schemas.behavior import BehaviorProfileResponse
 from app.services.device_service import DeviceService
 from app.services.session_service import SessionService
 from app.services.profile_service import ProfileService
+from app.services.email_service import EmailService
+from app.core.rate_limit import rate_limiter
 from app.ml.model_manager import ModelManager
 
 router = APIRouter(prefix="/admin", tags=["Admin & SOC Command Center"], dependencies=[Depends(require_admin)])
@@ -220,3 +225,81 @@ def get_admin_user_profile(user_id: int, db: Session = Depends(get_db)):
         is_anomaly=is_anomaly,
         anomaly_score=anomaly_score
     )
+
+
+@router.get("/users/{user_id}/model-metadata")
+def get_user_model_metadata(user_id: int, db: Session = Depends(get_db)):
+    """Allows Security Administrators to inspect internal ML model diagnostic metadata."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    profile = ProfileService.get_or_create_profile(db, user_id)
+    features_dict = ProfileService.get_profile_dict(profile)
+    ModelManager.ensure_hydrated(db, user_id, features_dict)
+
+    metadata = ModelManager.get_model_metadata(user_id)
+    status_label, confidence, is_mature = ProfileService.get_maturity_info(profile.sample_count)
+    metadata["baseline_maturity"] = status_label
+    metadata["maturity_confidence"] = confidence
+    metadata["is_mature"] = is_mature
+    metadata["profile_sample_count"] = profile.sample_count
+    return metadata
+
+
+@router.get("/email/diagnostics", response_model=EmailDiagnosticsResponse)
+def get_email_diagnostics():
+    """
+    Returns backend email delivery diagnostics.
+    Restricted to authorized SOC Administrators. Never exposes credentials.
+    """
+    return EmailService.get_diagnostics()
+
+
+@router.post("/email/test-connection", response_model=EmailTestResponse)
+def test_email_connection():
+    """
+    Performs a live connectivity and authentication test to the configured SMTP server without sending an email.
+    Restricted to authorized SOC Administrators.
+    """
+    success, message = EmailService.test_connection()
+    return EmailTestResponse(success=success, message=message)
+
+
+@router.post("/email/send-test", response_model=EmailTestResponse)
+def send_test_email(request: EmailTestRequest, current_user: User = Depends(require_admin)):
+    """
+    Sends a test verification email to an administrator-specified recipient.
+    Strictly rate-limited (at most 5 requests per minute) and validated.
+    """
+    rate_limiter.enforce(
+        key=f"admin_test_email:{current_user.id}",
+        max_requests=5,
+        window_seconds=60,
+        detail="Too many test email requests. Rate limit enforced."
+    )
+
+    is_deliverable, deliver_err = EmailService.is_deliverable_recipient(request.recipient_email)
+    if not is_deliverable:
+        raise HTTPException(status_code=400, detail=deliver_err)
+
+    plain_body = (
+        f"COGNISEC-AI Zero-Trust SMTP Delivery Test\n\n"
+        f"This is an automated test message initiated by SOC Administrator {current_user.name} ({current_user.email}).\n"
+        f"If you received this email, the SMTP delivery channel is functioning properly."
+    )
+    html_body = (
+        f"<div style='font-family: sans-serif; background: #06040a; color: #fff; padding: 24px; border-radius: 8px; border: 1px solid #dc2626;'>"
+        f"<h2 style='color: #ef4444;'>COGNISEC-AI // SMTP Test</h2>"
+        f"<p>This is an automated test message initiated by SOC Administrator <strong>{current_user.name}</strong>.</p>"
+        f"<p style='color: #22c55e;'>✓ SMTP transport, TLS handshake, and authentication succeeded.</p>"
+        f"</div>"
+    )
+
+    success, message = EmailService.send_email(
+        recipient_email=request.recipient_email,
+        subject="[COGNISEC-AI] SMTP Delivery Verification Test",
+        plain_text=plain_body,
+        html_text=html_body
+    )
+    return EmailTestResponse(success=success, message=message)

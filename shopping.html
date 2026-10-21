@@ -1,18 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nyraa Luxe Retail — Protected by COGNISEC AI</title>
+  <title>Nyraa Retail — India's Trusted Online Megastore for Electronics, Fashion &amp; Lifestyle</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛍️</text></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap"
-    rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
   <style>
     body {
       font-family: 'Plus Jakarta Sans', sans-serif;
-      background-color: #f8fafc;
+      background-color: #f1f5f9;
       color: #0f172a;
     }
 
@@ -23,9 +22,8 @@
     @keyframes fadeInScale {
       from {
         opacity: 0;
-        transform: scale(0.95) translateY(10px);
+        transform: scale(0.97) translateY(6px);
       }
-
       to {
         opacity: 1;
         transform: scale(1) translateY(0);
@@ -33,194 +31,938 @@
     }
 
     .animate-fade-in {
-      animation: fadeInScale 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: fadeInScale 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
     .product-card {
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .product-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 20px 30px -10px rgba(217, 119, 6, 0.15);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px -6px rgba(15, 23, 42, 0.1);
     }
+
+    /* Subnav active pill */
+    .subnav-link {
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .subnav-link:hover {
+      color: #2563eb;
+      background-color: #eff6ff;
+    }
+
+    /* NeuralTrace Step-Up Modal Viewport Fit & Internal Scroll */
+    #modal-stepup {
+      box-sizing: border-box;
+      padding: 1rem;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    #stepup-modal-container {
+      box-sizing: border-box;
+      max-height: calc(100vh - 32px);
+      max-height: calc(100dvh - 32px);
+      display: flex;
+      flex-direction: column;
+      margin: auto;
+      overflow: hidden;
+      width: 100%;
+      max-width: 32rem;
+    }
+    #stepup-modal-container * {
+      box-sizing: border-box;
+    }
+    #stepup-modal-header {
+      flex-shrink: 0;
+    }
+    #stepup-modal-body {
+      box-sizing: border-box;
+      overflow-y: auto;
+      overflow-x: hidden;
+      flex: 1 1 auto;
+      min-height: 0;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(37, 99, 235, 0.4) transparent;
+    }
+    #stepup-modal-footer {
+      flex-shrink: 0;
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
+      box-sizing: border-box;
+      background: linear-gradient(180deg, rgba(8, 5, 14, 0.96) 0%, #08050e 100%);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-top: 1px solid rgba(37, 99, 235, 0.25);
+    }
+    @media (max-height: 820px) {
+      .neuraltrace-container {
+        max-width: 290px;
+      }
+      #stepup-modal-container {
+        max-height: calc(100vh - 24px);
+        max-height: calc(100dvh - 24px);
+      }
+    }
+    @media (max-height: 700px) {
+      .neuraltrace-container {
+        max-width: 240px;
+      }
+      #stepup-modal-container {
+        max-height: calc(100vh - 16px);
+        max-height: calc(100dvh - 16px);
+      }
+    }
+    @media (max-width: 480px) {
+      #modal-stepup {
+        padding: 0.5rem;
+      }
+      #stepup-modal-container {
+        max-height: calc(100vh - 16px);
+        max-height: calc(100dvh - 16px);
+      }
+      .neuraltrace-container {
+        max-width: 280px;
+      }
+    }
+
+    /* Clean custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f8fafc; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   </style>
 </head>
 
-<body class="min-h-screen flex flex-col justify-between selection:bg-amber-500/20 selection:text-amber-900">
+<body class="min-h-screen flex flex-col justify-between selection:bg-blue-500/20 selection:text-blue-900 bg-slate-100 text-slate-900">
 
-  <!-- TOP COGNISEC AI SECURITY BANNER -->
-  <div
-    class="bg-slate-950 text-white border-b border-slate-800 px-6 py-2.5 flex items-center justify-between text-xs font-mono shadow-md">
-    <div class="flex items-center gap-3">
-      <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-      <span class="text-amber-400 font-bold">COGNISEC AI SECURITY:</span>
-      <span class="text-slate-300">Identity Match 99.98% (High Trust) &bull; UPI 1-Tap Active</span>
+  <!-- TOP ANNOUNCEMENT & FESTIVE OFFER STRIP -->
+  <div class="bg-indigo-950 text-white border-b border-indigo-900 px-4 sm:px-8 py-2 flex items-center justify-between text-xs font-mono shadow-sm">
+    <div class="flex items-center gap-3 overflow-hidden text-ellipsis whitespace-nowrap">
+      <span class="px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-bold text-[10px] uppercase tracking-wider">MEGA SALE</span>
+      <span class="text-amber-300 font-bold hidden sm:inline">Grand Indian Retail Festival:</span>
+      <span class="text-slate-200 text-xs">Up to 40% Off on Top Electronics &bull; Free Delivery Above ₹499</span>
     </div>
-    <div class="flex items-center gap-4 text-slate-400">
-      <span class="hidden sm:inline">Keystroke Dynamics: 1,000Hz</span>
-      <a href="index.html"
-        class="px-3 py-1 rounded bg-amber-500 text-black font-bold hover:bg-amber-400 transition-all text-[11px] uppercase tracking-wider">
-        ← Back to Platform
+    <div class="flex items-center gap-4 text-slate-300 shrink-0 text-[11px]">
+      <span class="hidden md:inline">24x7 Customer Help: 1800-209-NYRAA</span>
+      <a href="index.html" class="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all uppercase tracking-wider flex items-center gap-1">
+        <span>← Back to Platform</span>
       </a>
     </div>
   </div>
 
-  <!-- WHITE HEADER (UNIQUE BRAND: NYRAA LUXE RETAIL) -->
-  <header
-    class="bg-white border-b border-slate-200 px-6 sm:px-10 py-5 flex items-center justify-between shadow-sm sticky top-0 z-30">
-    <div class="flex items-center gap-3">
-      <div
-        class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-600 font-bold text-xl">
-        💎
+  <!-- MAIN E-COMMERCE RETAIL HEADER -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4 sm:gap-6">
+      
+      <!-- Brand Logo -->
+      <a href="#" class="flex items-center gap-2.5 shrink-0 group">
+        <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-2xl shadow-sm group-hover:bg-blue-700 transition-colors">
+          🛍️
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5 leading-none">
+            <span class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">NYRAA</span>
+            <span class="text-xs font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">RETAIL</span>
+          </div>
+          <span class="text-[10px] text-slate-500 font-medium hidden sm:block">India's Online Megastore</span>
+        </div>
+      </a>
+
+      <!-- Location Pin (Everyday Indian E-com UI) -->
+      <div class="hidden xl:flex items-center gap-2 text-xs text-slate-600 border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 shrink-0">
+        <span class="text-blue-600 text-sm">📍</span>
+        <div class="leading-tight">
+          <span class="text-[10px] text-slate-400 block">Deliver to</span>
+          <strong class="text-slate-800 font-semibold text-xs">Bengaluru 560038</strong>
+        </div>
       </div>
-      <div>
-        <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">NYRAA LUXE RETAIL</h1>
-        <p class="text-xs font-mono text-amber-700 font-bold">Bengaluru &bull; Mumbai &bull; Delhi NCR &bull; GSTIN
-          Verified</p>
+
+      <!-- Prominent Search Bar -->
+      <div class="flex-1 max-w-2xl relative">
+        <div class="relative flex items-center">
+          <input 
+            id="product-search-input" 
+            type="text" 
+            placeholder="Search watches, leather bags, wireless headphones, audio..." 
+            oninput="filterProducts()" 
+            class="w-full pl-10 pr-24 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 bg-slate-50 focus:bg-white text-xs font-medium text-slate-900 focus:outline-none transition-all shadow-inner" 
+          />
+          <span class="absolute left-3.5 text-slate-400 text-sm">🔍</span>
+          <button onclick="filterProducts()" class="absolute right-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer">
+            Search
+          </button>
+        </div>
       </div>
-    </div>
 
-    <div class="flex items-center gap-4">
-      <div id="user-header-info" class="text-right font-mono text-xs hidden md:block">
-        <span id="user-status-label" class="text-slate-500 block">Logged-in Customer</span>
-        <strong id="user-name-label" class="text-slate-900 font-bold">Boomika Ram (Bengaluru)</strong>
+      <!-- Right Header Actions (User, Wishlist, Cart) -->
+      <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        
+        <!-- User Info Labels (Preserved IDs) -->
+        <div id="user-header-info" class="text-right font-mono text-xs hidden lg:block leading-tight">
+          <span id="user-status-label" class="text-slate-500 block text-[10px] truncate max-w-[170px]">Guest Customer</span>
+          <strong id="user-name-label" class="text-slate-900 font-bold block text-xs truncate max-w-[170px]">Not Signed In</strong>
+        </div>
+
+        <!-- Cognitive MFA Enrollment Button -->
+        <button id="btn-header-mfa" onclick="window.openFactorEnrollmentModal ? window.openFactorEnrollmentModal() : (window.cognisec && window.cognisec.openFactorEnrollmentModal())"
+          class="hidden px-3 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 border border-amber-700/60 text-amber-300 font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+          title="Configure Adaptive Multi-Factor Authenticators">
+          <span>🛡️ MFA Setup</span>
+        </button>
+
+        <!-- Sign Out Button (Preserved ID) -->
+        <button id="btn-header-signout" onclick="handleSignOut()"
+          class="hidden px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-xs">
+          <span>Sign Out</span>
+          <svg class="w-3.5 h-3.5 text-rose-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        </button>
+
+        <!-- Sign In Button (Preserved ID) -->
+        <button id="btn-header-signin" onclick="openSignInModal()"
+          class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
+          <span>Sign In</span>
+          <svg class="w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
+        </button>
+
+        <!-- Wishlist Button -->
+        <button onclick="openWishlistModal()" title="View Wishlist"
+          class="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 font-bold text-xs transition-all flex items-center gap-1 cursor-pointer">
+          <span class="text-sm">❤️</span>
+          <span class="hidden sm:inline">Wishlist</span>
+          <span id="wishlist-count-badge" class="font-mono text-xs font-bold text-rose-600 bg-rose-50 px-1.5 rounded-full border border-rose-200">0</span>
+        </button>
+
+        <!-- Cart Button (Preserved IDs) -->
+        <button onclick="openCartModal()"
+          class="px-3 sm:px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs transition-all flex items-center gap-2 cursor-pointer shadow-sm">
+          <span class="text-base leading-none">🛒</span>
+          <span class="hidden sm:inline">Cart</span>
+          <span class="font-mono text-xs bg-slate-950 text-amber-300 px-2 py-0.5 rounded-full">
+            <span id="cart-count-badge">0</span>
+          </span>
+          <span id="cart-status-dot" class="w-2 h-2 rounded-full bg-red-500"></span>
+        </button>
+
       </div>
-
-      <!-- Sign Out Button -->
-      <button id="btn-header-signout" onclick="handleSignOut()"
-        class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
-        <span>Sign Out</span>
-        <svg class="w-3.5 h-3.5 text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          stroke-linejoin="round">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-          <polyline points="16 17 21 12 16 7" />
-          <line x1="21" x2="9" y1="12" y2="12" />
-        </svg>
-      </button>
-
-      <!-- Sign In Button -->
-      <button id="btn-header-signin" onclick="openSignInModal()"
-        class="hidden px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-md">
-        <span>Sign In</span>
-        <svg class="w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          stroke-linejoin="round">
-          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-          <polyline points="10 17 15 12 10 7" />
-          <line x1="15" x2="3" y1="12" y2="12" />
-        </svg>
-      </button>
-
-      <button onclick="openCartModal()"
-        class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center gap-2 cursor-pointer">
-        <span>Cart (<span id="cart-count-badge">0</span> items - ₹<span id="cart-total-badge">0</span>)</span>
-        <span id="cart-status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
-      </button>
     </div>
   </header>
 
-  <!-- MAIN HERO & CONTROLS -->
-  <main class="max-w-6xl mx-auto px-6 py-10 flex-1 w-full space-y-8">
+  <!-- SECONDARY CATEGORY NAVIGATION BAR -->
+  <nav class="bg-white border-b border-slate-200 sticky top-[65px] z-20 px-4 sm:px-8 py-2 overflow-x-auto shadow-xs">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-3 text-xs font-semibold text-slate-700 min-w-max">
+      <div class="flex items-center gap-1">
+        <a href="#catalogue" onclick="setCategoryFilter('all')" class="subnav-link px-3 py-1.5 rounded-lg text-blue-700 bg-blue-50 font-bold flex items-center gap-1.5">
+          <span>📦</span> All Departments
+        </a>
+        <a href="#catalogue" onclick="setCategoryFilter('watches')" class="subnav-link px-3 py-1.5 rounded-lg hover:text-blue-700 flex items-center gap-1.5">
+          <span>⌚</span> Watches &amp; Horology
+        </a>
+        <a href="#catalogue" onclick="setCategoryFilter('bags')" class="subnav-link px-3 py-1.5 rounded-lg hover:text-blue-700 flex items-center gap-1.5">
+          <span>💼</span> Bags &amp; Luggage
+        </a>
+        <a href="#catalogue" onclick="setCategoryFilter('audio')" class="subnav-link px-3 py-1.5 rounded-lg hover:text-blue-700 flex items-center gap-1.5">
+          <span>🎧</span> Headphones &amp; Audio
+        </a>
+        <a href="#catalogue" onclick="setCategoryFilter('accessories')" class="subnav-link px-3 py-1.5 rounded-lg hover:text-blue-700 flex items-center gap-1.5">
+          <span>✨</span> Fashion Accessories
+        </a>
+      </div>
 
-    <!-- LIGHT HERO BANNER -->
-    <div
-      class="p-8 rounded-3xl bg-white border border-slate-200 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
-      <div class="space-y-4 max-w-xl relative z-10">
-        <div class="flex flex-wrap items-center gap-2">
-          <span
-            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-mono font-bold">
-            <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
-            BEHAVIORAL BIOMETRIC CHECKOUT ACTIVE
-          </span>
-          <span
-            class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-mono font-bold">
-            ⚡ UPI 1-Tap Auto-Pay Enabled
+      <div class="flex items-center gap-2 pl-4 border-l border-slate-200">
+        <a href="#secure-financial-vault" class="subnav-link px-3 py-1.5 rounded-lg text-emerald-800 bg-emerald-50 hover:bg-emerald-100 font-bold flex items-center gap-1.5 border border-emerald-200">
+          <span>🔒</span> Saved Payment Vault
+        </a>
+        <a href="#store-services" class="subnav-link px-3 py-1.5 rounded-lg text-slate-600 hover:text-blue-600 flex items-center gap-1">
+          <span>🛡️</span> Customer Assurance
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN STOREFRONT CONTENT -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-8 py-6 flex-1 w-full space-y-8">
+
+    <!-- EVERYDAY PROMOTIONAL HERO BANNER -->
+    <section id="store-banner" class="rounded-3xl bg-gradient-to-r from-blue-900 via-indigo-800 to-blue-950 text-white p-6 sm:p-10 shadow-lg relative overflow-hidden">
+      <!-- Background subtle pattern -->
+      <div class="absolute -right-10 -bottom-10 opacity-10 text-[200px] select-none pointer-events-none">
+        🛍️
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
+        
+        <div class="lg:col-span-8 space-y-4">
+          <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+            <span class="px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-bold flex items-center gap-1">
+              <span>⚡</span> FESTIVE SPECIAL OFFERS
+            </span>
+            <span class="px-3 py-1 rounded-full bg-blue-800/80 text-blue-200 border border-blue-600">
+              ✓ Verified Genuine Products
+            </span>
+          </div>
+
+          <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
+            India's Biggest Deals on <br class="hidden sm:inline" />
+            <span class="text-amber-400">Watches, Audio &amp; Lifestyle</span>
+          </h1>
+
+          <p class="text-slate-200 text-sm max-w-2xl leading-relaxed font-normal">
+            Enjoy up to 40% off across premium Swiss chronographs, full-grain leather bags, and high-resolution wireless ANC earbuds. Instant 1-Tap checkout with UPI, RuPay, and NetBanking.
+          </p>
+
+          <div class="flex flex-wrap items-center gap-3 pt-2 text-xs font-bold">
+            <a href="#catalogue" class="px-6 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold shadow-md transition-all flex items-center gap-2">
+              <span>Shop Today's Deals →</span>
+            </a>
+            <button onclick="setCategoryFilter('watches'); document.getElementById('catalogue').scrollIntoView({behavior: 'smooth'});" class="px-4 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all cursor-pointer">
+              Explore Watches
+            </button>
+            <button onclick="setCategoryFilter('audio'); document.getElementById('catalogue').scrollIntoView({behavior: 'smooth'});" class="px-4 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all cursor-pointer">
+              Explore Audio &amp; ANC
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-blue-800/80 text-xs text-blue-200 font-medium">
+            <div class="flex items-center gap-1.5">
+              <span>🚚</span><span>Free Express Delivery</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span>🔄</span><span>7-Day Easy Returns</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span>💳</span><span>No Cost EMI Available</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span>🛡️</span><span>100% Purchase Protection</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Side: Fast Security Summary Card (Preserved Telemetry Anchors) -->
+        <div class="lg:col-span-4">
+          <div class="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/20 text-xs font-mono space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+              <span class="text-blue-200">Cognisec Pay Guard</span>
+              <span class="text-emerald-400 font-bold">Active 1,000Hz</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-300">UPI Fraud Shield:</span>
+              <strong class="text-emerald-300">0.001 Low Risk</strong>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-300">Instant 1-Tap Debit:</span>
+              <strong class="text-amber-300">Enabled (No SMS OTP)</strong>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-300">Payment Hub:</span>
+              <strong class="text-white">Bengaluru (Karnataka)</strong>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- POPULAR CATEGORIES GRID -->
+    <section class="space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+          <span>🏷️</span> Popular Shopping Categories
+        </h2>
+        <span class="text-xs text-blue-600 font-semibold cursor-pointer hover:underline" onclick="setCategoryFilter('all')">View All Items →</span>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        
+        <div onclick="setCategoryFilter('watches'); document.getElementById('catalogue').scrollIntoView({behavior: 'smooth'});" 
+          class="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs hover:shadow-md transition-all cursor-pointer flex items-center gap-3 group">
+          <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+            ⌚
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Watches</h3>
+            <span class="text-[11px] text-slate-500">Chronos &amp; Quartz</span>
+          </div>
+        </div>
+
+        <div onclick="setCategoryFilter('bags'); document.getElementById('catalogue').scrollIntoView({behavior: 'smooth'});" 
+          class="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs hover:shadow-md transition-all cursor-pointer flex items-center gap-3 group">
+          <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+            💼
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Bags &amp; Luggage</h3>
+            <span class="text-[11px] text-slate-500">Duffles &amp; Briefcases</span>
+          </div>
+        </div>
+
+        <div onclick="setCategoryFilter('audio'); document.getElementById('catalogue').scrollIntoView({behavior: 'smooth'});" 
+          class="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs hover:shadow-md transition-all cursor-pointer flex items-center gap-3 group">
+          <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+            🎧
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Headphones</h3>
+            <span class="text-[11px] text-slate-500">ANC &amp; Wireless</span>
+          </div>
+        </div>
+
+        <div onclick="setCategoryFilter('accessories'); document.getElementById('catalogue').scrollIntoView({behavior: 'smooth'});" 
+          class="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs hover:shadow-md transition-all cursor-pointer flex items-center gap-3 group">
+          <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+            ✨
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Accessories</h3>
+            <span class="text-[11px] text-slate-500">Cufflinks &amp; Sleeves</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CONTINUOUS ZERO TRUST MONITORING PANEL (PRESERVED ALL ORIGINAL IDs) -->
+    <div id="continuous-verification-panel" class="p-5 rounded-2xl bg-slate-900 text-white shadow-md border border-slate-800 font-mono space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 text-base">
+            🛡️
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="font-sans font-bold text-sm text-white">Nyraa Secure Pay Shield &bull; Zero Trust Session Guard</h3>
+              <span id="cv-status-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-950 text-blue-300 border border-blue-800">LIVE</span>
+            </div>
+            <p class="text-[11px] text-slate-400 font-sans">Passive dynamics protect UPI payments against account takeover without SMS OTP friction.</p>
+          </div>
+        </div>
+        <button onclick="triggerExhibitionStepUpTest()" 
+          class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+          title="Simulate step-up verification challenge for exhibition demonstration">
+          <span>⚡ Test Step-Up Challenge</span>
+        </button>
+      </div>
+
+      <!-- 4-Grid Live State Metrics (Preserved exact IDs) -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+        <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-0.5">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider block font-semibold">Behavioral Observation</span>
+          <strong id="cv-observation-state" class="text-amber-400 font-bold block truncate">Calibrating Baseline (30s)</strong>
+        </div>
+        <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-0.5">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider block font-semibold">Telemetry Stream</span>
+          <strong id="cv-telemetry-state" class="text-emerald-400 font-bold block truncate">Connected (TLS 1.3)</strong>
+        </div>
+        <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-0.5">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider block font-semibold">Financial Vault</span>
+          <strong id="cv-resource-state" class="text-amber-400 font-bold block truncate">🔒 Locked (Masked)</strong>
+        </div>
+        <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-0.5">
+          <span class="text-slate-400 text-[10px] uppercase tracking-wider block font-semibold">Server Decision &amp; Audit</span>
+          <strong id="cv-server-decision" class="text-slate-300 font-bold block truncate">PENDING_OBSERVATION</strong>
+        </div>
+      </div>
+
+      <div class="pt-1 flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-400 gap-2 border-t border-slate-800 font-mono">
+        <span>Passive physics telemetry only (Dwell/Flight/Velocity). No card numbers or passwords captured.</span>
+        <div class="flex items-center gap-1">
+          <span>Last Server Auth:</span>
+          <strong id="cv-last-auth-time" class="text-amber-400 font-mono">None</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECURE FINANCIAL PROFILE & SAVED PAYMENT VAULT (PRESERVED ALL ORIGINAL IDs) -->
+    <div id="secure-financial-vault" class="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-6 scroll-mt-24">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 text-xl font-bold">
+            💳
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2 class="text-lg font-extrabold text-slate-900 tracking-tight font-sans">SECURE FINANCIAL PROFILE &amp; SAVED CARDS VAULT</h2>
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 uppercase">PCI-DSS COMPLIANT DEMO</span>
+            </div>
+            <p class="text-xs font-mono text-slate-500">Tokenized Payment Methods &bull; Bank Mandates &bull; High-Value Purchase Audit History</p>
+          </div>
+        </div>
+        <div id="vault-access-badge-container">
+          <span id="vault-access-badge" class="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-mono font-bold flex items-center gap-1.5">
+            <span>🔒</span>
+            <span>Zero-Trust Locked</span>
           </span>
         </div>
-        <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-          Passwordless &amp; OTP-Free High-Value Purchases
-        </h2>
-        <p class="text-sm text-slate-600 leading-relaxed">
-          Integrated with GPay, PhonePe, Paytm, and BHIM UPI. Cognisec AI continuously verifies your motor interaction
-          pattern so high-value orders process instantly without waiting for SMS OTPs.
+      </div>
+
+      <!-- MASKED FINANCIAL VAULT PREVIEW (Default before server authorization) -->
+      <div id="financial-vault-masked" class="space-y-6">
+        <div class="p-6 sm:p-8 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-4 relative overflow-hidden">
+          <div class="max-w-md mx-auto space-y-2">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center mx-auto text-xl font-bold">
+              🔒
+            </div>
+            <h3 class="font-extrabold text-slate-900 text-base font-sans">Customer Financial Vault is Sealed</h3>
+            <p class="text-xs text-slate-600 leading-relaxed font-mono">
+              Saved cards, UPI autopay VPAs, and bank mandates are protected by Zero Trust continuous behavioral verification against unauthorized checkout.
+            </p>
+          </div>
+
+          <!-- Synthetic Masked Preview Cards (Blurred) -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 filter blur-[3px] select-none pointer-events-none opacity-60 font-mono text-xs">
+            <div class="p-4 rounded-xl bg-white border border-slate-200 text-left space-y-2">
+              <span class="text-slate-400 text-[10px]">SAVED CARDS</span>
+              <strong class="text-slate-900 block text-base">•••• •••• •••• Sealed</strong>
+              <span class="text-slate-400 block text-[11px]">Tokenized Vault (Auth Required)</span>
+            </div>
+            <div class="p-4 rounded-xl bg-white border border-slate-200 text-left space-y-2">
+              <span class="text-slate-400 text-[10px]">BANK ACCOUNT</span>
+              <strong class="text-slate-900 block text-base">•••••••••••• Sealed</strong>
+              <span class="text-slate-400 block text-[11px]">e-NACH Mandate Protected</span>
+            </div>
+            <div class="p-4 rounded-xl bg-white border border-slate-200 text-left space-y-2">
+              <span class="text-slate-400 text-[10px]">TRANSACTIONS</span>
+              <strong class="text-slate-900 block text-base">Order Ledger Sealed</strong>
+              <span class="text-slate-400 block text-[11px]">Tax Invoices Protected</span>
+            </div>
+          </div>
+
+          <div class="pt-2">
+            <button id="btn-request-financial-vault" onclick="requestFinancialVaultAccess()"
+              class="px-6 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all inline-flex items-center gap-2 cursor-pointer">
+              <span>Authorize &amp; View Financial Details →</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- UNLOCKED FINANCIAL VAULT CONTENT (Shown after server authorization) -->
+      <div id="financial-vault-unlocked" class="hidden space-y-6 font-mono animate-fade-in">
+        <!-- Loading State Container -->
+        <div id="financial-vault-loading" class="hidden text-center py-12 font-mono">
+          <div class="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p class="text-xs text-blue-700 font-bold">Decrypting tokenized payment vault from secure server...</p>
+        </div>
+
+        <!-- Dynamic Vault Content Container (Empty before server authorization) -->
+        <div id="financial-vault-dynamic-content" class="space-y-6"></div>
+
+        <!-- Authorized Vault Controls -->
+        <div class="p-4 rounded-2xl bg-slate-100 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div class="flex items-center gap-2 text-slate-600">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span>Server-Authoritative Zero Trust Access Granted &bull; Logged in Security Audit Trail</span>
+          </div>
+          <button onclick="lockFinancialVault()"
+            class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs transition-all cursor-pointer">
+            🔒 Re-lock Financial Vault
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN PRODUCT CATALOGUE SECTION -->
+    <section id="catalogue" class="space-y-6 scroll-mt-24">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>✨</span> Today's Trending Products
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">Handpicked deals on watches, bags, audio &amp; lifestyle accessories.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-mono text-slate-500">Showing <span id="catalogue-count-label" class="font-bold text-slate-800">10</span> items</span>
+        </div>
+      </div>
+
+      <!-- FILTER & SORT CONTROLS -->
+      <div class="flex flex-col lg:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+        
+        <!-- Category Filter Tabs (Preserved IDs) -->
+        <div class="flex items-center gap-2 w-full lg:w-auto overflow-x-auto text-xs font-mono">
+          <button onclick="setCategoryFilter('all')" id="cat-all"
+            class="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold cursor-pointer transition-all shrink-0">All Items</button>
+          <button onclick="setCategoryFilter('watches')" id="cat-watches"
+            class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer transition-all shrink-0">Watches</button>
+          <button onclick="setCategoryFilter('bags')" id="cat-bags"
+            class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer transition-all shrink-0">Bags &amp; Luggage</button>
+          <button onclick="setCategoryFilter('audio')" id="cat-audio"
+            class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer transition-all shrink-0">Audio &amp; ANC</button>
+          <button onclick="setCategoryFilter('accessories')" id="cat-accessories"
+            class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer transition-all shrink-0">Accessories</button>
+        </div>
+
+        <!-- Sorting Selector (Preserved ID) -->
+        <div class="flex items-center gap-2 w-full lg:w-auto justify-end text-xs font-mono">
+          <span class="text-slate-500 text-xs hidden sm:inline">Sort By:</span>
+          <select id="sort-select" onchange="handleSortChange()"
+            class="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer">
+            <option value="featured">Featured Deals</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="rating">Customer Rating (★)</option>
+            <option value="name">Alphabetical (A-Z)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- PRODUCTS GRID (Preserved ID) -->
+      <div id="products-grid-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <!-- Dynamically Rendered Products -->
+      </div>
+    </section>
+
+    <!-- RECENTLY VIEWED PRODUCTS STRIP (Preserved IDs) -->
+    <section id="recently-viewed-section" class="hidden space-y-4 pt-4 border-t border-slate-200">
+      <div class="flex items-center justify-between">
+        <h3 class="font-extrabold text-slate-900 text-base flex items-center gap-2">
+          <span>👀</span> Recently Viewed Items
+        </h3>
+        <button onclick="clearRecentlyViewed()" class="text-xs text-slate-400 hover:text-slate-700 font-mono underline cursor-pointer">
+          Clear history
+        </button>
+      </div>
+      <div id="recently-viewed-container" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- CUSTOMER ASSURANCE & SERVICE GUARANTEES -->
+    <section id="store-services" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 pt-4 border-t border-slate-200">
+      <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2">
+        <div class="text-2xl">🛡️</div>
+        <h4 class="font-bold text-slate-900 text-sm">100% Genuine Products</h4>
+        <p class="text-xs text-slate-600 leading-relaxed">
+          Sourced directly from certified brand distributors with standard manufacturer warranty.
         </p>
       </div>
 
-      <!-- LIVE SECURITY TELEMETRY CARD -->
-      <div
-        class="p-6 rounded-2xl bg-slate-900 text-white font-mono text-xs space-y-3.5 w-full md:w-80 shadow-2xl shrink-0 border border-slate-800">
-        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
-          <span class="text-slate-400">UPI Fraud Shield:</span>
-          <strong class="text-emerald-400 font-bold text-sm">PROTECTED (0.001 Risk)</strong>
-        </div>
-        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
-          <span class="text-slate-400">SIM Swap Defense:</span>
-          <strong class="text-emerald-400 font-bold">PASS (100% Match)</strong>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-slate-400">Delivery Pincode:</span>
-          <strong class="text-amber-400 font-bold">560001 (Bengaluru)</strong>
-        </div>
-      </div>
-    </div>
-
-    <!-- FRONTEND FILTER & SEARCH CONTROLS -->
-    <div
-      class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-      <!-- Search Input -->
-      <div class="relative w-full sm:w-80">
-        <input id="product-search-input" type="text" placeholder="Search products (e.g. Watch, Bag, Headphones)..."
-          oninput="filterProducts()"
-          class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-amber-500" />
-        <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">🔍</span>
+      <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2">
+        <div class="text-2xl">⚡</div>
+        <h4 class="font-bold text-slate-900 text-sm">Fast &amp; Secure 1-Tap UPI</h4>
+        <p class="text-xs text-slate-600 leading-relaxed">
+          Powered by Cognisec Zero Trust behavioral verification for frictionless checkout.
+        </p>
       </div>
 
-      <!-- Category Filter Tabs -->
-      <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto text-xs font-mono">
-        <button onclick="setCategoryFilter('all')" id="cat-all"
-          class="px-3.5 py-2 rounded-xl bg-amber-600 text-white font-bold cursor-pointer">All Items</button>
-        <button onclick="setCategoryFilter('watches')" id="cat-watches"
-          class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Watches</button>
-        <button onclick="setCategoryFilter('bags')" id="cat-bags"
-          class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Leather
-          Bags</button>
-        <button onclick="setCategoryFilter('audio')" id="cat-audio"
-          class="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer">Audio
-          &amp; Tech</button>
+      <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2">
+        <div class="text-2xl">🚚</div>
+        <h4 class="font-bold text-slate-900 text-sm">Pan-India Express Delivery</h4>
+        <p class="text-xs text-slate-600 leading-relaxed">
+          Insured doorstep courier delivery across 19,000+ PIN codes with real-time tracking.
+        </p>
       </div>
-    </div>
 
-    <!-- PRODUCTS GRID -->
-    <div id="products-grid-container" class="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <!-- Dynamically Rendered Products -->
-    </div>
+      <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2">
+        <div class="text-2xl">🔄</div>
+        <h4 class="font-bold text-slate-900 text-sm">7-Day Easy Returns</h4>
+        <p class="text-xs text-slate-600 leading-relaxed">
+          No questions asked doorstep pickup and instant refund back to your source payment.
+        </p>
+      </div>
+    </section>
+
   </main>
 
-  <!-- INTERACTIVE UPI & CART MODAL -->
+  <!-- CART DRAWER / MODAL (PRESERVED ALL IDs) -->
+  <div id="cart-drawer-modal"
+    class="fixed inset-0 z-50 hidden bg-slate-950/70 backdrop-blur-sm flex justify-end font-mono">
+    <div class="bg-white w-full max-w-md h-full shadow-2xl flex flex-col justify-between animate-fade-in border-l border-slate-200">
+      
+      <!-- Drawer Header -->
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🛒</span>
+          <div>
+            <h4 class="font-extrabold text-base text-slate-900 font-sans">Shopping Cart</h4>
+            <p class="text-[11px] text-blue-800 font-semibold"><span id="cart-drawer-item-count">0</span> items selected</p>
+          </div>
+        </div>
+        <button onclick="closeCartDrawer()" class="text-slate-400 hover:text-slate-800 text-sm p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer">✕</button>
+      </div>
+
+      <!-- Drawer Items List -->
+      <div id="cart-drawer-items" class="flex-1 overflow-y-auto p-5 space-y-4">
+        <!-- Dynamically rendered cart items -->
+      </div>
+
+      <!-- Drawer Footer & Calculations -->
+      <div class="p-5 bg-slate-50 border-t border-slate-200 space-y-3">
+        <div class="space-y-1.5 text-xs">
+          <div class="flex justify-between text-slate-600">
+            <span>Subtotal:</span>
+            <strong id="cart-drawer-subtotal" class="text-slate-900">₹0</strong>
+          </div>
+          <div class="flex justify-between text-slate-600">
+            <span>Delivery Charges:</span>
+            <span class="text-emerald-700 font-bold">FREE</span>
+          </div>
+          <div class="flex justify-between text-slate-600">
+            <span>Taxes &amp; GST:</span>
+            <span class="text-slate-800">Included</span>
+          </div>
+          <div class="pt-2 border-t border-slate-200 flex justify-between items-baseline text-sm">
+            <span class="font-bold text-slate-900 font-sans">Total Amount:</span>
+            <strong id="cart-drawer-total" class="text-xl font-extrabold text-blue-700 font-mono">₹0</strong>
+          </div>
+        </div>
+
+        <div class="space-y-2 pt-2">
+          <button id="btn-proceed-checkout" onclick="startCartCheckout()"
+            class="w-full py-3.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer">
+            <span>Proceed to 1-Tap Checkout →</span>
+          </button>
+          <button onclick="closeCartDrawer()"
+            class="w-full py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs transition-all cursor-pointer">
+            Continue Shopping
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRODUCT QUICK VIEW MODAL (PRESERVED ALL IDs) -->
+  <div id="product-detail-modal"
+    class="fixed inset-0 z-50 hidden bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 font-mono">
+    <div
+      class="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative animate-fade-in max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="p-2 rounded-xl bg-blue-50 text-blue-700 text-lg">📦</span>
+          <div>
+            <h4 id="pdm-name" class="font-extrabold text-base text-slate-900 font-sans">Product Details</h4>
+            <p id="pdm-tag" class="text-xs text-blue-700 font-mono">Category</p>
+          </div>
+        </div>
+        <button onclick="closeProductDetailModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer">✕</button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 font-sans">
+        <div class="space-y-3">
+          <div class="w-full h-52 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-7xl shadow-inner">
+            <span id="pdm-icon">⌚</span>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono space-y-1">
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500">Availability:</span>
+              <span id="pdm-stock" class="text-emerald-700 font-bold">In Stock</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500">Customer Rating:</span>
+              <span id="pdm-rating" class="text-amber-600 font-bold">4.9 ★</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-3.5 text-xs">
+          <div>
+            <div class="flex items-baseline gap-2">
+              <span id="pdm-price" class="text-2xl font-extrabold text-slate-900 font-mono">₹14,999</span>
+              <span id="pdm-old-price" class="text-xs text-slate-400 line-through font-mono">₹18,999</span>
+            </div>
+            <p id="pdm-desc" class="text-slate-600 mt-2 leading-relaxed text-xs">Product description.</p>
+          </div>
+
+          <div class="space-y-1.5">
+            <span class="text-slate-500 uppercase font-mono text-[10px] tracking-wider font-bold">Specifications</span>
+            <p id="pdm-materials" class="text-slate-800 text-xs leading-relaxed p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono">
+              Product specifications.
+            </p>
+          </div>
+
+          <!-- Variant Selector -->
+          <div class="space-y-1.5">
+            <label class="text-slate-500 uppercase font-mono text-[10px] tracking-wider font-bold">Select Edition / Color:</label>
+            <select id="pdm-variant-select"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-800 focus:outline-none focus:border-blue-500">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+
+          <!-- Quantity -->
+          <div class="flex items-center gap-3 pt-1">
+            <span class="text-slate-500 uppercase font-mono text-[10px] tracking-wider font-bold">Quantity:</span>
+            <div class="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50 font-mono text-xs">
+              <button onclick="decrementDetailQty()" class="px-3 py-1.5 hover:bg-slate-200 font-bold text-slate-700 cursor-pointer">-</button>
+              <span id="pdm-qty-val" class="px-3 py-1.5 font-bold text-slate-900">1</span>
+              <button onclick="incrementDetailQty()" class="px-3 py-1.5 hover:bg-slate-200 font-bold text-slate-700 cursor-pointer">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-end gap-3 font-mono text-xs">
+        <button onclick="closeProductDetailModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer">
+          Close
+        </button>
+        <button id="pdm-add-cart-btn" onclick="addCurrentDetailToCart()" class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold cursor-pointer shadow-sm">
+          + Add to Cart
+        </button>
+        <button id="pdm-buy-btn" onclick="buyCurrentDetailProduct()" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold cursor-pointer shadow-md">
+          Buy Instant UPI →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHECKOUT MODAL (PRESERVED ALL IDs) -->
+  <div id="checkout-modal"
+    class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+    <div
+      class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative animate-fade-in max-h-[92vh] overflow-y-auto">
+      
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🛍️</span>
+          <div>
+            <h4 class="font-extrabold text-base text-slate-900 font-sans">Nyraa Express Checkout</h4>
+            <p class="text-[11px] text-blue-700 font-bold">100% Encrypted &bull; Cognisec Biometrics Active</p>
+          </div>
+        </div>
+        <button onclick="closeCheckoutModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1.5 cursor-pointer">✕</button>
+      </div>
+
+      <form onsubmit="handleCheckoutSubmit(event)" class="space-y-4">
+        
+        <div class="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 text-xs space-y-2">
+          <div class="flex justify-between items-center text-slate-700 font-bold pb-1 border-b border-blue-200">
+            <span>Order Summary (<span id="chk-item-count">1</span> item)</span>
+            <span id="chk-order-total" class="text-blue-900 font-extrabold text-sm">₹14,999</span>
+          </div>
+          <div id="chk-items-preview" class="space-y-1 text-[11px] text-slate-600">
+            <!-- Dynamically populated preview -->
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-[11px] font-mono leading-relaxed">
+          <span>🛡️ <strong>Simulated Purchase Demonstration:</strong> No real money or credit card accounts will be billed. Cognisec AI behavioral analytics protects payment operations in the background.</span>
+        </div>
+
+        <div class="space-y-3 text-xs font-sans">
+          <h5 class="font-bold text-slate-900 font-mono text-[11px] uppercase tracking-wider">Delivery Information</h5>
+          
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label class="text-[10px] font-mono font-bold uppercase text-slate-600">Recipient Name</label>
+              <input id="chk-name" type="text" value="Jane Doe" required
+                class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-[10px] font-mono font-bold uppercase text-slate-600">Contact Number</label>
+              <input id="chk-phone" type="tel" value="+91 98450 12891" required
+                class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500" />
+            </div>
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-[10px] font-mono font-bold uppercase text-slate-600">Street Address</label>
+            <input id="chk-address" type="text" value="Plot 842, 100 Feet Road, Indiranagar" required
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500" />
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div class="space-y-1">
+              <label class="text-[10px] font-mono font-bold uppercase text-slate-600">City</label>
+              <input id="chk-city" type="text" value="Bengaluru" required
+                class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-[10px] font-mono font-bold uppercase text-slate-600">State</label>
+              <input id="chk-state" type="text" value="Karnataka" required
+                class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-[10px] font-mono font-bold uppercase text-slate-600">Pincode</label>
+              <input id="chk-pincode" type="text" value="560038" required
+                class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500" />
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-2 text-xs font-mono">
+          <label class="text-[10px] font-mono font-bold uppercase text-slate-600">Payment Option:</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" onclick="selectCheckoutPayment('upi', this)"
+              class="chk-pay-btn p-2 rounded-xl border-2 border-blue-500 bg-blue-50 text-blue-900 text-center font-bold">
+              UPI 1-Tap
+            </button>
+            <button type="button" onclick="selectCheckoutPayment('card', this)"
+              class="chk-pay-btn p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-500 text-center font-bold">
+              Saved Card (Auth Req.)
+            </button>
+            <button type="button" onclick="selectCheckoutPayment('net', this)"
+              class="chk-pay-btn p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-500 text-center font-bold">
+              NetBanking
+            </button>
+          </div>
+        </div>
+
+        <div class="pt-2">
+          <button type="submit" id="btn-complete-checkout"
+            class="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+            Authorize &amp; Complete Simulated Order →
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- WISHLIST MODAL (PRESERVED ALL IDs) -->
+  <div id="wishlist-modal"
+    class="fixed inset-0 z-50 hidden bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 font-mono">
+    <div
+      class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 text-slate-900 relative animate-fade-in max-h-[85vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">❤️</span>
+          <div>
+            <h4 class="font-extrabold text-base text-slate-900 font-sans">Your Saved Items</h4>
+            <p class="text-[11px] text-slate-500 font-mono">Customer Wishlist</p>
+          </div>
+        </div>
+        <button onclick="closeWishlistModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1.5 cursor-pointer">✕</button>
+      </div>
+
+      <div id="wishlist-items-container" class="space-y-3">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="pt-2 border-t border-slate-100 flex justify-end">
+        <button onclick="closeWishlistModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">
+          Close Wishlist
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERACTIVE UPI MODAL (PRESERVED ALL IDs) -->
   <div id="upi-modal"
     class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
     <div
-      class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative">
+      class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative animate-fade-in">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2">
-          <span class="text-amber-600 text-lg">⚡</span>
+          <span class="text-blue-600 text-lg">⚡</span>
           <strong id="modal-title" class="text-base font-extrabold font-sans">Cognisec AI 1-Tap UPI Checkout</strong>
         </div>
-        <button onclick="closeUpiModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1">✕</button>
+        <button onclick="closeUpiModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1 cursor-pointer">✕</button>
       </div>
 
       <div id="modal-step-confirm" class="space-y-4">
-        <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-1.5 text-xs">
+        <div class="p-4 rounded-2xl bg-blue-50 border border-blue-200 space-y-1.5 text-xs">
           <span class="text-slate-500">Order Summary:</span>
-          <strong id="modal-item-name" class="text-slate-900 block font-bold text-sm">Titan Stellar Chronograph</strong>
-          <span class="text-amber-800 font-bold block text-base pt-1">Amount to Pay: <span
+          <strong id="modal-item-name" class="text-slate-900 block font-bold text-sm">Titan Chronograph</strong>
+          <span class="text-blue-800 font-bold block text-base pt-1">Amount to Pay: <span
               id="modal-item-price">₹14,999</span></span>
         </div>
 
         <div class="p-4 rounded-2xl bg-slate-900 text-white space-y-2 text-xs">
-          <span class="text-amber-400 font-bold">Continuous Behavioral Verification:</span>
+          <span class="text-blue-400 font-bold">Continuous Behavioral Verification:</span>
           <p class="text-slate-300 text-[11px] leading-relaxed">No OTP required. Your typing velocity match index
             (99.98%) automatically authorizes instant UPI debit.</p>
         </div>
@@ -229,18 +971,16 @@
           <label class="text-xs text-slate-500 font-bold">Select UPI App:</label>
           <div class="grid grid-cols-3 gap-2 text-xs">
             <button onclick="selectUpiApp(this)"
-              class="upi-app-btn p-2.5 rounded-xl border-2 border-amber-500 bg-amber-50 text-amber-900 text-center font-bold">Google
-              Pay</button>
+              class="upi-app-btn p-2.5 rounded-xl border-2 border-blue-500 bg-blue-50 text-blue-900 text-center font-bold cursor-pointer">Google Pay</button>
             <button onclick="selectUpiApp(this)"
-              class="upi-app-btn p-2.5 rounded-xl border border-slate-200 hover:border-amber-500 bg-slate-50 text-center font-bold">PhonePe</button>
+              class="upi-app-btn p-2.5 rounded-xl border border-slate-200 hover:border-blue-500 bg-slate-50 text-center font-bold cursor-pointer">PhonePe</button>
             <button onclick="selectUpiApp(this)"
-              class="upi-app-btn p-2.5 rounded-xl border border-slate-200 hover:border-amber-500 bg-slate-50 text-center font-bold">Paytm
-              UPI</button>
+              class="upi-app-btn p-2.5 rounded-xl border border-slate-200 hover:border-blue-500 bg-slate-50 text-center font-bold cursor-pointer">Paytm UPI</button>
           </div>
         </div>
 
         <button onclick="processUpiPayment()"
-          class="w-full py-3.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+          class="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
           Authorize Instant Payment →
         </button>
       </div>
@@ -256,27 +996,27 @@
               class="text-slate-900">#NYR-849201</strong> &bull; UPI Ref: 38401928391</p>
         </div>
         <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800">
-          Delivery Address: Boomika Ram, Indiranagar, Bengaluru - 560038
+          Delivery Address: Indiranagar, Bengaluru - 560038 &bull; Express Courier
         </div>
         <button onclick="closeUpiModal()"
-          class="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase">
+          class="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase cursor-pointer">
           Done &amp; Continue Shopping
         </button>
       </div>
     </div>
   </div>
 
-  <!-- INTERACTIVE SIGN IN MODAL -->
+  <!-- INTERACTIVE SIGN IN MODAL (PRESERVED ALL IDs) -->
   <div id="signin-modal"
     class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
     <div
       class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative animate-fade-in">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2">
-          <div class="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 font-bold text-lg">💎</div>
+          <div class="p-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 font-bold text-lg">🛍️</div>
           <div>
-            <h4 class="font-extrabold text-base text-slate-900 font-sans">Sign In to Nyraa Luxe Retail</h4>
-            <p class="text-[11px] text-amber-800 font-bold">Protected by COGNISEC AI Zero Trust</p>
+            <h4 class="font-extrabold text-base text-slate-900 font-sans">Sign In to Nyraa Retail</h4>
+            <p class="text-[11px] text-blue-800 font-bold">Protected by COGNISEC AI Zero Trust</p>
           </div>
         </div>
         <button onclick="closeSignInModal()"
@@ -286,33 +1026,41 @@
       <form onsubmit="handleSignInSubmit(event)" class="space-y-4">
         <div class="space-y-1">
           <label class="text-xs font-bold text-slate-700 uppercase">Customer Email / ID</label>
-          <input id="signin-email-input" type="email" value="boomika.ram@cognisec.ai" required
-            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-amber-500" />
+          <input id="signin-email-input" type="email" value="" placeholder="Enter your registered email" autocomplete="username" required
+            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-blue-500" />
         </div>
         <div class="space-y-1">
-          <label class="text-xs font-bold text-slate-700 uppercase">Password</label>
-          <input id="signin-pass-input" type="password" value="••••••••••••" required
-            class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-amber-500" />
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-slate-700 uppercase">Password</label>
+            <button type="button" onclick="openForgotPasswordModal(document.getElementById('signin-email-input')?.value)" class="text-[11px] text-blue-600 hover:text-blue-700 underline font-mono cursor-pointer">Forgot Password?</button>
+          </div>
+          <div class="relative flex items-center">
+            <input id="signin-pass-input" type="password" value="" placeholder="Enter customer password" autocomplete="current-password" required
+              class="w-full pl-4 pr-11 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-blue-500" />
+            <button type="button" onclick="togglePasswordVisibility('signin-pass-input', this)" aria-label="Show password" title="Show password" class="absolute right-3 p-1 rounded-lg text-slate-400 hover:text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 pointer-events-none" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
         </div>
 
         <div
-          class="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
+          class="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>Cognisec Keystroke Dynamics</span>
           </div>
-          <span class="font-bold text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded">1,000Hz Active</span>
+          <span class="font-bold text-[10px] bg-blue-200 text-blue-900 px-2 py-0.5 rounded">1,000Hz Active</span>
         </div>
 
         <button type="submit" id="btn-submit-signin"
-          class="w-full py-3.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
+          class="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer">
           Sign In &amp; Authorize Session →
         </button>
       </form>
     </div>
   </div>
 
-  <!-- NOTIFICATION TOAST CONTAINER -->
+  <!-- NOTIFICATION TOAST CONTAINER (PRESERVED ALL IDs) -->
   <div id="auth-toast"
     class="fixed top-16 right-6 z-50 hidden p-4 rounded-2xl bg-slate-900 text-white shadow-2xl border border-slate-700 font-mono text-xs max-w-sm animate-fade-in">
     <div class="flex items-center gap-3">
@@ -324,19 +1072,72 @@
     </div>
   </div>
 
-  <!-- LIGHT FOOTER -->
-  <footer class="bg-white border-t border-slate-200 px-8 py-6 text-center text-xs font-mono text-slate-500">
-    Nyraa Luxe Retail Pvt. Ltd. &bull; Protected continuously by COGNISEC AI India Behavioral Engine.
+  <!-- POLISHED E-COMMERCE FOOTER -->
+  <footer class="bg-white border-t border-slate-200 text-slate-600 text-xs font-sans mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-8 py-10 grid grid-cols-1 md:grid-cols-4 gap-8">
+      
+      <div class="space-y-3">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🛍️</span>
+          <span class="text-lg font-black text-slate-900 tracking-tight">NYRAA RETAIL</span>
+        </div>
+        <p class="text-xs text-slate-500 leading-relaxed">
+          India's leading everyday e-commerce destination for authentic electronics, timepieces, leather goods, and audio gear.
+        </p>
+        <span class="inline-block px-2.5 py-1 rounded bg-slate-100 text-slate-800 border border-slate-200 font-mono text-[10px] font-bold">
+          GSTIN: 29AABCN8491M1Z5 &bull; Bengaluru
+        </span>
+      </div>
+
+      <div class="space-y-2">
+        <h5 class="font-bold text-slate-900 uppercase font-mono text-[11px] tracking-wider">Help &amp; Customer Support</h5>
+        <ul class="space-y-1.5 text-slate-500 text-xs">
+          <li><a href="#" class="hover:text-blue-600">Track Your Order</a></li>
+          <li><a href="#" class="hover:text-blue-600">Shipping &amp; Delivery Policies</a></li>
+          <li><a href="#" class="hover:text-blue-600">Returns &amp; Replacement</a></li>
+          <li><a href="#" class="hover:text-blue-600">Cancellation &amp; Refunds</a></li>
+          <li><a href="#store-services" class="hover:text-blue-600">Warranty Registration</a></li>
+        </ul>
+      </div>
+
+      <div class="space-y-2">
+        <h5 class="font-bold text-slate-900 uppercase font-mono text-[11px] tracking-wider">Popular Departments</h5>
+        <ul class="space-y-1.5 text-slate-500 text-xs">
+          <li><a href="#catalogue" onclick="setCategoryFilter('watches')" class="hover:text-blue-600">Watches &amp; Chronographs</a></li>
+          <li><a href="#catalogue" onclick="setCategoryFilter('bags')" class="hover:text-blue-600">Travel Duffles &amp; Sleeves</a></li>
+          <li><a href="#catalogue" onclick="setCategoryFilter('audio')" class="hover:text-blue-600">Wireless Audio &amp; ANC Earbuds</a></li>
+          <li><a href="#catalogue" onclick="setCategoryFilter('accessories')" class="hover:text-blue-600">Silver Jewelry &amp; Accessories</a></li>
+          <li><a href="#secure-financial-vault" class="hover:text-blue-600 font-semibold text-emerald-700">🔒 Saved Payment Vault</a></li>
+        </ul>
+      </div>
+
+      <div class="space-y-2">
+        <h5 class="font-bold text-slate-900 uppercase font-mono text-[11px] tracking-wider">Payment &amp; Security Assurance</h5>
+        <div class="space-y-1 text-slate-500 text-xs font-mono">
+          <p class="text-emerald-700 font-bold">✓ 100% Secure Checkout</p>
+          <p>UPI, RuPay, Visa, Mastercard, NetBanking</p>
+          <p class="text-[10px] text-slate-400 pt-2 font-sans">
+            Demo Portal Notice: Product orders, payment tokens, and deliveries shown here are simulated for exhibition and demonstration.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="border-t border-slate-100 py-4 px-4 text-center font-mono text-[11px] text-slate-400">
+      &copy; 2026 Nyraa Retail India Pvt. Ltd. &bull; Protected continuously by COGNISEC AI India Behavioral Engine.
+    </div>
   </footer>
 
-  <!-- FRONTEND WORKING SCRIPT -->
+  <!-- FRONTEND WORKING SCRIPT (PRESERVED ALL WORKING CODE & COGNISEC INTEGRATION) -->
   <script src="cognisec-client.js"></script>
   <script>
-    if (window.cognisec) window.cognisec.setApplication('ecommerce');
-    let isLoggedIn = true;
+    if (window.cognisec) window.cognisec.setApplication('shopping');
+    let isLoggedIn = false;
 
     function showToast(title, desc, icon = "🟢") {
       const toast = document.getElementById('auth-toast');
+      if (!toast) return;
       document.getElementById('toast-title').textContent = title;
       document.getElementById('toast-desc').textContent = desc;
       document.getElementById('toast-icon').textContent = icon;
@@ -344,6 +1145,18 @@
       setTimeout(() => {
         toast.classList.add('hidden');
       }, 3500);
+    }
+
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 pointer-events-none"><path d="m9.88 9.88 4.24 4.24m.02-4.24-4.24 4.24M2 12s3.6-8 10-8 10 8 10 8-3.6 8-10 8-10-8-10-8Z"/></svg>`;
+      } else {
+        input.type = 'password';
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 pointer-events-none"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>`;
+      }
     }
 
     function openSignInModal() {
@@ -359,51 +1172,454 @@
       const btn = document.getElementById('btn-submit-signin');
       btn.innerHTML = `<span>Authenticating via Cognisec AI...</span>`;
 
-      const emailInput = document.getElementById('login-email-input');
-      const email = emailInput ? emailInput.value : 'customer.jane@auraluxe.com';
-      if (window.cognisec) {
-        await window.cognisec.login(email, 'Customer@123', 'ecommerce');
+      const emailInput = document.getElementById('signin-email-input') || document.getElementById('login-email-input');
+      const email = emailInput ? emailInput.value.trim() : '';
+      const passInput = document.getElementById('signin-pass-input');
+      const pass = passInput ? passInput.value : '';
+      if (!email || !pass) {
+        btn.innerHTML = `<span>Sign In &amp; Authorize Session →</span>`;
+        showToast("Sign In Failed", "Enter your registered email and password.", "⚠️");
+        return;
       }
 
-      setTimeout(() => {
-        isLoggedIn = true;
-        btn.innerHTML = `<span>Sign In &amp; Authorize Session →</span>`;
-        closeSignInModal();
+      if (window.cognisec) {
+        const loginRes = await window.cognisec.login(email, pass, 'ecommerce');
+        if (loginRes && loginRes.success && loginRes.data) {
+          closeSignInModal();
+          btn.innerHTML = `<span>Sign In &amp; Authorize Session →</span>`;
+          syncShoppingAuthState();
+          showToast("Customer Session Active", "Signed in. Observation running silently in background (30s).", "🛍️");
+          window.cognisec.startObservationFlow(loginRes.data);
+          return;
+        } else {
+          btn.innerHTML = `<span>Sign In &amp; Authorize Session →</span>`;
+          showToast("Sign In Failed", loginRes?.error || "Invalid customer credentials.", "⚠️");
+          return;
+        }
+      }
 
-        // Update Header UI
-        document.getElementById('user-header-info').classList.remove('hidden');
-        document.getElementById('user-status-label').textContent = 'Logged-in Customer';
-        document.getElementById('user-name-label').textContent = 'Boomika Ram (Bengaluru)';
-        document.getElementById('btn-header-signout').classList.remove('hidden');
-        document.getElementById('btn-header-signin').classList.add('hidden');
-        document.getElementById('cart-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+      btn.innerHTML = `<span>Sign In &amp; Authorize Session →</span>`;
+      showToast("Backend Offline", "Cognisec AI client not connected.", "⚠️");
+    }
 
-        showToast("Signed In Successfully!", "Welcome back, Boomika Ram. Identity verified (99.98% High Trust).", "🔐");
-      }, 700);
+    let isFinancialVaultUnlocked = false;
+
+    async function updateContinuousVerificationPanel(serverOutcome = null) {
+      const obsEl = document.getElementById('cv-observation-state');
+      const telemEl = document.getElementById('cv-telemetry-state');
+      const resEl = document.getElementById('cv-resource-state');
+      const decEl = document.getElementById('cv-server-decision');
+      const badgeEl = document.getElementById('cv-status-badge');
+      const vaultBadge = document.getElementById('vault-access-badge');
+
+      const isAuth = window.cognisec ? window.cognisec.isAuthenticated() : false;
+      const isVerified = window.cognisec ? window.cognisec.isFullyVerified() : false;
+      const isObs = window.cognisec ? window.cognisec.isPendingObservation() : false;
+
+      if (!isAuth) {
+        if (obsEl) obsEl.textContent = 'Inactive (Sign in required)';
+        if (telemEl) telemEl.textContent = 'Standby';
+        if (resEl) resEl.textContent = '🔒 Locked (Masked)';
+        if (decEl) decEl.textContent = 'NO_SESSION';
+        if (badgeEl) {
+          badgeEl.textContent = 'OFFLINE';
+          badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700';
+        }
+        if (vaultBadge) {
+          vaultBadge.className = 'px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 text-xs font-mono font-bold flex items-center gap-1.5';
+          vaultBadge.innerHTML = '<span>🔒</span><span>Sign In Required</span>';
+        }
+        return;
+      }
+
+      if (isObs) {
+        if (obsEl) obsEl.textContent = 'Calibrating Baseline (30s)';
+        if (telemEl) telemEl.textContent = 'Connected (Buffering)';
+        if (resEl) resEl.textContent = '🔒 Locked (Masked)';
+        if (decEl) decEl.textContent = serverOutcome?.decision || 'OBSERVATION_PENDING';
+        if (badgeEl) {
+          badgeEl.textContent = 'CALIBRATING';
+          badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 animate-pulse';
+        }
+        if (vaultBadge) {
+          vaultBadge.className = 'px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-mono font-bold flex items-center gap-1.5';
+          vaultBadge.innerHTML = '<span>🔒</span><span>Observation In-Flight</span>';
+        }
+        return;
+      }
+
+      // Active / Verified State
+      if (telemEl) telemEl.textContent = 'Connected (TLS 1.3)';
+      if (obsEl) obsEl.textContent = 'Active (Passive Dynamics)';
+
+      if (isFinancialVaultUnlocked) {
+        if (resEl) resEl.textContent = '🔓 Authorized & Viewable';
+        if (decEl) decEl.textContent = serverOutcome?.decision || 'ALLOW (Server-Verified)';
+        if (badgeEl) {
+          badgeEl.textContent = 'VERIFIED';
+          badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800';
+        }
+        if (vaultBadge) {
+          vaultBadge.className = 'px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-bold flex items-center gap-1.5';
+          vaultBadge.innerHTML = '<span>🔓</span><span>Authorized (ALLOW)</span>';
+        }
+      } else {
+        if (resEl) resEl.textContent = '🔒 Locked (Masked)';
+        if (decEl) decEl.textContent = serverOutcome?.decision || (isVerified ? 'READY (Awaiting Request)' : 'VERIFY_REQUIRED');
+        if (badgeEl) {
+          badgeEl.textContent = isVerified ? 'GUARD ACTIVE' : 'STEP-UP REQUIRED';
+          badgeEl.className = isVerified
+            ? 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800'
+            : 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800';
+        }
+        if (vaultBadge) {
+          vaultBadge.className = 'px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-mono font-bold flex items-center gap-1.5';
+          vaultBadge.innerHTML = '<span>🔒</span><span>Zero-Trust Locked</span>';
+        }
+      }
+
+      const lastAuthEl = document.getElementById('cv-last-auth-time');
+      if (lastAuthEl) {
+        lastAuthEl.textContent = isVerified ? new Date().toLocaleTimeString() : 'None';
+      }
+    }
+
+    function renderFinancialVaultContent(data) {
+      const container = document.getElementById('financial-vault-dynamic-content');
+      if (!container) return;
+      const cards = data.saved_cards || [];
+      const upi = data.upi_vpa || {};
+      const bank = data.bank_account || {};
+      const orders = data.recent_confidential_orders || [];
+
+      let cardsHtml = cards.map(c => `
+        <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-lg space-y-3 relative overflow-hidden">
+          <div class="flex justify-between items-start">
+            <div>
+              <span class="text-[10px] text-blue-300 uppercase tracking-widest font-mono font-bold">${c.bank || 'Credit Card'}</span>
+              <p class="text-xs text-slate-300 font-mono">${c.type || 'Card'}</p>
+            </div>
+            <span class="px-2 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-300 border border-blue-400/30 font-mono">${c.network || 'VISA'}</span>
+          </div>
+          <div class="py-2">
+            <span class="text-xs text-slate-400 block font-mono">Card Number</span>
+            <span class="text-base font-extrabold tracking-widest font-mono text-amber-300">•••• •••• •••• ${c.last4 || '••••'}</span>
+          </div>
+          <div class="flex justify-between items-center text-[11px] pt-1 border-t border-slate-700/60 font-mono">
+            <div>
+              <span class="text-slate-400 text-[10px] block">EXPIRY</span>
+              <span class="text-slate-200 font-bold">${c.expiry || '••/••'}</span>
+            </div>
+            <div class="text-right">
+              <span class="text-slate-400 text-[10px] block">AVAIL. LIMIT</span>
+              <span class="text-emerald-400 font-bold">${c.limit_available || 'N/A'}</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      let ordersHtml = orders.map(o => `
+        <tr class="hover:bg-slate-50 border-b border-slate-100">
+          <td class="p-3 font-mono font-bold text-blue-700">${o.order_id}</td>
+          <td class="p-3 text-slate-500">${o.date}</td>
+          <td class="p-3 font-sans font-semibold text-slate-900">${o.item}</td>
+          <td class="p-3 font-mono font-bold text-slate-900">${o.amount}</td>
+          <td class="p-3 text-slate-600 text-[11px] font-mono">${o.payment_method}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${o.status}</span></td>
+        </tr>
+      `).join('');
+
+      container.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${cardsHtml}
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+          <div class="p-4 rounded-2xl bg-white border border-slate-200 space-y-2.5">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+              <span class="font-bold text-slate-900 uppercase tracking-wider text-[11px]">Primary UPI VPA</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">AutoPay Enabled</span>
+            </div>
+            <div class="space-y-1">
+              <span class="text-slate-400 text-[10px] block">Virtual Payment Address</span>
+              <span class="font-bold text-slate-900 text-sm">${upi.primary || 'Not enrolled'}</span>
+            </div>
+            <div class="flex justify-between items-center text-slate-600 text-[11px] pt-1">
+              <span>Linked: <strong class="text-slate-800">${upi.linked_account || 'N/A'}</strong></span>
+              <span class="text-slate-400 text-[10px]">${upi.mandate_id || ''}</span>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-white border border-slate-200 space-y-2.5">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+              <span class="font-bold text-slate-900 uppercase tracking-wider text-[11px]">Primary Bank Account</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Direct Deposit</span>
+            </div>
+            <div class="space-y-1">
+              <span class="text-slate-400 text-[10px] block">${bank.bank || 'Bank'} &bull; ${bank.branch || ''}</span>
+              <span class="font-bold text-slate-900 text-sm tracking-wider">A/C: ${bank.account_number || '••••••••'}</span>
+            </div>
+            <div class="flex justify-between items-center text-slate-600 text-[11px] pt-1">
+              <span>IFSC: <strong class="text-slate-800">${bank.ifsc || 'N/A'}</strong></span>
+              <span class="text-slate-500">${bank.type || 'Savings'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-white border border-slate-200 space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <h4 class="font-bold text-slate-900 text-xs font-mono uppercase tracking-wider">Confidential Order Ledger &amp; Tax Invoices</h4>
+            <span class="text-[10px] text-slate-400 font-mono">Decrypted via Active ApplicationGrant</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs font-mono">
+              <thead class="bg-slate-50 text-slate-500 text-[10px] uppercase">
+                <tr>
+                  <th class="p-2.5">Order ID</th>
+                  <th class="p-2.5">Date</th>
+                  <th class="p-2.5">Item</th>
+                  <th class="p-2.5">Amount</th>
+                  <th class="p-2.5">Method</th>
+                  <th class="p-2.5">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${ordersHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadAndDisplayFinancialVault() {
+      const cs = window.cognisec;
+      const ANCHOR = 'btn-request-financial-vault';
+      const loadingEl = document.getElementById('financial-vault-loading');
+      const dynamicEl = document.getElementById('financial-vault-dynamic-content');
+      const unlockedEl = document.getElementById('financial-vault-unlocked');
+      const maskedEl = document.getElementById('financial-vault-masked');
+
+      if (maskedEl) maskedEl.classList.add('hidden');
+      if (unlockedEl) unlockedEl.classList.remove('hidden');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      if (dynamicEl) dynamicEl.innerHTML = '';
+
+      try {
+        if (!cs || typeof cs.fetchVaultData !== 'function') {
+          throw new Error('Security client vault service not available');
+        }
+        const resp = await cs.fetchVaultData('financial_vault');
+        if (resp && resp.success && resp.data) {
+          renderFinancialVaultContent(resp.data);
+          if (loadingEl) loadingEl.classList.add('hidden');
+          isFinancialVaultUnlocked = true;
+          updateContinuousVerificationPanel();
+          return true;
+        } else {
+          throw new Error((resp && resp.error) || 'Server rejected confidential financial vault request.');
+        }
+      } catch (err) {
+        console.error('[COGNISEC-AI] Failed to load financial vault data:', err);
+        lockFinancialVault();
+        if (cs && typeof cs.showVaultAccessNotice === 'function') {
+          cs.showVaultAccessNotice({
+            anchorId: ANCHOR,
+            tone: 'error',
+            title: 'Vault Authorization Failed',
+            message: err.message || 'Server Zero Trust authorization denied access to confidential financial records.',
+            actions: [{ label: 'Retry Authorization', onClick: requestFinancialVaultAccess }]
+          });
+        }
+        showToast("Access Denied", "Protected financial vault access denied by server policy.", "🔒");
+        return false;
+      }
+    }
+
+    async function requestFinancialVaultAccess() {
+      const cs = window.cognisec;
+      const ANCHOR = 'btn-request-financial-vault';
+      console.info('[COGNISEC-AI][vault] financial confidential-access click', { hasClient: !!cs, modalOpen: !!(cs && cs.isStepUpModalOpen) });
+      if (cs && cs.isStepUpModalOpen) return;
+      if (cs) cs.clearVaultAccessNotice();
+
+      const isAuth = isLoggedIn || (cs && cs.isAuthenticated());
+      if (!isAuth) {
+        showToast("Customer Authentication Required", "Please sign in to access your secure financial profile.", "🔒");
+        if (cs) cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'info', title: 'Sign in required', message: 'Sign in to your account to request confidential financial profile.', actions: [{ label: 'Sign in', onClick: openSignInModal }] });
+        openSignInModal();
+        return;
+      }
+
+      try {
+        if (!cs) {
+          showToast("Security Engine Offline", "Cognisec AI client not connected.", "⚠️");
+          return;
+        }
+        const retry = { label: 'Retry', onClick: requestFinancialVaultAccess };
+        const restart = { label: 'Sign out & start a new session', onClick: () => cs.signOutAndRestart() };
+
+        // Authoritative server check
+        const accessCheck = await cs.checkResourceAccess('financial_vault');
+        if (accessCheck && accessCheck.access_granted) {
+          const loaded = await loadAndDisplayFinancialVault();
+          if (loaded) {
+            showToast("Financial Profile Unlocked", "Zero Trust verified: Saved cards and bank accounts accessible.", "💳");
+          }
+          return;
+        }
+
+        if (accessCheck && (accessCheck.decision === 'TERMINATE_SESSION' || accessCheck.risk_level === 'CRITICAL')) {
+          lockFinancialVault();
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'error', title: 'Access denied', message: accessCheck.message || 'Confidential access denied by server Zero Trust policy.', actions: [restart] });
+          return;
+        }
+
+        if (accessCheck && !accessCheck.verification_required && (accessCheck.decision === 'RESTRICT' || accessCheck.risk_level === 'HIGH')) {
+          lockFinancialVault();
+          showToast("Elevated Risk", "Sensitive operations restricted under elevated risk policy.", "⚠️");
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'warn', title: 'Elevated risk - NeuralTrace not available', message: accessCheck.message || 'Sensitive operations are restricted under elevated risk policy.', actions: [restart] });
+          return;
+        }
+
+        if (accessCheck && accessCheck.decision === 'OBSERVATION_PENDING') {
+          lockFinancialVault();
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'info', title: 'Observation period active', message: accessCheck.message || 'Confidential access locked during behavioral observation.', actions: [retry] });
+          return;
+        }
+
+        if (accessCheck && accessCheck.decision === 'UNAUTHENTICATED') {
+          lockFinancialVault();
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'warn', title: 'Please sign in again', message: accessCheck.message, actions: [{ label: 'Sign in', onClick: () => { cs.clearAuth(); syncPortalAuthState(); openSignInModal(); } }] });
+          return;
+        }
+
+        if (!accessCheck || accessCheck.decision === 'ERROR' || !accessCheck.verification_required) {
+          lockFinancialVault();
+          cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'error', title: 'Could not get an access decision', message: (accessCheck && accessCheck.message) || 'The security server did not return a usable decision. Records stay locked.', actions: [retry] });
+          return;
+        }
+
+        // Open NeuralTrace step-up challenge
+        showToast("NeuralTrace Verification Required", "Reconstruct your enrolled neural route to authorize financial access.", "🛡️");
+        cs.openStepUpModal({
+          preferredFactor: 'GESTURE_PATTERN',
+          targetResource: 'financial_vault',
+          title: 'NEURALTRACE — CONFIDENTIAL ACCESS VERIFICATION',
+          subtitle: 'Additional identity verification is required to access confidential financial details.',
+          reason: 'Zero Trust verification: Reconstruct your enrolled neural route to authorize access to your financial profile & payment vault.',
+          forceNew: true,
+          onSuccess: async (data) => {
+            const verifyCheck = await cs.checkResourceAccess('financial_vault');
+            if (verifyCheck && verifyCheck.access_granted) {
+              cs.clearVaultAccessNotice();
+              const loaded = await loadAndDisplayFinancialVault();
+              if (loaded) {
+                showToast("Financial Profile Unlocked", "Zero Trust verified via NeuralTrace: Saved cards and bank accounts accessible.", "💳");
+              }
+            } else {
+              lockFinancialVault();
+              cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'error', title: 'Access denied', message: (verifyCheck && verifyCheck.message) || 'Server rejected confidential clearance.', actions: [retry] });
+            }
+          },
+          onCancel: () => {
+            lockFinancialVault();
+            cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'info', title: 'Verification cancelled', message: 'Financial vault remains sealed.', actions: [retry] });
+          }
+        });
+      } catch (err) {
+        console.error('[COGNISEC-AI] Failed to authorize financial vault:', err);
+        lockFinancialVault();
+        if (window.cognisec) window.cognisec.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'error', title: 'Authorization error', message: 'Failed to contact security engine. Please retry.', actions: [{ label: 'Retry', onClick: requestFinancialVaultAccess }] });
+      }
+    }
+
+    function lockFinancialVault() {
+      isFinancialVaultUnlocked = false;
+      if (window.cognisec) {
+        window.cognisec.revokeResourceClearance('financial_vault');
+      }
+      const dynamicEl = document.getElementById('financial-vault-dynamic-content');
+      if (dynamicEl) dynamicEl.innerHTML = '';
+      const loadingEl = document.getElementById('financial-vault-loading');
+      if (loadingEl) loadingEl.classList.add('hidden');
+      document.getElementById('financial-vault-masked')?.classList.remove('hidden');
+      document.getElementById('financial-vault-unlocked')?.classList.add('hidden');
+      updateContinuousVerificationPanel();
+      showToast("Financial Vault Locked", "Payment methods and bank accounts re-sealed under Zero Trust policy.", "🔒");
+    }
+
+    function triggerExhibitionStepUpTest() {
+      if (!isLoggedIn) {
+        showToast("Please Sign In First", "Sign in as customer to demonstrate exhibition step-up.", "ℹ️");
+        openSignInModal();
+        return;
+      }
+      lockFinancialVault();
+      if (window.cognisec && typeof window.cognisec.openStepUpModal === 'function') {
+        window.cognisec.openStepUpModal({
+          forceNew: true,
+          reason: "[EXHIBITION TEST] Simulated keystroke dynamics anomaly during checkout: Step-Up verification required."
+        });
+      }
     }
 
     function syncShoppingAuthState() {
       const isAuth = window.cognisec ? window.cognisec.isAuthenticated() : false;
+      const isVerified = window.cognisec ? window.cognisec.isFullyVerified() : false;
       const user = window.cognisec ? window.cognisec.getUser() : null;
       isLoggedIn = isAuth;
 
       if (isAuth && user) {
+        const statusBadge = isVerified ? '' : ' (Observing)';
         document.getElementById('user-header-info').classList.remove('hidden');
-        document.getElementById('user-status-label').textContent = 'Logged-in Customer';
-        document.getElementById('user-name-label').textContent = `${user.name}`;
+        document.getElementById('user-status-label').textContent = `${user.email || 'Customer'}` + statusBadge;
+        document.getElementById('user-name-label').textContent = `${user.name || 'Jane Doe'}`;
         document.getElementById('btn-header-signout').classList.remove('hidden');
         document.getElementById('btn-header-signin').classList.add('hidden');
-        document.getElementById('cart-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+        document.getElementById('btn-header-mfa')?.classList.remove('hidden');
+        document.getElementById('cart-status-dot').className = isVerified
+          ? 'w-2 h-2 rounded-full bg-emerald-400'
+          : 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+
+        // Check authoritative server access decision for cross-portal synchronization
+        if (isVerified) {
+          window.cognisec.checkResourceAccess('financial_vault').then(async decision => {
+            if (decision && decision.access_granted) {
+              if (!isFinancialVaultUnlocked) {
+                await loadAndDisplayFinancialVault();
+              }
+            } else if (isFinancialVaultUnlocked && decision && !decision.access_granted) {
+              lockFinancialVault();
+            }
+          }).catch(() => {});
+        }
       } else {
         document.getElementById('user-status-label').textContent = 'Guest Customer';
         document.getElementById('user-name-label').textContent = 'Not Signed In';
         document.getElementById('btn-header-signout').classList.add('hidden');
         document.getElementById('btn-header-signin').classList.remove('hidden');
+        document.getElementById('btn-header-mfa')?.classList.add('hidden');
         document.getElementById('cart-status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
       }
+
+      updateContinuousVerificationPanel();
     }
 
     window.addEventListener('cognisec:auth_change', syncShoppingAuthState);
+    window.addEventListener('cognisec:step_up_success', async (e) => {
+      syncShoppingAuthState();
+      const decision = await window.cognisec.checkResourceAccess('financial_vault');
+      if (decision && decision.access_granted) {
+        await loadAndDisplayFinancialVault();
+        showToast("Financial Profile Unlocked", "Zero Trust verified: Saved cards & bank accounts accessible.", "💳");
+      }
+    });
+    window.addEventListener('cognisec:session_locked', () => {
+      showToast("Checkout Terminal Locked", "Verification failed. Shopping session & financial vault restricted.", "🔒");
+      lockFinancialVault();
+      syncShoppingAuthState();
+    });
     document.addEventListener('DOMContentLoaded', () => {
       syncShoppingAuthState();
       const urlParams = new URLSearchParams(window.location.search);
@@ -415,79 +1631,302 @@
 
     async function handleSignOut() {
       if (window.cognisec) await window.cognisec.logout();
+      lockFinancialVault();
       syncShoppingAuthState();
       cart = [];
       updateCartBadges();
+      renderCartDrawer();
       showToast("Signed Out", "You have signed out. Zero Trust session terminated.", "🚪");
     }
 
+    // ================= PRODUCT CATALOGUE DATA =================
     const PRODUCTS = [
-      { id: 1, name: "Nyraa Titan Chronograph", category: "watches", price: 14999, oldPrice: 18999, tag: "Swiss Horology", desc: "Sapphire glass, automatic movement, mesh strap.", icon: "⌚" },
-      { id: 2, name: "Nyraa Artisanal Duffle Bag", category: "bags", price: 5999, oldPrice: 8499, tag: "Leather Goods", desc: "Vegetable tanned handcrafted genuine leather.", icon: "💼" },
-      { id: 3, name: "Nyraa Neural ANC Headphones", category: "audio", price: 24990, oldPrice: 29990, tag: "Pro Acoustics", desc: "Active noise cancelling planar magnetic audio.", icon: "🎧" },
-      { id: 4, name: "Nyraa Royal Gold Watch", category: "watches", price: 22499, oldPrice: 27999, tag: "Horology", desc: "18K Gold PVD coating with skeleton dial.", icon: "⏱️" },
-      { id: 5, name: "Nyraa Leather Laptop Sleeve", category: "bags", price: 2499, oldPrice: 3999, tag: "Accessories", desc: "Water-resistant padded leather sleeve for 15-inch laptops.", icon: "📁" },
-      { id: 6, name: "Nyraa Studio Earbuds Pro", category: "audio", price: 8999, oldPrice: 12999, tag: "Wireless", desc: "Spatial audio, quad-mic beamforming for calls.", icon: "🎵" }
+      { 
+        id: 1, 
+        name: "Nyraa Titan Chronograph Watch", 
+        category: "watches", 
+        price: 14999, 
+        oldPrice: 18999, 
+        rating: 4.9, 
+        reviews: 142, 
+        tag: "Best Deal", 
+        desc: "Precision quartz movement, 316L stainless steel dial, scratch-resistant sapphire crystal glass, 50M water resistance.", 
+        materials: "Solid 316L Surgical Steel, Scratch-Resistant Sapphire Crystal, Milanese Mesh Strap.",
+        variants: ["Midnight Obsidian (42mm)", "Silver Frost (42mm)", "Cognac Leather (40mm)"],
+        stock: "In Stock &bull; Fast Delivery",
+        badge: "Bestseller",
+        icon: "⌚" 
+      },
+      { 
+        id: 2, 
+        name: "Nyraa Travel Leather Duffle Bag", 
+        category: "bags", 
+        price: 5999, 
+        oldPrice: 8499, 
+        rating: 4.8, 
+        reviews: 98, 
+        tag: "Top Rated", 
+        desc: "Handcrafted full-grain leather weekender duffle, heavy-duty brass YKK zips, padded shoulder sling.", 
+        materials: "Full-Grain Italian Calfskin, Antique Solid Brass Hardware, Waterproof Cotton Twill Lining.",
+        variants: ["Rich Cognac", "Espresso Dark Brown", "Jet Matte Black"],
+        stock: "Only 4 Left",
+        badge: "Popular",
+        icon: "💼" 
+      },
+      { 
+        id: 3, 
+        name: "Nyraa Studio Wireless ANC Headphones", 
+        category: "audio", 
+        price: 24990, 
+        oldPrice: 29990, 
+        rating: 5.0, 
+        reviews: 86, 
+        tag: "Electronics", 
+        desc: "Hybrid Active Noise Cancellation (42dB), 40mm planar drivers, 45-hour playback reserve, ultra-soft memory foam.", 
+        materials: "Aerospace Aluminum Yokes, Memory Foam Lambskin Earcups, Carbon Fiber Baffle.",
+        variants: ["Space Gray & Onyx", "Champagne Gold & Cream", "Titanium Silver"],
+        stock: "In Stock &bull; 1-Day Delivery",
+        badge: "Choice Award",
+        icon: "🎧" 
+      },
+      { 
+        id: 4, 
+        name: "Nyraa Royal Gold Edition Watch", 
+        category: "watches", 
+        price: 22499, 
+        oldPrice: 27999, 
+        rating: 4.9, 
+        reviews: 64, 
+        tag: "Premium", 
+        desc: "18K Gold PVD electroplate finish with exposed exhibition balance wheel and genuine embossed leather strap.", 
+        materials: "18K Gold PVD Finished Stainless Steel, Dual Sapphire Exhibition Caseback, Italian Leather.",
+        variants: ["18K Yellow Gold / Brown Strap", "Rose Gold / Black Leather", "Platinum Silver / Blue Strap"],
+        stock: "Limited Units",
+        badge: "Trending",
+        icon: "⏱️" 
+      },
+      { 
+        id: 5, 
+        name: "Nyraa Padded Laptop Sleeve 15-inch", 
+        category: "bags", 
+        price: 2499, 
+        oldPrice: 3999, 
+        rating: 4.7, 
+        reviews: 215, 
+        tag: "Daily Essential", 
+        desc: "Ultra-slim water-resistant padded top-grain leather sleeve tailored for MacBook Pro 14\" and 16\".", 
+        materials: "Top-Grain Nappa Leather, Microfiber Anti-Scratch Interior, Magnetic Flap Closure.",
+        variants: ["Cognac Tan", "Midnight Navy", "Stealth Black"],
+        stock: "In Stock",
+        badge: "Great Value",
+        icon: "📁" 
+      },
+      { 
+        id: 6, 
+        name: "Nyraa True Wireless Stereo Earbuds Pro", 
+        category: "audio", 
+        price: 8999, 
+        oldPrice: 12999, 
+        rating: 4.8, 
+        reviews: 310, 
+        tag: "Audio", 
+        desc: "Spatial surround audio with dynamic head tracking, quad-mic beamforming ENC for crystal calls, Qi wireless case.", 
+        materials: "Ceramic Acoustic Enclosure, IPX5 Water Resistance, Silicone Liquid Gel Tips (4 Sizes).",
+        variants: ["Onyx Gloss", "Frost Pearl White", "Sage Green"],
+        stock: "In Stock",
+        badge: "Hot Deal",
+        icon: "🎵" 
+      },
+      { 
+        id: 7, 
+        name: "Nyraa Structured Executive Briefcase", 
+        category: "bags", 
+        price: 11499, 
+        oldPrice: 15999, 
+        rating: 4.9, 
+        reviews: 47, 
+        tag: "Office Essential", 
+        desc: "Scratch-resistant cross-hatch structured briefcase with dedicated padded laptop partition and trolley sleeve.", 
+        materials: "Scratch-Resistant Italian Saffiano Leather, Brushed Nickel Hardware, Suede Lining.",
+        variants: ["Classic Black", "Bordeaux Burgundy", "Navy Sapphire"],
+        stock: "In Stock",
+        badge: "Formal",
+        icon: "🧳" 
+      },
+      { 
+        id: 8, 
+        name: "Nyraa Aviator Dual-Time Watch 44mm", 
+        category: "watches", 
+        price: 18999, 
+        oldPrice: 23500, 
+        rating: 4.8, 
+        reviews: 79, 
+        tag: "Aviation", 
+        desc: "Dual-timezone GMT pilot watch with high-contrast SuperLuminova dials and bidirectional rotatable bezel.", 
+        materials: "Matte Bead-Blasted Titanium, Anti-Reflective Domed Sapphire, Ballistic Cordura Strap.",
+        variants: ["Stealth Gunmetal / Olive Strap", "Classic Steel / Black Strap", "Desert Tan / Sand Strap"],
+        stock: "In Stock",
+        badge: "New Arrival",
+        icon: "🧭" 
+      },
+      { 
+        id: 9, 
+        name: "Nyraa Sterling Silver Engraved Cufflinks", 
+        category: "accessories", 
+        price: 3499, 
+        oldPrice: 4999, 
+        rating: 4.9, 
+        reviews: 53, 
+        tag: "Jewelry", 
+        desc: "Solid 925 sterling silver cufflinks handcrafted with geometric engine-turned engraving and rhodium finish.", 
+        materials: "Hallmarked 925 Sterling Silver, Rhodium Anti-Tarnish Coating, Whaleback Toggle.",
+        variants: ["Pure Silver Rhodium", "Rose Gold Vermeil", "Black Enamel Inlay"],
+        stock: "Gift Box Included",
+        badge: "Gift Choice",
+        icon: "✨" 
+      },
+      { 
+        id: 10, 
+        name: "Nyraa Hi-Fi Wireless Room Speaker", 
+        category: "audio", 
+        price: 32999, 
+        oldPrice: 39999, 
+        rating: 5.0, 
+        reviews: 38, 
+        tag: "Home Audio", 
+        desc: "120W room-filling acoustic soundstage with high-resolution lossless AirPlay 2, Spotify Connect, and acoustic room tuning.", 
+        materials: "Cast Aluminum Monolith, Acoustic Wool Kvadrat Grille, Walnut Wood Base Plate.",
+        variants: ["Smoked Walnut & Dark Metal", "Nordic Ash & Natural Silver"],
+        stock: "Special Curation",
+        badge: "Flagship",
+        icon: "📻" 
+      }
     ];
 
     let currentCategory = 'all';
     let searchQuery = '';
+    let currentSort = 'featured';
     let cart = [];
+    let wishlist = [];
+    let recentlyViewed = [];
+    let selectedDetailProduct = null;
+    let detailQty = 1;
+    let selectedCheckoutPaymentType = 'upi';
 
+    // ================= PRODUCT CATALOGUE RENDERING =================
     function renderProducts() {
       const container = document.getElementById('products-grid-container');
       if (!container) return;
 
-      const filtered = PRODUCTS.filter(p => {
+      let filtered = PRODUCTS.filter(p => {
         const matchCat = (currentCategory === 'all' || p.category === currentCategory);
-        const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.desc.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            p.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            p.tag.toLowerCase().includes(searchQuery.toLowerCase());
         return matchCat && matchSearch;
       });
 
+      if (currentSort === 'price-asc') {
+        filtered.sort((a, b) => a.price - b.price);
+      } else if (currentSort === 'price-desc') {
+        filtered.sort((a, b) => b.price - a.price);
+      } else if (currentSort === 'rating') {
+        filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      } else if (currentSort === 'name') {
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+      }
+
+      const countLabel = document.getElementById('catalogue-count-label');
+      if (countLabel) countLabel.textContent = filtered.length;
+
       if (filtered.length === 0) {
-        container.innerHTML = `<div class="col-span-3 text-center py-12 font-mono text-slate-400">No products found matching your filter.</div>`;
+        container.innerHTML = `
+          <div class="col-span-full text-center py-16 px-6 rounded-3xl bg-white border border-slate-200 space-y-3">
+            <span class="text-4xl">🔍</span>
+            <h4 class="font-extrabold text-slate-800 text-base font-sans">No products match your search</h4>
+            <p class="text-xs text-slate-500 font-mono">Try adjusting your keyword or reset filters to browse all items.</p>
+            <button onclick="resetFilters()" class="mt-2 px-4 py-2 rounded-xl bg-blue-600 text-white font-mono text-xs font-bold cursor-pointer shadow-sm">
+              Reset Filters
+            </button>
+          </div>
+        `;
         return;
       }
 
-      container.innerHTML = filtered.map(p => `
-        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all space-y-5 flex flex-col justify-between group">
-          <div class="space-y-4">
-            <div class="w-full h-48 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-5xl group-hover:scale-105 transition-transform">
-              ${p.icon}
+      container.innerHTML = filtered.map(p => {
+        const discountPercent = Math.round(((p.oldPrice - p.price) / p.oldPrice) * 100);
+        const isWishlisted = wishlist.includes(p.id);
+
+        return `
+          <div class="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group product-card relative">
+            
+            <div class="space-y-3">
+              <!-- Top Badges & Wishlist -->
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 uppercase">${discountPercent}% OFF</span>
+                <button onclick="toggleWishlist(${p.id}, event)" title="${isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}" 
+                  class="w-8 h-8 rounded-full bg-slate-50 hover:bg-rose-50 border border-slate-200 flex items-center justify-center text-sm transition-transform active:scale-90 cursor-pointer">
+                  ${isWishlisted ? '❤️' : '🤍'}
+                </button>
+              </div>
+
+              <!-- Product Visual Box -->
+              <div onclick="openProductDetailModal(${p.id})" 
+                class="w-full h-44 rounded-xl bg-slate-50 hover:bg-blue-50/40 border border-slate-200 flex items-center justify-center text-6xl group-hover:scale-102 transition-transform cursor-pointer relative shadow-inner">
+                <span>${p.icon}</span>
+                <span class="absolute bottom-2 right-2 text-[10px] font-mono bg-white/90 backdrop-blur-xs text-slate-600 px-2 py-0.5 rounded-full border border-slate-200 font-semibold shadow-2xs">
+                  Quick View ↗
+                </span>
+              </div>
+
+              <!-- Title & Rating -->
+              <div class="space-y-1">
+                <div class="flex items-center gap-1.5 text-xs text-amber-600 font-mono">
+                  <span class="px-1.5 py-0.2 bg-amber-50 rounded border border-amber-200 font-bold">★ ${p.rating}</span>
+                  <span class="text-slate-400 text-[11px]">(${p.reviews})</span>
+                </div>
+                <h3 onclick="openProductDetailModal(${p.id})" 
+                  class="font-bold text-slate-900 text-sm hover:text-blue-600 cursor-pointer transition-colors leading-snug line-clamp-1">
+                  ${p.name}
+                </h3>
+                <p class="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">${p.desc}</p>
+              </div>
             </div>
-            <div>
-              <span class="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 uppercase">${p.tag}</span>
-              <h4 class="font-bold text-slate-900 text-xl mt-2">${p.name}</h4>
-              <p class="text-xs text-slate-600 mt-1 leading-relaxed">${p.desc}</p>
+
+            <!-- Price & Actions -->
+            <div class="pt-3 border-t border-slate-100 space-y-2 mt-3">
+              <div class="flex items-baseline gap-2">
+                <span class="text-slate-900 font-black text-lg font-mono">₹${p.price.toLocaleString('en-IN')}</span>
+                <span class="text-slate-400 text-xs line-through font-mono">₹${p.oldPrice.toLocaleString('en-IN')}</span>
+                <span class="text-[10px] text-emerald-700 font-bold">Save ₹${(p.oldPrice - p.price).toLocaleString('en-IN')}</span>
+              </div>
+
+              <div class="flex items-center gap-1.5">
+                <button onclick="addToCart(${p.id})" 
+                  class="flex-1 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-mono text-xs font-bold transition-all cursor-pointer text-center">
+                  + Cart
+                </button>
+                <button onclick="buyProduct('${p.name}', ${p.price})" 
+                  class="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-mono text-xs font-extrabold transition-all shadow-2xs cursor-pointer text-center">
+                  Buy Now →
+                </button>
+              </div>
             </div>
+
           </div>
-          <div class="flex items-center justify-between pt-4 border-t border-slate-100">
-            <div>
-              <span class="text-slate-400 text-[10px] block line-through">₹${p.oldPrice.toLocaleString('en-IN')}</span>
-              <span class="text-slate-900 font-extrabold text-xl font-mono">₹${p.price.toLocaleString('en-IN')}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <button onclick="addToCart(${p.id})" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-mono text-xs font-bold transition-all">
-                + Cart
-              </button>
-              <button onclick="buyProduct('${p.name}', ${p.price})" class="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-mono text-xs font-bold transition-all shadow-sm">
-                Buy UPI →
-              </button>
-            </div>
-          </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     function setCategoryFilter(cat) {
       currentCategory = cat;
-      ['all', 'watches', 'bags', 'audio'].forEach(c => {
+      ['all', 'watches', 'bags', 'audio', 'accessories'].forEach(c => {
         const btn = document.getElementById(`cat-${c}`);
         if (btn) {
           if (c === cat) {
-            btn.className = 'px-3.5 py-2 rounded-xl bg-amber-600 text-white font-bold cursor-pointer';
+            btn.className = 'px-4 py-2 rounded-xl bg-blue-600 text-white font-bold cursor-pointer transition-all shrink-0';
           } else {
-            btn.className = 'px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer';
+            btn.className = 'px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer transition-all shrink-0';
           }
         }
       });
@@ -499,30 +1938,415 @@
       renderProducts();
     }
 
-    function addToCart(productId) {
+    function handleSortChange() {
+      currentSort = document.getElementById('sort-select')?.value || 'featured';
+      renderProducts();
+    }
+
+    function resetFilters() {
+      searchQuery = '';
+      const input = document.getElementById('product-search-input');
+      if (input) input.value = '';
+      currentSort = 'featured';
+      const sortSelect = document.getElementById('sort-select');
+      if (sortSelect) sortSelect.value = 'featured';
+      setCategoryFilter('all');
+    }
+
+    // ================= CART MANAGEMENT =================
+    function addToCart(productId, qty = 1, variant = null) {
       if (!isLoggedIn) {
         showToast("Sign In Required", "Please sign in to add items to your cart.", "🔒");
         openSignInModal();
         return;
       }
       const item = PRODUCTS.find(p => p.id === productId);
-      if (item) {
-        cart.push(item);
-        updateCartBadges();
-        showToast("Added to Cart", `${item.name} added to cart.`, "🛒");
+      if (!item) return;
+
+      const chosenVariant = variant || (item.variants && item.variants[0]) || "Standard Edition";
+      const existing = cart.find(c => c.id === productId && c.variant === chosenVariant);
+      if (existing) {
+        existing.qty = Math.min(10, existing.qty + qty);
+      } else {
+        cart.push({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          oldPrice: item.oldPrice,
+          icon: item.icon,
+          qty: qty,
+          variant: chosenVariant
+        });
       }
+
+      updateCartBadges();
+      renderCartDrawer();
+      showToast("Added to Cart", `${item.name} added to your cart.`, "🛍️");
     }
 
     function updateCartBadges() {
-      const total = cart.reduce((sum, item) => sum + item.price, 0);
-      document.getElementById('cart-count-badge').textContent = cart.length;
-      document.getElementById('cart-total-badge').textContent = total.toLocaleString('en-IN');
+      const totalCount = cart.reduce((sum, item) => sum + item.qty, 0);
+      const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+      
+      const countEl = document.getElementById('cart-count-badge');
+      const totalEl = document.getElementById('cart-total-badge');
+      if (countEl) countEl.textContent = totalCount;
+      if (totalEl) totalEl.textContent = totalAmount.toLocaleString('en-IN');
     }
 
+    function renderCartDrawer() {
+      const container = document.getElementById('cart-drawer-items');
+      const itemCountEl = document.getElementById('cart-drawer-item-count');
+      const subtotalEl = document.getElementById('cart-drawer-subtotal');
+      const totalEl = document.getElementById('cart-drawer-total');
+      const checkoutBtn = document.getElementById('btn-proceed-checkout');
+
+      const totalCount = cart.reduce((sum, item) => sum + item.qty, 0);
+      const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+      if (itemCountEl) itemCountEl.textContent = totalCount;
+      if (subtotalEl) subtotalEl.textContent = '₹' + totalAmount.toLocaleString('en-IN');
+      if (totalEl) totalEl.textContent = '₹' + totalAmount.toLocaleString('en-IN');
+
+      if (!container) return;
+
+      if (cart.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 space-y-3 font-mono text-xs">
+            <span class="text-4xl">👜</span>
+            <h5 class="font-bold text-slate-800 text-sm">Your shopping cart is empty</h5>
+            <p class="text-slate-500 text-[11px]">Explore deals on watches, bags, and audio gear.</p>
+            <button onclick="closeCartDrawer(); window.location.hash='#catalogue';" class="mt-2 px-4 py-2 rounded-xl bg-blue-50 text-blue-800 font-bold border border-blue-200 cursor-pointer">
+              Explore Products →
+            </button>
+          </div>
+        `;
+        if (checkoutBtn) {
+          checkoutBtn.disabled = true;
+          checkoutBtn.classList.add('opacity-50', 'pointer-events-none');
+        }
+        return;
+      }
+
+      if (checkoutBtn) {
+        checkoutBtn.disabled = false;
+        checkoutBtn.classList.remove('opacity-50', 'pointer-events-none');
+      }
+
+      container.innerHTML = cart.map((item, index) => `
+        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3 text-xs">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-2xl shrink-0">
+              ${item.icon}
+            </div>
+            <div class="space-y-0.5">
+              <strong class="font-bold text-slate-900 block font-sans">${item.name}</strong>
+              <p class="text-[10px] text-blue-800 font-mono">${item.variant}</p>
+              <div class="font-mono text-slate-900 font-extrabold text-[11px] pt-0.5">
+                ₹${(item.price * item.qty).toLocaleString('en-IN')}
+                <span class="text-slate-400 font-normal"> (₹${item.price.toLocaleString('en-IN')} ea)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col items-end gap-2 shrink-0 font-mono">
+            <button onclick="removeFromCart(${index})" title="Remove item" class="text-slate-400 hover:text-red-500 text-xs p-1 cursor-pointer">
+              🗑️
+            </button>
+            <div class="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white text-[11px]">
+              <button onclick="changeCartQty(${index}, -1)" class="px-2 py-0.5 hover:bg-slate-100 font-bold text-slate-700 cursor-pointer">-</button>
+              <span class="px-2 py-0.5 font-bold text-slate-900">${item.qty}</span>
+              <button onclick="changeCartQty(${index}, 1)" class="px-2 py-0.5 hover:bg-slate-100 font-bold text-slate-700 cursor-pointer">+</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function changeCartQty(index, delta) {
+      if (!cart[index]) return;
+      cart[index].qty += delta;
+      if (cart[index].qty <= 0) {
+        cart.splice(index, 1);
+      } else if (cart[index].qty > 10) {
+        cart[index].qty = 10;
+        showToast("Quantity Limit", "Maximum 10 units per order.", "ℹ️");
+      }
+      updateCartBadges();
+      renderCartDrawer();
+    }
+
+    function removeFromCart(index) {
+      if (!cart[index]) return;
+      const removed = cart.splice(index, 1);
+      updateCartBadges();
+      renderCartDrawer();
+      if (removed[0]) showToast("Removed", `${removed[0].name} removed from cart.`, "ℹ️");
+    }
+
+    function openCartModal() {
+      if (!isLoggedIn) {
+        showToast("Sign In Required", "Please sign in to view your cart.", "🔒");
+        openSignInModal();
+        return;
+      }
+      renderCartDrawer();
+      document.getElementById('cart-drawer-modal').classList.remove('hidden');
+    }
+
+    function closeCartDrawer() {
+      document.getElementById('cart-drawer-modal').classList.add('hidden');
+    }
+
+    // ================= PRODUCT DETAILS MODAL =================
+    function openProductDetailModal(productId) {
+      const p = PRODUCTS.find(item => item.id === productId);
+      if (!p) return;
+      selectedDetailProduct = p;
+      detailQty = 1;
+
+      if (!recentlyViewed.includes(p.id)) {
+        recentlyViewed.unshift(p.id);
+        if (recentlyViewed.length > 4) recentlyViewed.pop();
+        renderRecentlyViewed();
+      }
+
+      document.getElementById('pdm-name').textContent = p.name;
+      document.getElementById('pdm-tag').textContent = p.tag;
+      document.getElementById('pdm-icon').textContent = p.icon;
+      document.getElementById('pdm-stock').innerHTML = p.stock;
+      document.getElementById('pdm-rating').textContent = `${p.rating} ★ (${p.reviews} customer reviews)`;
+      document.getElementById('pdm-price').textContent = `₹${p.price.toLocaleString('en-IN')}`;
+      document.getElementById('pdm-old-price').textContent = `₹${p.oldPrice.toLocaleString('en-IN')}`;
+      document.getElementById('pdm-desc').textContent = p.desc;
+      document.getElementById('pdm-materials').textContent = p.materials || p.desc;
+      document.getElementById('pdm-qty-val').textContent = detailQty;
+
+      const variantSelect = document.getElementById('pdm-variant-select');
+      variantSelect.innerHTML = (p.variants || ["Standard"]).map(v => `<option value="${v}">${v}</option>`).join('');
+
+      document.getElementById('product-detail-modal').classList.remove('hidden');
+    }
+
+    function closeProductDetailModal() {
+      document.getElementById('product-detail-modal').classList.add('hidden');
+      selectedDetailProduct = null;
+    }
+
+    function incrementDetailQty() {
+      if (detailQty < 10) detailQty++;
+      document.getElementById('pdm-qty-val').textContent = detailQty;
+    }
+
+    function decrementDetailQty() {
+      if (detailQty > 1) detailQty--;
+      document.getElementById('pdm-qty-val').textContent = detailQty;
+    }
+
+    function addCurrentDetailToCart() {
+      if (!selectedDetailProduct) return;
+      const variant = document.getElementById('pdm-variant-select')?.value;
+      addToCart(selectedDetailProduct.id, detailQty, variant);
+      closeProductDetailModal();
+    }
+
+    function buyCurrentDetailProduct() {
+      if (!selectedDetailProduct) return;
+      const variant = document.getElementById('pdm-variant-select')?.value;
+      closeProductDetailModal();
+      buyProduct(`${selectedDetailProduct.name} (${variant})`, selectedDetailProduct.price * detailQty);
+    }
+
+    // ================= RECENTLY VIEWED STRIP =================
+    function renderRecentlyViewed() {
+      const section = document.getElementById('recently-viewed-section');
+      const container = document.getElementById('recently-viewed-container');
+      if (!section || !container) return;
+
+      if (recentlyViewed.length === 0) {
+        section.classList.add('hidden');
+        return;
+      }
+      section.classList.remove('hidden');
+
+      const viewedItems = recentlyViewed.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
+      container.innerHTML = viewedItems.map(p => `
+        <div onclick="openProductDetailModal(${p.id})" class="p-3.5 rounded-2xl bg-white border border-slate-200 hover:border-blue-400 shadow-2xs hover:shadow-sm transition-all cursor-pointer space-y-2">
+          <div class="h-20 rounded-xl bg-slate-50 flex items-center justify-center text-3xl">
+            ${p.icon}
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-xs truncate font-sans">${p.name}</h4>
+            <span class="text-blue-700 font-extrabold text-xs font-mono">₹${p.price.toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function clearRecentlyViewed() {
+      recentlyViewed = [];
+      renderRecentlyViewed();
+      showToast("Cleared", "Recently viewed items cleared.", "ℹ️");
+    }
+
+    // ================= WISHLIST ACTIONS =================
+    function toggleWishlist(productId, e) {
+      if (e) e.stopPropagation();
+      const idx = wishlist.indexOf(productId);
+      if (idx > -1) {
+        wishlist.splice(idx, 1);
+        showToast("Removed from Wishlist", "Item removed from your saved list.", "🤍");
+      } else {
+        wishlist.push(productId);
+        showToast("Saved to Wishlist", "Item added to your saved list.", "❤️");
+      }
+      const countEl = document.getElementById('wishlist-count-badge');
+      if (countEl) countEl.textContent = wishlist.length;
+      renderProducts();
+    }
+
+    function openWishlistModal() {
+      const container = document.getElementById('wishlist-items-container');
+      if (!container) return;
+
+      if (wishlist.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8 text-xs text-slate-500 font-mono">
+            <span>❤️</span>
+            <p class="pt-2">Your wishlist is currently empty.</p>
+          </div>
+        `;
+      } else {
+        const items = wishlist.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
+        container.innerHTML = items.map(item => `
+          <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-xl">
+                ${item.icon}
+              </div>
+              <div>
+                <strong class="text-slate-900 font-bold block">${item.name}</strong>
+                <span class="text-blue-700 font-mono font-bold">₹${item.price.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="addToCart(${item.id}); toggleWishlist(${item.id});" class="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white font-mono text-[10px] font-bold cursor-pointer">
+                Move to Cart
+              </button>
+              <button onclick="toggleWishlist(${item.id})" class="text-slate-400 hover:text-red-500 p-1 text-xs cursor-pointer">
+                ✕
+              </button>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      document.getElementById('wishlist-modal').classList.remove('hidden');
+    }
+
+    function closeWishlistModal() {
+      document.getElementById('wishlist-modal').classList.add('hidden');
+    }
+
+    // ================= CHECKOUT EXPERIENCE (SIMULATED DEMO) =================
+    function startCartCheckout() {
+      if (!isLoggedIn) {
+        showToast("Sign In Required", "Please sign in to proceed to checkout.", "🔒");
+        closeCartDrawer();
+        openSignInModal();
+        return;
+      }
+      if (window.cognisec && !window.cognisec.isFullyVerified()) {
+        showToast("Verification Required", "Financial checkout locked until mandatory identity OTP is verified.", "🔒");
+        if (window.cognisec.triggerLoginOtpModal) window.cognisec.triggerLoginOtpModal();
+        return;
+      }
+
+      closeCartDrawer();
+      const totalCount = cart.reduce((sum, item) => sum + item.qty, 0);
+      const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+      document.getElementById('chk-item-count').textContent = totalCount;
+      document.getElementById('chk-order-total').textContent = '₹' + totalAmount.toLocaleString('en-IN');
+
+      const previewEl = document.getElementById('chk-items-preview');
+      if (previewEl) {
+        previewEl.innerHTML = cart.slice(0, 3).map(c => `
+          <div class="flex justify-between">
+            <span class="truncate max-w-[240px]">${c.qty}x ${c.name}</span>
+            <strong class="text-slate-800">₹${(c.price * c.qty).toLocaleString('en-IN')}</strong>
+          </div>
+        `).join('') + (cart.length > 3 ? `<div class="text-[10px] text-slate-400">+ ${cart.length - 3} more items</div>` : '');
+      }
+
+      document.getElementById('checkout-modal').classList.remove('hidden');
+    }
+
+    function closeCheckoutModal() {
+      document.getElementById('checkout-modal').classList.add('hidden');
+    }
+
+    function selectCheckoutPayment(type, btn) {
+      selectedCheckoutPaymentType = type;
+      document.querySelectorAll('.chk-pay-btn').forEach(b => {
+        b.className = 'chk-pay-btn p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-500 text-center font-bold cursor-pointer';
+      });
+      btn.className = 'chk-pay-btn p-2 rounded-xl border-2 border-blue-500 bg-blue-50 text-blue-900 text-center font-bold cursor-pointer';
+    }
+
+    async function handleCheckoutSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-complete-checkout');
+      btn.innerHTML = `<span>Authorizing via Cognisec AI Telemetry...</span>`;
+
+      if (window.cognisec) {
+        const statusRes = await window.cognisec.getSessionSecurityStatus();
+        if (statusRes.session_status === 'PENDING_OBSERVATION' || statusRes.decision === 'OBSERVATION_PENDING') {
+          showToast("Observation Active (10s)", "Baseline calibration in progress. Checkout locked until complete.", "⏳");
+          btn.innerHTML = `<span>Authorize &amp; Complete Simulated Order →</span>`;
+          return;
+        }
+        if (statusRes.verification_required || statusRes.session_status === 'STEP_UP_REQUIRED' || statusRes.decision === 'STEP_UP_VERIFICATION') {
+          showToast("Verification Required", "High-value checkout requires step-up verification.", "🔒");
+          closeCheckoutModal();
+          window.cognisec.openStepUpModal({ reason: "High-value checkout authorization requires step-up identity challenge." });
+          btn.innerHTML = `<span>Authorize &amp; Complete Simulated Order →</span>`;
+          return;
+        }
+        if (statusRes.session_status === 'RESTRICTED' || statusRes.decision === 'RESTRICT') {
+          showToast("Checkout Blocked", "Session is restricted by security policy.", "🛑");
+          closeCheckoutModal();
+          btn.innerHTML = `<span>Authorize &amp; Complete Simulated Order →</span>`;
+          return;
+        }
+      }
+
+      setTimeout(() => {
+        const orderId = '#NYR-' + Math.floor(100000 + Math.random() * 900000);
+        closeCheckoutModal();
+        btn.innerHTML = `<span>Authorize &amp; Complete Simulated Order →</span>`;
+
+        document.getElementById('success-order-id').textContent = orderId;
+        document.getElementById('modal-step-confirm').classList.add('hidden');
+        document.getElementById('modal-step-success').classList.remove('hidden');
+        document.getElementById('upi-modal').classList.remove('hidden');
+
+        cart = [];
+        updateCartBadges();
+        showToast("Order Confirmed", `Order ${orderId} placed successfully. Delivery initiated.`, "🎉");
+      }, 1200);
+    }
+
+    // ================= UPI MODAL DIRECT PURCHASE (PRESERVED) =================
     function buyProduct(name, price) {
       if (!isLoggedIn) {
         showToast("Sign In Required", "Please sign in to complete purchases.", "🔒");
         openSignInModal();
+        return;
+      }
+      if (window.cognisec && !window.cognisec.isFullyVerified()) {
+        showToast("Verification Required", "Financial checkout locked until mandatory identity OTP is verified.", "🔒");
+        if (window.cognisec.triggerLoginOtpModal) window.cognisec.triggerLoginOtpModal();
         return;
       }
       document.getElementById('modal-item-name').textContent = name;
@@ -532,48 +2356,63 @@
       document.getElementById('upi-modal').classList.remove('hidden');
     }
 
-    function openCartModal() {
-      if (!isLoggedIn) {
-        showToast("Sign In Required", "Please sign in to view your cart.", "🔒");
-        openSignInModal();
-        return;
-      }
-      if (cart.length === 0) {
-        buyProduct('Titan Chronograph (Quick Cart)', 14999);
-      } else {
-        const total = cart.reduce((sum, item) => sum + item.price, 0);
-        buyProduct(`Cart Items (${cart.length} selected)`, total);
-      }
-    }
-
     function closeUpiModal() {
       document.getElementById('upi-modal').classList.add('hidden');
     }
 
     function selectUpiApp(btn) {
       document.querySelectorAll('.upi-app-btn').forEach(b => {
-        b.className = 'upi-app-btn p-2.5 rounded-xl border border-slate-200 hover:border-amber-500 bg-slate-50 text-center font-bold';
+        b.className = 'upi-app-btn p-2.5 rounded-xl border border-slate-200 hover:border-blue-500 bg-slate-50 text-center font-bold cursor-pointer';
       });
-      btn.className = 'upi-app-btn p-2.5 rounded-xl border-2 border-amber-500 bg-amber-50 text-amber-900 text-center font-bold';
+      btn.className = 'upi-app-btn p-2.5 rounded-xl border-2 border-blue-500 bg-blue-50 text-blue-900 text-center font-bold cursor-pointer';
     }
 
-    function processUpiPayment() {
+    async function processUpiPayment() {
+      if (!isLoggedIn) {
+        showToast("Sign In Required", "Please sign in to authorize UPI payment.", "🔒");
+        closeUpiModal();
+        openSignInModal();
+        return;
+      }
+
+      if (window.cognisec) {
+        const statusRes = await window.cognisec.getSessionSecurityStatus();
+        if (statusRes.session_status === 'PENDING_OBSERVATION' || statusRes.decision === 'OBSERVATION_PENDING') {
+          showToast("Observation Active (10s)", "Baseline calibration in progress. Checkout locked until complete.", "⏳");
+          return;
+        }
+        if (statusRes.verification_required || statusRes.session_status === 'STEP_UP_REQUIRED' || statusRes.decision === 'STEP_UP_VERIFICATION') {
+          showToast("Verification Required", "High-value financial checkout requires step-up verification.", "🔒");
+          closeUpiModal();
+          window.cognisec.openStepUpModal({ reason: "High-Value checkout authorization requires step-up identity challenge." });
+          return;
+        }
+        if (statusRes.session_status === 'RESTRICTED' || statusRes.decision === 'RESTRICT') {
+          showToast("Checkout Blocked", "Session is restricted by security policy.", "🛑");
+          closeUpiModal();
+          return;
+        }
+      }
+
       const confirmStep = document.getElementById('modal-step-confirm');
       confirmStep.innerHTML = `
         <div class="text-center py-8 space-y-3">
-          <div class="w-10 h-10 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p class="text-xs font-bold text-slate-800">Verifying Keystroke Vector &amp; Authorizing UPI Debit...</p>
+          <div class="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p class="text-xs font-bold text-slate-800">Verifying Continuous Dynamics &amp; Authorizing Instant Debit...</p>
         </div>
       `;
       setTimeout(() => {
         document.getElementById('success-order-id').textContent = '#NYR-' + Math.floor(100000 + Math.random() * 900000);
         confirmStep.classList.add('hidden');
         document.getElementById('modal-step-success').classList.remove('hidden');
+        cart = [];
+        updateCartBadges();
       }, 1400);
     }
 
     // Initialize
     renderProducts();
+    updateCartBadges();
   </script>
 </body>
 

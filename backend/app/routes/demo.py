@@ -13,7 +13,7 @@ from app.models.alert import Alert
 from app.services.session_service import SessionService
 from app.services.risk_service import RiskService
 from app.services.decision_service import DecisionService
-from app.routes.deps import get_current_user
+from app.routes.deps import require_admin
 
 router = APIRouter(prefix="/demo", tags=["Demo Attack Simulator"])
 
@@ -21,9 +21,10 @@ router = APIRouter(prefix="/demo", tags=["Demo Attack Simulator"])
 @router.post("/simulate", response_model=AttackSimulationResponse)
 def simulate_attack_scenario(
     request: AttackSimulationRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
+
     """
     Executes controlled exhibition attack scenarios for final demonstration:
     - NEW_DEVICE

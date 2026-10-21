@@ -25,50 +25,83 @@ class DecisionService:
         Returns: (decision, user_facing_message, session_status, security_event_id)
         """
         now_utc = datetime.now(timezone.utc)
+        db_session = SessionService.get_session(db, session_id)
+        is_fresh = SessionService.is_step_up_fresh(db_session, current_risk_score=risk_score, current_risk_level=risk_level)
+
+        # A RESTRICTED session can be relaxed by normal risk telemetry unless a brute-force
+        # lockout (STEP_UP_LOCKED), admin action, or termination is in force.
+        if db_session and db_session.status == "RESTRICTED" and risk_level in ("LOW", "MEDIUM"):
+            active_hard_lock = db.query(SecurityEvent).filter(
+                SecurityEvent.session_id == session_id,
+                SecurityEvent.event_type.in_(["STEP_UP_LOCKED", "ADMIN_REVOCATION", "SESSION_TERMINATED"])
+            ).first()
+            if active_hard_lock:
+                return (
+                    "RESTRICT",
+                    "Access temporarily restricted. Sensitive operations are locked.",
+                    "RESTRICTED",
+                    None,
+                )
+
 
         if risk_level == "LOW":
             decision = "ALLOW"
             user_message = "Access allowed. Continuous identity verification active."
             session_status = "ACTIVE"
             event_id = None
+            if db_session and db_session.status != "TERMINATED":
+                db_session.current_risk_level = "LOW"
+                if db_session.status not in ("PENDING_OBSERVATION", "PENDING_OTP", "TERMINATED"):
+                    db_session.status = "ACTIVE"
+                db.commit()
 
         elif risk_level == "MEDIUM":
-            decision = "STEP_UP_VERIFICATION"
-            user_message = "Additional security verification required to proceed."
-            session_status = "STEP_UP_REQUIRED"
-            SessionService.update_session_status(db, session_id, status=session_status, risk_level=risk_level)
-            
-            # Log security event
-            sec_event = SecurityEvent(
-                user_id=user_id,
-                session_id=session_id,
-                application=application.lower(),
-                event_type="STEP_UP_CHALLENGE",
-                severity="MEDIUM",
-                anomaly_score=anomaly_score,
-                risk_score=risk_score,
-                decision=decision,
-                details=json.dumps({"factors": contributing_factors}),
-                timestamp=now_utc
-            )
-            db.add(sec_event)
-            db.commit()
-            db.refresh(sec_event)
-            event_id = sec_event.id
+            if is_fresh:
+                # Session has active, fresh Step-Up verification. Allow continuous access without re-triggering challenge.
+                decision = "ALLOW"
+                user_message = "Access allowed. Continuous identity verified via active step-up authentication."
+                session_status = "ACTIVE"
+                event_id = None
+                if db_session and db_session.status != "TERMINATED":
+                    db_session.current_risk_level = "MEDIUM"
+                    db.commit()
+            else:
+                decision = "STEP_UP_VERIFICATION"
+                user_message = "Additional security verification required to proceed."
+                session_status = "STEP_UP_REQUIRED"
+                SessionService.update_session_status(db, session_id, status=session_status, risk_level=risk_level)
 
-            # Create SOC alert
-            alert = Alert(
-                user_id=user_id,
-                security_event_id=sec_event.id,
-                application=application.lower(),
-                alert_type="STEP_UP_CHALLENGE_TRIGGERED",
-                message=f"Step-up verification required in {application.upper()} portal. Factors: {', '.join(contributing_factors) if contributing_factors else 'Moderate risk'}",
-                severity="MEDIUM",
-                status="OPEN",
-                created_at=now_utc
-            )
-            db.add(alert)
-            db.commit()
+                # Log security event
+                sec_event = SecurityEvent(
+                    user_id=user_id,
+                    session_id=session_id,
+                    application=application.lower(),
+                    event_type="STEP_UP_CHALLENGE",
+                    severity="MEDIUM",
+                    anomaly_score=anomaly_score,
+                    risk_score=risk_score,
+                    decision=decision,
+                    details=json.dumps({"factors": contributing_factors}),
+                    timestamp=now_utc
+                )
+                db.add(sec_event)
+                db.commit()
+                db.refresh(sec_event)
+                event_id = sec_event.id
+
+                # Create SOC alert
+                alert = Alert(
+                    user_id=user_id,
+                    security_event_id=sec_event.id,
+                    application=application.lower(),
+                    alert_type="STEP_UP_CHALLENGE_TRIGGERED",
+                    message=f"Step-up verification required in {application.upper()} portal. Factors: {', '.join(contributing_factors) if contributing_factors else 'Moderate risk'}",
+                    severity="MEDIUM",
+                    status="OPEN",
+                    created_at=now_utc
+                )
+                db.add(alert)
+                db.commit()
 
         elif risk_level == "HIGH":
             decision = "RESTRICT"
@@ -110,7 +143,7 @@ class DecisionService:
             decision = "TERMINATE_SESSION"
             user_message = "Your session has been securely terminated due to critical security risk."
             session_status = "TERMINATED"
-            SessionService.terminate_session(db, session_id)
+            SessionService.terminate_session(db, session_id, risk_level="CRITICAL")
 
             sec_event = SecurityEvent(
                 user_id=user_id,

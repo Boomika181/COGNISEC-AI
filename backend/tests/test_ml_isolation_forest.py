@@ -33,7 +33,7 @@ def test_ml_learning_state_before_five_samples():
 
 
 def test_ml_training_at_five_samples_and_ml_ready():
-    detector = IsolationForestDetector(contamination=0.05, random_state=42)
+    detector = IsolationForestDetector(contamination=0.05, random_state=42, min_samples_for_training=5)
     
     # 5 consistent trusted samples
     trusted_training_vectors = np.array([
@@ -133,10 +133,11 @@ def test_end_to_end_ml_integration_and_anti_poisoning(client, user_token):
     })
     assert attack_res.status_code == 200
     attack_data = attack_res.json()
-    assert attack_data["is_anomaly"] is True
-    assert attack_data["anomaly_score"] >= 0.50
-    assert attack_data["risk_level"] in ["MEDIUM", "HIGH", "CRITICAL"]
     assert attack_data["decision"] in ["STEP_UP_VERIFICATION", "RESTRICT", "TERMINATE_SESSION"]
+    assert "anomaly_score" not in attack_data
+    assert "risk_score" not in attack_data
+    assert "ml_status" not in attack_data
+
 
     # 4. Anti-Poisoning Verification: Model sample count did not increase from the attack
     prof_after = client.get("/api/behavior/profile", headers={"Authorization": f"Bearer {user_token}"}).json()
@@ -196,6 +197,6 @@ def test_model_hydration_from_database_after_restart(client, user_token):
     })
     assert ev_res.status_code == 200
     d = ev_res.json()
-    assert d["ml_status"] == "ML_READY"
-    assert d["is_anomaly"] is False
     assert d["decision"] == "ALLOW"
+    assert "ml_status" not in d
+    assert "anomaly_score" not in d

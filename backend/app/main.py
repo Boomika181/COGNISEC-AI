@@ -13,14 +13,23 @@ from app.routes import (
     security_router,
     admin_router,
     demo_router,
+    devices_router,
+    notifications_router,
 )
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("cognisec")
 
-# Create database tables automatically upon startup
+# Create database tables automatically upon startup and sync schema columns
 Base.metadata.create_all(bind=engine)
+try:
+    from app.database.schema_sync import sync_device_and_notification_schemas, sync_session_schema, sync_application_grants_schema
+    sync_device_and_notification_schemas()
+    sync_session_schema()
+    sync_application_grants_schema()
+except Exception as e:
+    logger.warning(f"Schema sync deferred: {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -47,6 +56,8 @@ app.include_router(behavior_router, prefix=settings.API_V1_STR)
 app.include_router(security_router, prefix=settings.API_V1_STR)
 app.include_router(admin_router, prefix=settings.API_V1_STR)
 app.include_router(demo_router, prefix=settings.API_V1_STR)
+app.include_router(devices_router, prefix=settings.API_V1_STR)
+app.include_router(notifications_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

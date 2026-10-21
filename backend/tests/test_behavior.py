@@ -43,9 +43,11 @@ def test_submit_behavioral_telemetry(client, user_token):
     assert res.status_code == 200
     data = res.json()
     assert data["decision"] in ["ALLOW", "STEP_UP_VERIFICATION"]
-    assert "user_message" in data
     assert data["session_status"] == "ACTIVE"
-    assert 0.0 <= data["risk_score"] <= 1.0
+    # Normal user response must NOT leak internal ML or risk scores
+    assert "risk_score" not in data
+    assert "anomaly_score" not in data
+
 
 
 def test_get_behavior_profile(client, user_token):
@@ -137,7 +139,9 @@ def test_baseline_not_contaminated_by_suspicious_behavior(client, user_token):
     assert res.status_code == 200
     event_data = res.json()
     assert event_data["decision"] in ["RESTRICT", "TERMINATE_SESSION", "STEP_UP_VERIFICATION"]
-    assert event_data["risk_score"] >= 0.30
+    assert "risk_score" not in event_data
+    assert "anomaly_score" not in event_data
+
 
     # Verify baseline sample count DID NOT INCREASE (baseline protection enforced)
     after_prof = client.get("/api/behavior/profile", headers={"Authorization": f"Bearer {user_token}"}).json()

@@ -26,3 +26,5 @@ class User(Base):
     behavior_profile = relationship("BehaviorProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     security_events = relationship("SecurityEvent", back_populates="user", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="user", cascade="all, delete-orphan")
+    adaptive_factors = relationship("AdaptiveFactor", back_populates="user", cascade="all, delete-orphan")
+    notifications = relationship("DeviceNotification", back_populates="user", cascade="all, delete-orphan")
