@@ -195,7 +195,7 @@ class ModelManager:
         effective_samples = max(sample_count, model_samples)
 
         if effective_samples == 0:
-            return "ML_COLD_START", 0, False, 0.05
+            return "ML_COLD_START", 0, False, 0.0
         elif effective_samples < 5:
             return "ML_LEARNING", model_samples, False, 0.10
         else:

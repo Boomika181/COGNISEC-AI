@@ -149,7 +149,7 @@
     </div>
     <div class="flex items-center gap-4 text-slate-300 shrink-0 text-[11px]">
       <span class="hidden md:inline">24x7 Customer Help: 1800-209-NYRAA</span>
-      <a href="index.html" class="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all uppercase tracking-wider flex items-center gap-1">
+      <a href="index.html" id="btn-back-to-platform" onclick="handleBackToPlatform(event)" class="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all uppercase tracking-wider flex items-center gap-1">
         <span>← Back to Platform</span>
       </a>
     </div>
@@ -1538,6 +1538,9 @@
       isFinancialVaultUnlocked = false;
       if (window.cognisec) {
         window.cognisec.revokeResourceClearance('financial_vault');
+        if (typeof window.cognisec.relockVault === 'function') {
+          window.cognisec.relockVault('financial_vault').catch(() => {});
+        }
       }
       const dynamicEl = document.getElementById('financial-vault-dynamic-content');
       if (dynamicEl) dynamicEl.innerHTML = '';
@@ -1547,6 +1550,19 @@
       document.getElementById('financial-vault-unlocked')?.classList.add('hidden');
       updateContinuousVerificationPanel();
       showToast("Financial Vault Locked", "Payment methods and bank accounts re-sealed under Zero Trust policy.", "🔒");
+    }
+
+    async function handleBackToPlatform(e) {
+      if (e) e.preventDefault();
+      try {
+        if (window.cognisec && typeof window.cognisec.relockVault === 'function') {
+          await window.cognisec.relockVault('financial_vault');
+        }
+      } catch (err) {
+        console.warn('Error during relock on platform exit:', err);
+      }
+      lockFinancialVault();
+      window.location.href = 'index.html';
     }
 
     function triggerExhibitionStepUpTest() {
@@ -1625,6 +1641,38 @@
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('signin') === 'true' || urlParams.get('login') === 'true') {
         openSignInModal();
+      }
+
+      // Automatically relock when navigating away from financial vault section
+      document.querySelectorAll('.subnav-link').forEach(link => {
+        link.addEventListener('click', () => {
+          const href = link.getAttribute('href');
+          if (href && href !== '#secure-financial-vault' && isFinancialVaultUnlocked) {
+            lockFinancialVault();
+          }
+        });
+      });
+    });
+
+    // Server-enforced automatic relock on window navigation, unload, or back/forward
+    window.addEventListener('pagehide', () => {
+      if (isFinancialVaultUnlocked) {
+        if (window.cognisec && typeof window.cognisec.relockVault === 'function') {
+          window.cognisec.relockVault('financial_vault');
+        }
+        lockFinancialVault();
+      }
+    });
+
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted || isFinancialVaultUnlocked) {
+        lockFinancialVault();
+      }
+    });
+
+    window.addEventListener('popstate', () => {
+      if (isFinancialVaultUnlocked && location.hash !== '#secure-financial-vault') {
+        lockFinancialVault();
       }
     });
     setTimeout(syncShoppingAuthState, 150);

@@ -17,6 +17,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(20), default="USER", nullable=False)  # "USER" or "ADMIN"
     account_status = Column(String(20), default="ACTIVE", nullable=False)  # "ACTIVE", "LOCKED", "SUSPENDED"
+    failed_login_attempts = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     # Relationships

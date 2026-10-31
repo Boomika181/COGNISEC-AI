@@ -90,7 +90,7 @@
         title="Security Notification Center"
       >
         <svg class="w-4 h-4 text-amber-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-        <span id="notif-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-mono font-bold flex items-center justify-center border border-black shadow-[0_0_10px_#ef4444]">0</span>
+        <span id="notif-badge" class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-mono font-bold flex items-center justify-center border border-black shadow-[0_0_10px_#ef4444] animate-pulse">1</span>
       </button>
 
       <button id="navbar-signin-btn" onclick="handleNavbarAuthClick()" class="px-4 py-2.5 text-xs font-mono tracking-wider text-slate-300 hover:text-white border border-red-900/60 hover:border-red-500/80 rounded-lg bg-black/40 hover:bg-red-950/30 transition-all cursor-pointer flex items-center gap-2 font-medium">
@@ -1452,57 +1452,60 @@
           <div>
             <div class="flex items-center gap-3">
               <h3 class="font-heading font-extrabold text-xl text-white tracking-wider">COGNISEC SOC COMMAND CENTER</h3>
-              <span class="px-2.5 py-0.5 text-[10px] font-mono bg-red-950 text-red-400 border border-red-800 rounded-full font-bold uppercase tracking-widest animate-pulse">DEFCON 1: ONLINE</span>
+              <span id="soc-telemetry-status" class="px-2.5 py-0.5 text-[10px] font-mono bg-red-950 text-red-400 border border-red-800 rounded-full font-bold uppercase tracking-widest animate-pulse">STATUS: LIVE TELEMETRY</span>
             </div>
             <p class="text-xs text-slate-400 pt-0.5">Real-Time AI Threat Monitoring • Zero-Trust Behavioral Neural Engine Active</p>
           </div>
         </div>
         <div class="flex items-center gap-3">
-          <button onclick="triggerSocRescan()" class="px-3.5 py-1.5 rounded-xl bg-red-950/70 hover:bg-red-900 border border-red-800 text-red-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5">
+          <span id="soc-operator-email" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/70 border border-red-900/60 text-xs font-mono text-red-300">
+            <span class="text-slate-400">OPERATOR:</span> <strong id="soc-operator-email-val">cognisecai.security@gmail.com</strong>
+          </span>
+          <button id="soc-rescan-btn" onclick="triggerSocRescan()" class="px-3.5 py-1.5 rounded-xl bg-red-950/70 hover:bg-red-900 border border-red-800 text-red-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5">
             <span>⚡ AI Re-Scan</span>
           </button>
-          <button onclick="handleLogout()" class="px-3.5 py-1.5 rounded-xl bg-red-950/90 hover:bg-red-800 border border-red-700 text-red-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5" title="Sign Out of SOC">
+          <button id="soc-logout-btn" onclick="handleLogout()" class="px-3.5 py-1.5 rounded-xl bg-red-950/90 hover:bg-red-800 border border-red-700 text-red-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5" title="Sign Out of SOC">
             <span>🚪 Logout</span>
           </button>
           <button onclick="closeModal('dashboard')" class="p-2 rounded-xl bg-red-950/60 hover:bg-red-900/80 border border-red-800/50 text-slate-400 hover:text-white transition-colors cursor-pointer" title="Close (Keep Authenticated)">✕</button>
         </div>
       </div>
 
-      <!-- TOP METRIC KPI CARDS (LIVE METRICS) -->
+      <!-- TOP METRIC KPI CARDS (LIVE BACKEND DATA) -->
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-4 bg-[#09060e] border-b border-red-950">
         <!-- Live Sessions -->
         <div class="p-3.5 rounded-2xl bg-black/60 border border-red-900/40 space-y-1">
           <span class="text-[10px] text-slate-400 uppercase tracking-wider block">🔴 Live Sessions</span>
           <div class="flex items-baseline justify-between">
-            <strong id="soc-stat-sessions" class="text-xl font-bold text-white font-mono">1,428</strong>
-            <span class="text-[10px] text-emerald-400 font-bold">99.8% OK</span>
+            <strong id="soc-stat-sessions" class="text-xl font-bold text-white font-mono">—</strong>
+            <span id="soc-stat-sessions-sub" class="text-[10px] text-emerald-400 font-bold">Active</span>
           </div>
         </div>
 
-        <!-- Trusted Users -->
+        <!-- Registered Users -->
         <div class="p-3.5 rounded-2xl bg-black/60 border border-emerald-900/40 space-y-1">
-          <span class="text-[10px] text-slate-400 uppercase tracking-wider block">🟢 Trusted Users</span>
+          <span class="text-[10px] text-slate-400 uppercase tracking-wider block">🟢 Active Users</span>
           <div class="flex items-baseline justify-between">
-            <strong id="soc-stat-trusted" class="text-xl font-bold text-emerald-400 font-mono">14,892</strong>
-            <span class="text-[10px] text-emerald-400 font-bold">Score &gt;95%</span>
+            <strong id="soc-stat-trusted" class="text-xl font-bold text-emerald-400 font-mono">—</strong>
+            <span id="soc-stat-users-sub" class="text-[10px] text-slate-400 font-bold">Registered</span>
           </div>
         </div>
 
-        <!-- Blocked Users -->
+        <!-- Blocked / Terminated Sessions -->
         <div class="p-3.5 rounded-2xl bg-black/60 border border-red-900/50 space-y-1">
-          <span class="text-[10px] text-slate-400 uppercase tracking-wider block">⛔ Blocked / ATOs</span>
+          <span class="text-[10px] text-slate-400 uppercase tracking-wider block">⛔ Blocked / Revoked</span>
           <div class="flex items-baseline justify-between">
-            <strong id="soc-stat-blocked" class="text-xl font-bold text-red-400 font-mono">18</strong>
-            <span class="text-[10px] text-red-400 font-bold">Intercepted</span>
+            <strong id="soc-stat-blocked" class="text-xl font-bold text-red-400 font-mono">—</strong>
+            <span id="soc-stat-blocked-sub" class="text-[10px] text-red-400 font-bold">Enforced</span>
           </div>
         </div>
 
-        <!-- New Devices -->
+        <!-- Registered Devices -->
         <div class="p-3.5 rounded-2xl bg-black/60 border border-sky-900/40 space-y-1">
-          <span class="text-[10px] text-slate-400 uppercase tracking-wider block">💻 New Devices</span>
+          <span class="text-[10px] text-slate-400 uppercase tracking-wider block">💻 Enterprise Devices</span>
           <div class="flex items-baseline justify-between">
-            <strong id="soc-stat-devices" class="text-xl font-bold text-sky-400 font-mono">47</strong>
-            <span class="text-[10px] text-sky-400 font-bold">TPM Attested</span>
+            <strong id="soc-stat-devices" class="text-xl font-bold text-sky-400 font-mono">—</strong>
+            <span id="soc-stat-devices-sub" class="text-[10px] text-sky-400 font-bold">Enrolled</span>
           </div>
         </div>
 
@@ -1510,310 +1513,446 @@
         <div class="p-3.5 rounded-2xl bg-black/60 border border-amber-900/40 space-y-1 col-span-2 sm:col-span-1">
           <span class="text-[10px] text-slate-400 uppercase tracking-wider block">⚠️ Active Alerts</span>
           <div class="flex items-baseline justify-between">
-            <strong id="soc-stat-alerts" class="text-xl font-bold text-amber-400 font-mono">3</strong>
-            <span class="text-[10px] text-amber-400 font-bold">Inspected</span>
+            <strong id="soc-stat-alerts" class="text-xl font-bold text-amber-400 font-mono">—</strong>
+            <span id="soc-stat-alerts-sub" class="text-[10px] text-amber-400 font-bold">Open</span>
           </div>
         </div>
       </div>
 
       <!-- SOC Navigation Tabs -->
       <div class="px-6 py-2.5 bg-[#0a0711] border-b border-red-950/80 flex items-center gap-2 overflow-x-auto text-xs">
-        <button onclick="switchDashboardTab('overview')" id="dash-tab-overview" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)] cursor-pointer">
-          <span>🖥️ Command Overview</span>
+        <button onclick="switchDashboardTab('overview')" id="dash-tab-overview" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)] cursor-pointer shrink-0">
+          <span>🖥️ Security Overview</span>
         </button>
-        <button onclick="switchDashboardTab('behavior')" id="dash-tab-behavior" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer">
-          <span>🧠 Behavior History &amp; Risk Trends</span>
+        <button onclick="switchDashboardTab('users')" id="dash-tab-users" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer shrink-0">
+          <span>👥 Users &amp; Sessions</span>
         </button>
-        <button onclick="switchDashboardTab('threatmap')" id="dash-tab-threatmap" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer">
-          <span>🗺 Threat Map &amp; Geo Radar</span>
+        <button onclick="switchDashboardTab('devices')" id="dash-tab-devices" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer shrink-0">
+          <span>💻 Device Inventory</span>
         </button>
-        <button onclick="switchDashboardTab('logs')" id="dash-tab-logs" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer">
-          <span>📜 Attack Timeline &amp; Login Logs</span>
+        <button onclick="switchDashboardTab('behavior')" id="dash-tab-behavior" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer shrink-0">
+          <span>🧠 Behavioral AI</span>
+        </button>
+        <button onclick="switchDashboardTab('logs')" id="dash-tab-logs" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer shrink-0">
+          <span>📜 Security Events &amp; Alerts</span>
+        </button>
+        <button onclick="switchDashboardTab('audit')" id="dash-tab-audit" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer shrink-0">
+          <span>📋 Audit Trail</span>
+        </button>
+        <button onclick="switchDashboardTab('health')" id="dash-tab-health" class="px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer shrink-0">
+          <span>📊 Analytics &amp; Health</span>
         </button>
       </div>
 
       <!-- SOC Body Content Container -->
       <div class="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
 
-        <!-- 1. COMMAND OVERVIEW TAB -->
+        <!-- 1. SECURITY OVERVIEW TAB -->
         <div id="dash-content-overview" class="space-y-6">
 
-          <!-- Top Grid: Live AI Risk Gauge & Threat Radar -->
+          <!-- Risk & Step-Up Distribution Strip -->
+          <div class="p-4 rounded-2xl bg-black/70 border border-red-900/50 space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-red-950">
+              <h4 class="font-heading font-extrabold text-xs text-white uppercase tracking-wider flex items-center gap-2">
+                <span>🛡️</span> Zero-Trust Risk Distribution &amp; Adaptive Verification Activity
+              </h4>
+              <span id="soc-risk-anomaly" class="text-[10px] text-sky-400 font-mono font-bold bg-sky-950/80 px-2.5 py-0.5 rounded border border-sky-800">
+                ANOMALY RATE: 0%
+              </span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+              <div class="p-3 rounded-xl bg-black/60 border border-emerald-950 space-y-1">
+                <span class="text-slate-400 text-[10px] block">🟢 Low Risk Sessions</span>
+                <strong id="soc-risk-low" class="text-base font-bold text-emerald-400">—</strong>
+                <span class="text-slate-500 text-[10px] block">Autonomous access</span>
+              </div>
+              <div class="p-3 rounded-xl bg-black/60 border border-amber-950 space-y-1">
+                <span class="text-slate-400 text-[10px] block">🟡 Medium Risk Sessions</span>
+                <strong id="soc-risk-med" class="text-base font-bold text-amber-300">—</strong>
+                <span class="text-slate-500 text-[10px] block">Continuous monitoring</span>
+              </div>
+              <div class="p-3 rounded-xl bg-black/60 border border-red-950 space-y-1">
+                <span class="text-slate-400 text-[10px] block">🔴 High / Critical Risk</span>
+                <strong id="soc-risk-high" class="text-base font-bold text-red-400">—</strong>
+                <span class="text-slate-500 text-[10px] block">Step-Up / Blocked</span>
+              </div>
+              <div class="p-3 rounded-xl bg-black/60 border border-purple-950 space-y-1">
+                <span class="text-slate-400 text-[10px] block">🟣 Step-Up Verifications</span>
+                <strong id="soc-risk-stepup" class="text-base font-bold text-purple-300">—</strong>
+                <span class="text-slate-500 text-[10px] block">MFA Challenges</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Two-Column Overview: Open Alerts & Recent Security Events -->
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-            <!-- Left 7 Cols: Live Behavior History & AI Risk Trends -->
-            <div class="lg:col-span-7 glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/60 space-y-4">
+            <!-- Left: Open Security Alerts -->
+            <div class="lg:col-span-6 glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/60 space-y-3">
               <div class="flex items-center justify-between pb-3 border-b border-red-950">
                 <div class="flex items-center gap-2">
-                  <span class="text-red-400 font-bold">📈</span>
-                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">AI Behavior History &amp; Risk Trends</h4>
+                  <span class="text-amber-400 font-bold">🚨</span>
+                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Active Threat Alerts</h4>
                 </div>
-                <span class="text-[10px] text-emerald-400 font-bold bg-emerald-950 px-2.5 py-1 rounded border border-emerald-800">
-                  ENTROPY STABLE (0.001)
-                </span>
-              </div>
-
-              <!-- Animated Waveform Chart -->
-              <div class="h-44 w-full bg-black/80 rounded-xl border border-red-950 p-3 flex flex-col justify-between relative overflow-hidden">
-                <div class="flex items-center justify-between text-[10px] text-slate-500">
-                  <span>100% Neural Match</span>
-                  <span>Real-Time Biometric Vector Stream</span>
-                  <span>0% Anomaly</span>
-                </div>
-
-                <!-- SVG Graph Waveform -->
-                <div class="w-full h-24 relative flex items-center">
-                  <svg class="w-full h-full text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]" viewBox="0 0 500 80" preserveAspectRatio="none">
-                    <path d="M0,40 Q25,10 50,40 T100,40 T150,20 T200,50 T250,30 T300,40 T350,15 T400,45 T450,35 T500,40" fill="none" stroke="currentColor" stroke-width="2.5" />
-                  </svg>
-                </div>
-
-                <div class="flex items-center justify-between text-[10px] text-slate-400 font-bold">
-                  <span>Keystroke Flight: 124ms</span>
-                  <span>Cursor Velocity: 840px/s</span>
-                  <span>Touch Angle: 42°</span>
+                <div class="flex items-center gap-1.5">
+                  <span id="soc-overview-alerts-badge" class="text-[10px] text-amber-300 font-bold bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800">
+                    LIVE INCIDENTS
+                  </span>
+                  <select id="soc-alerts-scope-select" onchange="window.onSocScopeChange('alerts', this.value)" class="text-[10px] font-mono bg-black/80 border border-slate-700 text-slate-300 rounded px-1.5 py-0.5 focus:border-red-500 focus:outline-none">
+                    <option value="all">Scope: All</option>
+                    <option value="genuine" selected>Scope: Genuine Only</option>
+                    <option value="simulated">Scope: Simulated</option>
+                  </select>
                 </div>
               </div>
-
-              <div class="grid grid-cols-3 gap-3 text-[11px]">
-                <div class="p-2.5 rounded-xl bg-black/50 border border-red-950 flex flex-col">
-                  <span class="text-slate-400">Keystroke Match</span>
-                  <strong class="text-emerald-400 font-bold">99.98%</strong>
-                </div>
-                <div class="p-2.5 rounded-xl bg-black/50 border border-red-950 flex flex-col">
-                  <span class="text-slate-400">Mouse Velocity</span>
-                  <strong class="text-emerald-400 font-bold">Human Standard</strong>
-                </div>
-                <div class="p-2.5 rounded-xl bg-black/50 border border-red-950 flex flex-col">
-                  <span class="text-slate-400">Device Fingerprint</span>
-                  <strong class="text-sky-400 font-bold">Attested</strong>
-                </div>
+              <div id="soc-overview-alerts" class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                <div class="p-6 text-center text-slate-500 font-mono text-xs">Loading open alerts...</div>
               </div>
             </div>
 
-            <!-- Right 5 Cols: Global Threat Radar & Nodes -->
-            <div class="lg:col-span-5 glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/60 space-y-4">
+            <!-- Right: Real Recent Security Audit Events -->
+            <div class="lg:col-span-6 glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/60 space-y-3">
               <div class="flex items-center justify-between pb-3 border-b border-red-950">
                 <div class="flex items-center gap-2">
-                  <span class="text-red-400 font-bold">🗺</span>
-                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Threat Map &amp; Radar</h4>
+                  <span class="text-red-400 font-bold">📜</span>
+                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Live Security Event Feed</h4>
                 </div>
-                <span class="text-[10px] text-sky-400 font-bold bg-sky-950 px-2.5 py-1 rounded border border-sky-800">
-                  4 NODES ACTIVE
-                </span>
-              </div>
-
-              <!-- Radar Container -->
-              <div class="h-44 w-full bg-black/80 rounded-xl border border-red-950 p-4 flex flex-col items-center justify-center relative">
-                <div class="w-32 h-32 rounded-full border border-red-900/40 relative flex items-center justify-center animate-pulse">
-                  <div class="w-20 h-20 rounded-full border border-red-800/60 flex items-center justify-center">
-                    <div class="w-8 h-8 rounded-full bg-red-600/30 border border-red-500 flex items-center justify-center text-[10px] text-white font-bold animate-ping"></div>
-                  </div>
-                  <!-- Pinging Nodes -->
-                  <span class="absolute top-2 left-4 w-2 h-2 bg-emerald-400 rounded-full animate-ping" title="Bengaluru HQ"></span>
-                  <span class="absolute bottom-4 right-6 w-2 h-2 bg-emerald-400 rounded-full animate-ping" title="San Francisco Node"></span>
-                  <span class="absolute top-6 right-8 w-2 h-2 bg-red-500 rounded-full animate-ping" title="Blocked Node"></span>
+                <div class="flex items-center gap-1.5">
+                  <select id="soc-events-scope-select" onchange="window.onSocScopeChange('events', this.value)" class="text-[10px] font-mono bg-black/80 border border-slate-700 text-slate-300 rounded px-1.5 py-0.5 focus:border-red-500 focus:outline-none">
+                    <option value="all">Scope: All</option>
+                    <option value="genuine" selected>Scope: Genuine Only</option>
+                    <option value="simulated">Scope: Simulated</option>
+                  </select>
                 </div>
-                <span class="text-[10px] text-slate-400 mt-2">Active Geo Shield: Bengaluru &bull; SF &bull; Frankfurt &bull; Tokyo</span>
               </div>
-
-              <div class="p-3 rounded-xl bg-red-950/30 border border-red-900/40 flex items-center justify-between text-[11px]">
-                <span class="text-slate-300">Latest Intercept:</span>
-                <strong class="text-red-400 font-bold">Blocked Botnet (185.220.101.4)</strong>
+              <div id="soc-live-logs" class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                <div class="p-6 text-center text-slate-500 font-mono text-xs">Loading security audit feed...</div>
               </div>
             </div>
 
           </div>
 
-          <!-- VISUAL BEHAVIOR TIMELINE (JUDGES VISIBILITY FEATURE) -->
-          <div class="glass-panel p-6 rounded-2xl border border-red-900/50 bg-black/80 space-y-5">
-            <div class="flex items-center justify-between pb-3 border-b border-red-950">
-              <div class="flex items-center gap-2.5">
-                <span class="text-red-400 font-bold text-lg">⏳</span>
+        </div>
+
+        <!-- 2. USERS & SESSIONS TAB -->
+        <div id="dash-content-users" class="hidden space-y-6">
+
+          <!-- Active Enterprise Sessions Panel -->
+          <div class="glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/60 space-y-3">
+            <div class="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-red-950 gap-3">
+              <div class="flex items-center gap-2">
+                <span class="text-red-400 font-bold">⚡</span>
                 <div>
-                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">AI Behavior Threat Timeline</h4>
-                  <p class="text-[11px] text-slate-400">Step-by-step AI threat interception &amp; anomaly detection sequence</p>
+                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Live &amp; Historical Sessions</h4>
+                  <p class="text-[11px] text-slate-400">Searchable Zero-Trust session directory with administrative revocation &amp; risk inspection.</p>
                 </div>
               </div>
-              <span class="px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-red-950 text-red-400 border border-red-800 animate-pulse">
-                LIVE SOC SEQUENCER
+              <div class="flex items-center gap-2">
+                <span id="soc-sessions-count-badge" class="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-800">
+                  LIVE
+                </span>
+              </div>
+            </div>
+
+            <!-- Session Search & Filter Controls -->
+            <div class="grid grid-cols-1 sm:grid-cols-5 gap-2.5 p-3 rounded-xl bg-black/50 border border-red-950 text-xs font-mono">
+              <div class="sm:col-span-2">
+                <input id="soc-sessions-search" type="text" oninput="window.filterSocSessions()" placeholder="🔍 Search by user, email, or session ID..." class="w-full px-3 py-1.5 rounded-lg bg-black border border-red-900/60 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 text-xs">
+              </div>
+              <div>
+                <select id="soc-sessions-status" onchange="window.filterSocSessions()" class="w-full px-2.5 py-1.5 rounded-lg bg-black border border-red-900/60 text-white text-xs focus:outline-none focus:border-red-500">
+                  <option value="ALL">Status: ALL</option>
+                  <option value="ACTIVE" selected>Status: ACTIVE</option>
+                  <option value="RESTRICTED">Status: RESTRICTED</option>
+                  <option value="STEP_UP_REQUIRED">Status: STEP-UP REQUIRED</option>
+                  <option value="TERMINATED">Status: TERMINATED</option>
+                </select>
+              </div>
+              <div>
+                <select id="soc-sessions-risk" onchange="window.filterSocSessions()" class="w-full px-2.5 py-1.5 rounded-lg bg-black border border-red-900/60 text-white text-xs focus:outline-none focus:border-red-500">
+                  <option value="ALL">Risk: ALL</option>
+                  <option value="LOW">Risk: LOW</option>
+                  <option value="MEDIUM">Risk: MEDIUM</option>
+                  <option value="HIGH">Risk: HIGH</option>
+                  <option value="CRITICAL">Risk: CRITICAL</option>
+                </select>
+              </div>
+              <div>
+                <select id="soc-sessions-scope" onchange="window.filterSocSessions()" class="w-full px-2.5 py-1.5 rounded-lg bg-black border border-red-900/60 text-white text-xs focus:outline-none focus:border-red-500">
+                  <option value="all">Scope: ALL</option>
+                  <option value="genuine" selected>Scope: GENUINE ONLY</option>
+                  <option value="simulated">Scope: SIMULATED</option>
+                </select>
+              </div>
+            </div>
+            <div id="soc-sessions-table-container" class="overflow-x-auto max-h-96 pr-1">
+              <div class="p-6 text-center text-slate-500 font-mono text-xs">Loading active enterprise sessions...</div>
+            </div>
+          </div>
+
+          <!-- Enterprise User Directory Panel -->
+          <div class="glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/60 space-y-3">
+            <div class="flex items-center justify-between pb-3 border-b border-red-950">
+              <div class="flex items-center gap-2">
+                <span class="text-red-400 font-bold">👥</span>
+                <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Registered Enterprise Users</h4>
+              </div>
+              <span id="soc-users-count-badge" class="text-[10px] text-sky-400 font-mono font-bold bg-sky-950/80 px-2.5 py-0.5 rounded border border-sky-800">
+                DIRECTORY
+              </span>
+            </div>
+            <div id="soc-users-table-container" class="overflow-x-auto max-h-96 pr-1">
+              <div class="p-6 text-center text-slate-500 font-mono text-xs">Loading registered users...</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 3. DEVICE INVENTORY TAB -->
+        <div id="dash-content-devices" class="hidden space-y-6">
+          <div class="glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/60 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-red-950 gap-3">
+              <div class="flex items-center gap-2">
+                <span class="text-sky-400 font-bold">💻</span>
+                <div>
+                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Device Inventory &amp; Trust Review Queue</h4>
+                  <p class="text-[11px] text-slate-400">Zero Trust Device Verification • Persistent cryptanalytic device binding &amp; revocation.</p>
+                </div>
+              </div>
+              <span id="soc-devices-count-badge" class="text-[10px] text-sky-300 font-mono font-bold bg-sky-950/80 px-2.5 py-0.5 rounded border border-sky-800">
+                PERSISTED
               </span>
             </div>
 
-            <!-- Vertical Timeline Steps -->
-            <div class="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-emerald-500 before:via-amber-500 before:to-red-600 font-mono text-xs">
+            <!-- Queue Filters -->
+            <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-black/40 border border-red-950 text-xs font-mono">
+              <div class="flex flex-wrap items-center gap-1.5" id="soc-device-queue-pills">
+                <button type="button" onclick="window.filterSocDevices('ALL')" id="dev-filter-all" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-600 text-white cursor-pointer transition-all">ALL RECORDS</button>
+                <button type="button" onclick="window.filterSocDevices('ACTIVE')" id="dev-filter-active" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-black border border-emerald-900/60 text-emerald-400 hover:bg-emerald-950/40 cursor-pointer transition-all">🟢 ACTIVE LIVE</button>
+                <button type="button" onclick="window.filterSocDevices('PENDING_CONFIRMATION')" id="dev-filter-pending" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-black border border-amber-900/60 text-amber-300 hover:bg-amber-950/40 cursor-pointer transition-all">AWAITING CONFIRMATION</button>
+                <button type="button" onclick="window.filterSocDevices('TRUSTED')" id="dev-filter-trusted" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-black border border-emerald-900/60 text-emerald-300 hover:bg-emerald-950/40 cursor-pointer transition-all">TRUSTED</button>
+                <button type="button" onclick="window.filterSocDevices('REVOKED')" id="dev-filter-revoked" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-black border border-red-900/60 text-red-300 hover:bg-red-950/40 cursor-pointer transition-all">REVOKED</button>
+                <button type="button" onclick="window.filterSocDevices('KNOWN_TEST')" id="dev-filter-test" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-black border border-purple-900/60 text-purple-300 hover:bg-purple-950/40 cursor-pointer transition-all">🧪 KNOWN TEST</button>
+                <button type="button" onclick="window.filterSocDevices('INSUFFICIENT')" id="dev-filter-insufficient" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-black border border-slate-800 text-slate-400 hover:bg-slate-900 cursor-pointer transition-all">INSUFFICIENT EVIDENCE</button>
+              </div>
+              <span class="text-[10px] text-slate-500 hidden md:inline">1 Live Device · 101 Historical Persisted Records (Physical Hardware Unconfirmed)</span>
+            </div>
 
-              <!-- Step 1: 10:11 Login Successful -->
-              <div class="relative group">
-                <span class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-emerald-950 border-2 border-emerald-400 flex items-center justify-center text-[10px] text-emerald-400 font-bold shadow-[0_0_10px_rgba(52,211,153,0.8)]">1</span>
-                <div class="p-3.5 rounded-xl bg-slate-950/80 border border-emerald-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-md">
-                  <div class="space-y-0.5">
-                    <div class="flex items-center gap-2">
-                      <span class="text-emerald-400 font-bold text-sm">10:11</span>
-                      <strong class="text-white text-sm font-sans font-bold">Login Successful</strong>
-                    </div>
-                    <p class="text-slate-400 text-[11px]">Primary user authenticated via passwordless biometrics.</p>
-                  </div>
-                  <span class="px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-bold shrink-0">🟢 SESSION VERIFIED</span>
+            <div id="soc-devices-table-container" class="overflow-x-auto max-h-[32rem] pr-1">
+              <div class="p-6 text-center text-slate-500 font-mono text-xs">Loading registered device inventory...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. BEHAVIORAL AI INTELLIGENCE TAB -->
+        <div id="dash-content-behavior" class="hidden space-y-6">
+          <div class="p-5 rounded-2xl bg-black/60 border border-red-900/50 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-red-950">
+              <div class="flex items-center gap-2">
+                <span class="text-purple-400 font-bold text-base">🧠</span>
+                <div>
+                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">10-Dimensional Behavioral Telemetry Baseline</h4>
+                  <p class="text-[11px] text-slate-400">Inspect genuine user behavioral vectors, maturity calibration, and Isolation Forest ML state.</p>
                 </div>
               </div>
+              <div class="flex items-center gap-2">
+                <label for="soc-behavior-user-select" class="text-slate-400 text-xs shrink-0">Inspect User:</label>
+                <select id="soc-behavior-user-select" onchange="window.inspectUserBehavior(this.value)" class="px-3 py-1.5 rounded-xl bg-black border border-red-900/60 text-white font-mono text-xs focus:outline-none focus:border-red-500">
+                  <option value="">Loading users...</option>
+                </select>
+              </div>
+            </div>
 
-              <!-- Step 2: 10:13 Typing Pattern Changed -->
-              <div class="relative group">
-                <span class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-amber-950 border-2 border-amber-400 flex items-center justify-center text-[10px] text-amber-400 font-bold shadow-[0_0_10px_rgba(245,158,11,0.8)]">2</span>
-                <div class="p-3.5 rounded-xl bg-slate-950/80 border border-amber-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-md">
-                  <div class="space-y-0.5">
-                    <div class="flex items-center gap-2">
-                      <span class="text-amber-400 font-bold text-sm">10:13</span>
-                      <strong class="text-white text-sm font-sans font-bold">Typing Pattern Changed</strong>
-                    </div>
-                    <p class="text-slate-400 text-[11px]">Keystroke flight time variance shifted +42ms. AI Engine flagged anomaly.</p>
-                  </div>
-                  <span class="px-2.5 py-1 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] font-bold shrink-0">🟡 ANOMALY DETECTED</span>
+            <div id="soc-behavior-display" class="space-y-5">
+              <div class="p-8 text-center text-slate-500 font-mono text-xs">Select a user above to view their behavioral telemetry baseline.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. SECURITY EVENTS & ALERTS TAB -->
+        <div id="dash-content-logs" class="hidden space-y-6">
+          <div class="p-5 rounded-2xl bg-black/60 border border-red-900/50 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-red-950">
+              <div class="flex items-center gap-2">
+                <span class="text-red-400 font-bold text-base">📜</span>
+                <div>
+                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Cryptographic Security Events &amp; Alert Resolution</h4>
+                  <p class="text-[11px] text-slate-400">Immutable audit logs of all authentication, risk decisions, revocations, and threat incidents.</p>
                 </div>
               </div>
+              <div class="flex items-center gap-2">
+                <label for="soc-events-severity-filter" class="text-slate-400 text-xs shrink-0">Severity:</label>
+                <select id="soc-events-severity-filter" onchange="window.filterSocEvents(this.value)" class="px-3 py-1.5 rounded-xl bg-black border border-red-900/60 text-white font-mono text-xs focus:outline-none focus:border-red-500">
+                  <option value="ALL">ALL SEVERITIES</option>
+                  <option value="CRITICAL">CRITICAL</option>
+                  <option value="HIGH">HIGH</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="LOW">LOW</option>
+                </select>
+              </div>
+            </div>
 
-              <!-- Step 3: 10:14 New Device Detected -->
-              <div class="relative group">
-                <span class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-orange-950 border-2 border-orange-500 flex items-center justify-center text-[10px] text-orange-400 font-bold shadow-[0_0_10px_rgba(249,115,22,0.8)]">3</span>
-                <div class="p-3.5 rounded-xl bg-slate-950/80 border border-orange-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-md">
-                  <div class="space-y-0.5">
-                    <div class="flex items-center gap-2">
-                      <span class="text-orange-400 font-bold text-sm">10:14</span>
-                      <strong class="text-white text-sm font-sans font-bold">New Device Detected</strong>
-                    </div>
-                    <p class="text-slate-400 text-[11px]">Unregistered hardware fingerprint &amp; foreign IP address attestation mismatch.</p>
-                  </div>
-                  <span class="px-2.5 py-1 rounded bg-orange-950 text-orange-300 border border-orange-800 text-[10px] font-bold shrink-0">🟠 UNTRUSTED DEVICE</span>
+            <!-- Full Alerts Panel -->
+            <div class="space-y-3">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <h5 class="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🚨</span> Open &amp; Historical Incidents
+                  </h5>
+                  <span id="soc-logs-alerts-count" class="text-[10px] font-mono text-amber-400 font-bold">—</span>
+                </div>
+                <!-- Alert Lifecycle Status Filters -->
+                <div class="flex flex-wrap items-center gap-1 font-mono text-[10px]" id="soc-alert-status-pills">
+                  <button type="button" onclick="window.filterSocAlerts('ALL')" id="alert-pill-all" class="px-2.5 py-0.5 rounded font-bold bg-red-600 text-white cursor-pointer">ALL</button>
+                  <button type="button" onclick="window.filterSocAlerts('OPEN')" id="alert-pill-open" class="px-2.5 py-0.5 rounded font-bold bg-black border border-amber-900/60 text-amber-300 hover:bg-amber-950/40 cursor-pointer">OPEN</button>
+                  <button type="button" onclick="window.filterSocAlerts('REOPENED')" id="alert-pill-reopened" class="px-2.5 py-0.5 rounded font-bold bg-black border border-amber-900/60 text-amber-300 hover:bg-amber-950/40 cursor-pointer">REOPENED</button>
+                  <button type="button" onclick="window.filterSocAlerts('ACKNOWLEDGED')" id="alert-pill-ack" class="px-2.5 py-0.5 rounded font-bold bg-black border border-sky-900/60 text-sky-300 hover:bg-sky-950/40 cursor-pointer">ACKNOWLEDGED</button>
+                  <button type="button" onclick="window.filterSocAlerts('INVESTIGATING')" id="alert-pill-inv" class="px-2.5 py-0.5 rounded font-bold bg-black border border-purple-900/60 text-purple-300 hover:bg-purple-950/40 cursor-pointer">INVESTIGATING</button>
+                  <button type="button" onclick="window.filterSocAlerts('RESOLVED')" id="alert-pill-res" class="px-2.5 py-0.5 rounded font-bold bg-black border border-emerald-900/60 text-emerald-300 hover:bg-emerald-950/40 cursor-pointer">RESOLVED</button>
                 </div>
               </div>
+              <div id="soc-all-alerts-container" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                <div class="p-6 text-center text-slate-500 font-mono text-xs">Loading alerts...</div>
+              </div>
+            </div>
 
-              <!-- Step 4: 10:15 Risk Increased -->
-              <div class="relative group">
-                <span class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-red-950 border-2 border-red-500 flex items-center justify-center text-[10px] text-red-400 font-bold shadow-[0_0_10px_rgba(239,68,68,0.8)]">4</span>
-                <div class="p-3.5 rounded-xl bg-slate-950/80 border border-red-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-md">
-                  <div class="space-y-0.5">
-                    <div class="flex items-center gap-2">
-                      <span class="text-red-400 font-bold text-sm">10:15</span>
-                      <strong class="text-white text-sm font-sans font-bold">Risk Increased</strong>
-                    </div>
-                    <p class="text-slate-400 text-[11px]">Cumulative AI risk score breached threshold to 0.894 (CRITICAL ATO Threat).</p>
-                  </div>
-                  <span class="px-2.5 py-1 rounded bg-red-950 text-red-400 border border-red-800 text-[10px] font-bold shrink-0">🔴 RISK BREACH (0.894)</span>
+            <!-- Full Security Events Table -->
+            <div class="space-y-3 pt-3 border-t border-red-950">
+              <div class="flex items-center justify-between">
+                <h5 class="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>📜</span> Security Event Audit Trail
+                </h5>
+                <span id="soc-logs-events-count" class="text-[10px] font-mono text-slate-400 font-bold">—</span>
+              </div>
+              <div id="soc-all-events-container" class="overflow-x-auto max-h-96 pr-1">
+                <div class="p-6 text-center text-slate-500 font-mono text-xs">Loading security event audit feed...</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 6. SECURITY AUDIT TRAIL TAB -->
+        <div id="dash-content-audit" class="hidden space-y-6">
+          <div class="p-5 rounded-2xl bg-black/60 border border-red-900/50 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-red-950">
+              <div class="flex items-center gap-2">
+                <span class="text-red-400 font-bold text-base">📋</span>
+                <div>
+                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Administrative &amp; Operator Audit Trail</h4>
+                  <p class="text-[11px] text-slate-400">Cryptographically correlated record of operator interventions, device trust changes, session revocations, and triage history.</p>
                 </div>
               </div>
-
-              <!-- Step 5: 10:15 Session Locked -->
-              <div class="relative group">
-                <span class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-red-600 border-2 border-white flex items-center justify-center text-[10px] text-white font-bold shadow-[0_0_15px_rgba(239,68,68,1)]">5</span>
-                <div class="p-3.5 rounded-xl bg-gradient-to-r from-red-950/80 via-black to-red-950/80 border-2 border-red-600 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-[0_0_30px_rgba(239,68,68,0.4)]">
-                  <div class="space-y-0.5">
-                    <div class="flex items-center gap-2">
-                      <span class="text-red-400 font-bold text-sm">10:15</span>
-                      <strong class="text-white text-sm font-sans font-bold">Session Locked &amp; Intercepted</strong>
-                    </div>
-                    <p class="text-slate-300 text-[11px]">Zero-Trust automated kill-switch executed. Account &amp; tokens instantly revoked.</p>
-                  </div>
-                  <span class="px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold text-xs tracking-wider uppercase shadow-[0_0_15px_rgba(239,68,68,0.8)] shrink-0">⛔ SESSION KILLED</span>
-                </div>
+              <div class="flex items-center gap-2">
+                <label for="soc-audit-action-filter" class="text-slate-400 text-xs shrink-0">Action:</label>
+                <select id="soc-audit-action-filter" onchange="window.loadSocAuditLogs(this.value)" class="px-3 py-1.5 rounded-xl bg-black border border-red-900/60 text-white font-mono text-xs focus:outline-none focus:border-red-500">
+                  <option value="ALL">ALL ADMINISTRATIVE ACTIONS</option>
+                  <option value="ADMIN_SESSION_TERMINATED">SESSION TERMINATED</option>
+                  <option value="ADMIN_DEVICE_REVOKED">DEVICE REVOKED</option>
+                  <option value="ADMIN_DEVICE_TRUSTED">DEVICE TRUST CONFIRMED</option>
+                  <option value="ADMIN_ALERT_TRIAGED">ALERT TRIAGED</option>
+                  <option value="ADMIN_ALERT_RESOLVED">ALERT RESOLVED</option>
+                  <option value="ADMIN_RESCAN">AI RE-SCAN EXECUTED</option>
+                </select>
               </div>
+            </div>
 
+            <div id="soc-audit-table-container" class="overflow-x-auto max-h-[30rem] pr-1">
+              <div class="p-6 text-center text-slate-500 font-mono text-xs">Loading audit trail...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. HISTORICAL ANALYTICS & MEASURABLE SYSTEM HEALTH TAB -->
+        <div id="dash-content-health" class="hidden space-y-6">
+          <!-- Time Range Selector -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-black/70 border border-red-950 font-mono text-xs">
+            <div class="flex items-center gap-2">
+              <span class="text-amber-400 font-bold">📊</span>
+              <div>
+                <strong class="text-white text-xs block uppercase">Zero-Trust Telemetry &amp; Access Analytics</strong>
+                <span class="text-[10px] text-slate-400">Persisted historical metrics across authentication, behavioral risk, challenges, and enforcement.</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="window.loadSocAnalytics('24h')" id="analytics-btn-24h" class="px-3 py-1 rounded-lg text-[11px] font-bold bg-red-600 text-white cursor-pointer">24 Hours</button>
+              <button type="button" onclick="window.loadSocAnalytics('7d')" id="analytics-btn-7d" class="px-3 py-1 rounded-lg text-[11px] font-bold bg-black border border-red-900/60 text-slate-300 hover:bg-red-950/40 cursor-pointer">7 Days</button>
+              <button type="button" onclick="window.loadSocAnalytics('30d')" id="analytics-btn-30d" class="px-3 py-1 rounded-lg text-[11px] font-bold bg-black border border-red-900/60 text-slate-300 hover:bg-red-950/40 cursor-pointer">30 Days</button>
             </div>
           </div>
 
-          <!-- Bottom Grid: Live Streaming Attack Timeline & Login Logs -->
-          <div class="glass-panel p-5 rounded-2xl border border-red-900/50 bg-black/60 space-y-4">
+          <!-- Real Analytics Numbers Grid -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs" id="soc-analytics-metrics-grid">
+            <div class="p-3.5 rounded-xl bg-black/60 border border-red-950 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase block">Total Auth Attempts</span>
+              <strong id="analytics-stat-auth-total" class="text-lg font-bold text-white">—</strong>
+              <span id="analytics-stat-auth-rate" class="text-[10px] text-emerald-400 block">—% Success</span>
+            </div>
+            <div class="p-3.5 rounded-xl bg-black/60 border border-emerald-950 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase block">Autonomous Allow</span>
+              <strong id="analytics-stat-allow" class="text-lg font-bold text-emerald-400">—</strong>
+              <span class="text-[10px] text-slate-500 block">Low Risk</span>
+            </div>
+            <div class="p-3.5 rounded-xl bg-black/60 border border-purple-950 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase block">Step-Up Challenges</span>
+              <strong id="analytics-stat-stepup" class="text-lg font-bold text-purple-300">—</strong>
+              <span id="analytics-stat-stepup-rate" class="text-[10px] text-purple-400 block">— Verified</span>
+            </div>
+            <div class="p-3.5 rounded-xl bg-black/60 border border-amber-950 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase block">Sessions Restricted</span>
+              <strong id="analytics-stat-restricted" class="text-lg font-bold text-amber-300">—</strong>
+              <span class="text-[10px] text-slate-500 block">Behavior Deviation</span>
+            </div>
+            <div class="p-3.5 rounded-xl bg-black/60 border border-red-950 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase block">Sessions Terminated</span>
+              <strong id="analytics-stat-terminated" class="text-lg font-bold text-red-400">—</strong>
+              <span class="text-[10px] text-slate-500 block">Enforced / Expired</span>
+            </div>
+            <div class="p-3.5 rounded-xl bg-black/60 border border-sky-950 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase block">Alerts Resolved</span>
+              <strong id="analytics-stat-alerts" class="text-lg font-bold text-sky-300">—</strong>
+              <span id="analytics-stat-alerts-rate" class="text-[10px] text-slate-500 block">—% Triage</span>
+            </div>
+          </div>
+
+          <!-- Measurable System Health (No Fabricated Uptime) -->
+          <div class="p-5 rounded-2xl bg-black/60 border border-red-900/50 space-y-4">
             <div class="flex items-center justify-between pb-3 border-b border-red-950">
               <div class="flex items-center gap-2">
-                <span class="text-red-400 font-bold">📜</span>
-                <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Attack Timeline &amp; Real-Time Login Logs</h4>
+                <span class="text-emerald-400 font-bold text-base">🟢</span>
+                <div>
+                  <h4 class="font-heading font-extrabold text-sm text-white uppercase tracking-wider">Measurable System Health &amp; Ingestion Freshness</h4>
+                  <p class="text-[11px] text-slate-400">Direct database round-trip ping, telemetry stream status, and recent ingestion timestamps.</p>
+                </div>
               </div>
-              <span class="text-[10px] text-slate-400">Streaming Live Feed</span>
+              <button onclick="window.loadSocSystemHealth()" class="px-3 py-1 rounded-lg text-xs font-mono font-bold bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 cursor-pointer">↻ Ping Now</button>
             </div>
 
-            <div id="soc-live-logs" class="space-y-2 max-h-48 overflow-y-auto pr-1">
-              <div class="p-3 rounded-xl bg-black/50 border border-emerald-950 flex items-center justify-between font-mono text-[11px]">
-                <div class="flex items-center gap-3">
-                  <span class="text-emerald-400 font-bold">🟢 [00:43:12]</span>
-                  <span class="text-white font-bold">Boomika Ram (Bengaluru Node)</span>
-                  <span class="text-slate-400 text-[10px]">&bull; Keystroke Match 99.98% &bull; Risk: 0.001</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs" id="soc-health-grid">
+              <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-1">
+                <span class="text-slate-400 text-[10px] block">Database Connectivity</span>
+                <div class="flex items-center gap-2">
+                  <span id="health-db-status" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <strong id="health-db-status-text" class="text-white text-sm font-bold">CONNECTED</strong>
                 </div>
-                <span class="px-2.5 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded text-[10px] font-bold">AUTHENTICATED</span>
+                <span id="health-db-latency" class="text-[10px] text-emerald-400 block">Ping Latency: — ms</span>
               </div>
-
-              <div class="p-3 rounded-xl bg-black/50 border border-red-950 flex items-center justify-between font-mono text-[11px]">
-                <div class="flex items-center gap-3">
-                  <span class="text-red-400 font-bold">🔴 [00:41:05]</span>
-                  <span class="text-white font-bold">ATO Attack Attempt (Account #84920)</span>
-                  <span class="text-slate-400 text-[10px]">&bull; Anomaly Score: 94.2% &bull; Motor Flight Mismatch</span>
-                </div>
-                <span class="px-2.5 py-0.5 bg-red-950 text-red-400 border border-red-800 rounded text-[10px] font-bold">INTERCEPTED &amp; BLOCKED</span>
+              <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-1">
+                <span class="text-slate-400 text-[10px] block">Telemetry Pipeline</span>
+                <strong id="health-telemetry-status" class="text-white text-sm font-bold">ACTIVE</strong>
+                <span class="text-[10px] text-slate-500 block">10-Dimensional Vector Engine</span>
               </div>
-
-              <div class="p-3 rounded-xl bg-black/50 border border-sky-950 flex items-center justify-between font-mono text-[11px]">
-                <div class="flex items-center gap-3">
-                  <span class="text-sky-400 font-bold">🟡 [00:38:44]</span>
-                  <span class="text-white font-bold">New Device Onboarded (Mac M3 Pro)</span>
-                  <span class="text-slate-400 text-[10px]">&bull; Hardware TPM 2.0 Attested &bull; Bengaluru Node</span>
-                </div>
-                <span class="px-2.5 py-0.5 bg-sky-950 text-sky-400 border border-sky-800 rounded text-[10px] font-bold">TRUSTED</span>
+              <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-1">
+                <span class="text-slate-400 text-[10px] block">Last Event Ingested</span>
+                <strong id="health-last-event" class="text-white text-xs font-bold truncate block">—</strong>
+                <span id="health-last-event-sub" class="text-[10px] text-slate-400 block">Waiting for telemetry...</span>
               </div>
-
-              <div class="p-3 rounded-xl bg-black/50 border border-emerald-950 flex items-center justify-between font-mono text-[11px]">
-                <div class="flex items-center gap-3">
-                  <span class="text-emerald-400 font-bold">🟢 [00:35:10]</span>
-                  <span class="text-white font-bold">Dr. Boomika Ram (AyuSync EHR)</span>
-                  <span class="text-slate-400 text-[10px]">&bull; Doctor Proximity Shield Lock Verified</span>
-                </div>
-                <span class="px-2.5 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded text-[10px] font-bold">EHR ACCESS GRANTED</span>
+              <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-1">
+                <span class="text-slate-400 text-[10px] block">Active DB Sessions</span>
+                <strong id="health-active-sessions" class="text-white text-sm font-bold">—</strong>
+                <span class="text-[10px] text-emerald-400 block">Zero-Trust Evaluated</span>
               </div>
             </div>
-          </div>
-
-        </div>
-
-        <!-- 2. BEHAVIOR HISTORY & RISK TRENDS TAB -->
-        <div id="dash-content-behavior" class="hidden space-y-6">
-          <div class="p-6 rounded-2xl bg-black/60 border border-red-900/50 space-y-4">
-            <h4 class="font-heading font-bold text-sm text-white uppercase">Behavioral Anomaly &amp; Sensitivity Controls</h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-2">
-                <div class="flex justify-between text-xs">
-                  <span class="text-slate-400">Adaptive Sensitivity:</span>
-                  <span class="text-red-400 font-bold">85% (Strict Enforcement)</span>
-                </div>
-                <div class="w-full h-2 bg-red-950 rounded-full overflow-hidden">
-                  <div class="h-full bg-red-500 w-[85%]"></div>
-                </div>
-              </div>
-              <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-2">
-                <div class="flex justify-between text-xs">
-                  <span class="text-slate-400">Confidence Floor:</span>
-                  <span class="text-amber-400 font-bold">70% Minimum Trust</span>
-                </div>
-                <div class="w-full h-2 bg-red-950 rounded-full overflow-hidden">
-                  <div class="h-full bg-amber-400 w-[70%]"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3. THREAT MAP & GEO RADAR TAB -->
-        <div id="dash-content-threatmap" class="hidden space-y-6">
-          <div class="p-6 rounded-2xl bg-black/60 border border-red-900/50 space-y-4 text-center">
-            <h4 class="font-heading font-bold text-sm text-white uppercase">Global Threat Interception Grid</h4>
-            <div class="h-64 rounded-xl bg-black border border-red-950 flex items-center justify-center text-slate-400">
-              <p>🗺 Active Geo Threat Radar Scanning Across Bengaluru, San Francisco, Frankfurt, and Tokyo Hubs...</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- 4. ATTACK TIMELINE & LOGIN LOGS TAB -->
-        <div id="dash-content-logs" class="hidden space-y-6">
-          <div class="p-6 rounded-2xl bg-black/60 border border-red-900/50 space-y-4">
-            <h4 class="font-heading font-bold text-sm text-white uppercase">Complete Authenticated Audit Log Feed</h4>
-            <p class="text-xs text-slate-400">Every login event, continuous re-verification pulse, and blocked ATO threat is cryptographically signed and stored.</p>
           </div>
         </div>
 
@@ -1822,14 +1961,102 @@
       <!-- SOC Command Footer -->
       <div class="px-6 py-4 border-t border-red-950 bg-red-950/20 flex items-center justify-between text-xs">
         <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span class="text-emerald-400 font-bold">SOC ENGINE ONLINE &bull; 100% OPERATIONAL</span>
+          <span id="soc-engine-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="soc-engine-status-text" class="text-emerald-400 font-bold">SOC ENGINE ONLINE &bull; EVALUATING REAL-TIME SYSTEM TELEMETRY</span>
         </div>
         <button onclick="closeModal('dashboard')" class="px-5 py-2 text-xs font-heading font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.5)] cursor-pointer">
           Close SOC Dashboard
         </button>
       </div>
 
+    </div>
+  </div>
+
+  <!-- ================= 1A. INCIDENT INVESTIGATION DOSSIER MODAL ================= -->
+  <div id="modal-incident-investigation" class="fixed inset-0 z-50 hidden bg-black/95 backdrop-blur-2xl flex items-center justify-center p-3 sm:p-5 font-mono animate-fade-in">
+    <div class="relative w-full max-w-6xl max-h-[92vh] bg-[#06040a] border border-red-900/80 rounded-3xl shadow-[0_0_90px_rgba(220,38,38,0.5)] overflow-hidden flex flex-col">
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-red-950 flex items-center justify-between bg-gradient-to-r from-red-950/90 via-black to-red-950/90 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 rounded-xl bg-red-900/40 border border-red-700/60 text-red-400">
+            <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="font-heading font-extrabold text-base sm:text-lg text-white tracking-wider">SECURITY INCIDENT INVESTIGATION DOSSIER</h3>
+              <span id="inc-modal-status-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800">OPEN</span>
+              <span id="inc-modal-severity-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white">CRITICAL</span>
+            </div>
+            <p class="text-xs text-slate-400">Correlated Identity, Device, Session, 10 Behavioral Vectors, Timeline &amp; Administrative Actions</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="inc-modal-id-badge" class="hidden sm:inline-block px-2.5 py-1 rounded bg-black/70 border border-red-900/60 text-[11px] text-red-300">ID: —</span>
+          <button onclick="closeModal('incident-investigation')" class="p-2 rounded-xl bg-red-950/60 hover:bg-red-900/80 border border-red-800/50 text-slate-400 hover:text-white transition-colors cursor-pointer" title="Close">✕</button>
+        </div>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div id="inc-modal-body" class="p-6 overflow-y-auto space-y-5 text-xs flex-1">
+        <div class="p-8 text-center text-slate-500 font-mono text-xs">Loading incident dossier...</div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-3 border-t border-red-950 bg-red-950/20 flex items-center justify-between text-xs font-mono shrink-0">
+        <span class="text-slate-400 text-[11px]">Zero-Trust Correlated Audit Event • Cryptographically Bound</span>
+        <button onclick="closeModal('incident-investigation')" class="px-4 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl cursor-pointer">
+          Close Dossier
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 1B. AI RE-SCAN FINDINGS MODAL ================= -->
+  <div id="modal-soc-rescan-result" class="fixed inset-0 z-50 hidden bg-black/90 backdrop-blur-2xl flex items-center justify-center p-4 font-mono animate-fade-in">
+    <div class="relative w-full max-w-2xl bg-[#06040a] border border-red-800 rounded-3xl p-6 shadow-[0_0_80px_rgba(239,68,68,0.5)] text-white space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-red-950">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">⚡</span>
+          <h4 class="font-heading font-extrabold text-base text-white tracking-wider">AI ZERO-TRUST SECURITY AUDIT &amp; RE-SCAN</h4>
+        </div>
+        <button onclick="closeModal('soc-rescan-result')" class="p-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/80 text-slate-400 hover:text-white cursor-pointer">✕</button>
+      </div>
+
+      <div class="grid grid-cols-3 gap-3 text-center text-xs">
+        <div class="p-3 rounded-xl bg-black/60 border border-red-950">
+          <span class="text-slate-400 text-[10px] block">Active Sessions</span>
+          <strong id="rescan-eval-sessions" class="text-base font-bold text-white">—</strong>
+        </div>
+        <div class="p-3 rounded-xl bg-black/60 border border-amber-950">
+          <span class="text-slate-400 text-[10px] block">Pending Devices</span>
+          <strong id="rescan-eval-devices" class="text-base font-bold text-amber-300">—</strong>
+        </div>
+        <div class="p-3 rounded-xl bg-black/60 border border-red-950">
+          <span class="text-slate-400 text-[10px] block">Open Threats</span>
+          <strong id="rescan-eval-alerts" class="text-base font-bold text-red-400">—</strong>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <div class="flex items-center justify-between text-xs">
+          <span class="font-bold text-slate-300">Analysis Findings:</span>
+          <span id="rescan-eval-time" class="text-[10px] text-slate-500 font-mono">—</span>
+        </div>
+        <div id="rescan-findings-container" class="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs">
+          <div class="p-3 rounded-xl bg-black/50 border border-slate-900 text-slate-400">No anomalies detected.</div>
+        </div>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-900/60 text-[11px] text-emerald-400 flex items-center gap-2">
+        <span>✓</span>
+        <span>Re-scan completed. Administrative action persisted to cryptographic audit trail.</span>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="closeModal('soc-rescan-result')" class="px-5 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.5)] cursor-pointer">
+          Done
+        </button>
+      </div>
     </div>
   </div>
 
@@ -2116,7 +2343,7 @@
         </div>
 
         <!-- 2A. USER SIGN IN PANE -->
-        <form id="user-auth-signin-pane" onsubmit="submitUserSignIn(event)" class="space-y-4">
+        <form id="user-auth-signin-pane" novalidate onsubmit="submitUserSignIn(event)" class="space-y-4">
           <div class="space-y-1">
             <h4 class="font-heading font-bold text-lg text-white">User Portal Sign In</h4>
             <p class="text-xs font-mono text-slate-400">Enter user credentials to access protected applications.</p>
@@ -2148,7 +2375,7 @@
             </div>
             <div class="p-2.5 rounded-xl bg-red-950/20 border border-red-950/60 space-y-1">
               <div class="flex items-start gap-2">
-                <input id="login-share-location" type="checkbox" class="mt-0.5 rounded accent-red-600 cursor-pointer">
+                <input id="login-share-location" type="checkbox" checked class="mt-0.5 rounded accent-red-600 cursor-pointer">
                 <label for="login-share-location" class="text-[11px] text-slate-300 font-sans cursor-pointer select-none leading-tight">
                   <span class="font-bold text-amber-300">Grant Browser Location</span> for zero-trust login security verification
                 </label>
@@ -2171,7 +2398,7 @@
 
         <!-- 2B. USER SIGN UP PANE -->
         <!-- 2B. USER SIGN UP PANE (ZERO-TRUST MULTI-FACTOR REGISTRATION WIZARD) -->
-        <form id="user-auth-signup-pane" onsubmit="handleSignupWizardSubmit(event)" class="hidden space-y-4">
+        <form id="user-auth-signup-pane" novalidate onsubmit="handleSignupWizardSubmit(event)" class="hidden space-y-4">
           <div class="space-y-1">
             <h4 class="font-heading font-bold text-lg text-white">Zero-Trust Account Enrollment</h4>
             <p class="text-xs font-mono text-slate-400">Continuous biometric factor binding for high-assurance security.</p>
@@ -2340,7 +2567,7 @@
       </div>
 
       <!-- SCREEN 3: SOC ADMIN FORM -->
-      <form id="login-screen-soc" onsubmit="submitLoginForm(event, 'soc')" class="hidden p-6 space-y-5 max-w-md mx-auto w-full">
+      <form id="login-screen-soc" novalidate onsubmit="submitLoginForm(event, 'soc')" class="hidden p-6 space-y-5 max-w-md mx-auto w-full">
         <div class="space-y-1">
           <h4 class="font-heading font-bold text-lg text-white">SOC Administrator Authentication</h4>
           <p class="text-xs font-mono text-slate-400">Enter SOC credentials to access live telemetry and threat response.</p>
@@ -2349,7 +2576,7 @@
         <div class="space-y-4 font-mono text-xs">
           <div class="space-y-1.5">
             <label class="text-slate-300 uppercase tracking-wider block">SOC Admin Email</label>
-            <input id="login-soc-email" type="email" placeholder="admin.soc@cognisec.ai" required class="w-full px-4 py-3 rounded-xl bg-black/80 border border-red-900/50 text-white focus:outline-none focus:border-red-500">
+            <input id="login-soc-email" type="email" placeholder="cognisecai.security@gmail.com" required class="w-full px-4 py-3 rounded-xl bg-black/80 border border-red-900/50 text-white focus:outline-none focus:border-red-500">
           </div>
           <div class="space-y-1.5">
             <div class="flex items-center justify-between">
@@ -2491,7 +2718,7 @@
       </div>
 
       <!-- Step 1: Request OTP -->
-      <form id="pwd-reset-step1-form" onsubmit="submitPasswordResetRequest(event)" class="p-6 space-y-4">
+      <form id="pwd-reset-step1-form" novalidate onsubmit="submitPasswordResetRequest(event)" class="p-6 space-y-4">
         <div class="space-y-1">
           <h4 class="font-heading font-bold text-sm text-white">Request Verification Code</h4>
           <p class="text-xs font-mono text-slate-400">Enter your registered email to receive a 6-digit recovery code via Gmail SMTP.</p>
@@ -2510,7 +2737,7 @@
       </form>
 
       <!-- Step 2: Verify OTP and Set New Password -->
-      <form id="pwd-reset-step2-form" onsubmit="submitPasswordResetVerify(event)" class="hidden p-6 space-y-4">
+      <form id="pwd-reset-step2-form" novalidate onsubmit="submitPasswordResetVerify(event)" class="hidden p-6 space-y-4">
         <div class="space-y-1">
           <h4 class="font-heading font-bold text-sm text-white">Enter Code &amp; New Password</h4>
           <p id="pwd-reset-step2-desc" class="text-xs font-mono text-slate-400">Verification code sent to your email.</p>
@@ -2674,19 +2901,19 @@
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <h3 class="font-heading font-extrabold text-sm sm:text-base text-white tracking-wide">COGNISEC-AI</h3>
+              <h3 class="font-heading font-bold text-sm sm:text-base text-white tracking-wide">COGNISEC-AI</h3>
               <span class="text-slate-600 hidden sm:inline">|</span>
-              <span class="font-mono text-xs text-slate-300 hidden sm:inline">ZERO-TRUST DASHBOARD</span>
-              <span class="px-2 py-0.5 text-[9px] sm:text-[10px] font-mono bg-emerald-950/80 text-emerald-400 border border-emerald-800/70 rounded-full font-bold flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                AUTHENTICATED SESSION
+              <span class="font-sans text-xs text-slate-300 hidden sm:inline">Zero-Trust Dashboard</span>
+              <span class="px-2.5 py-0.5 text-[10px] font-sans bg-emerald-950/80 text-emerald-400 border border-emerald-800/70 rounded-full font-medium flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                Active Session
               </span>
             </div>
-            <p class="text-[11px] font-mono text-slate-400 truncate hidden xs:block">Continuous Identity Verification &amp; Application Portal</p>
+            <p class="text-[11px] font-sans text-slate-400 truncate hidden xs:block">Continuous Identity Verification &amp; Application Portal</p>
           </div>
         </div>
         <div class="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          <button onclick="handleLogout()" class="px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-950/50 hover:bg-red-900/70 border border-red-800/60 text-red-300 hover:text-white font-mono text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5" title="Sign Out">
+          <button onclick="handleLogout()" class="px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-950/50 hover:bg-red-900/70 border border-red-800/60 text-red-300 hover:text-white font-sans text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5" title="Sign Out">
             <span>🚪</span>
             <span class="hidden sm:inline">Logout</span>
           </button>
@@ -2695,7 +2922,7 @@
       </div>
 
       <!-- User Dashboard Body (Single Smooth Scroll Container) -->
-      <div class="p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto overscroll-contain flex-1 font-mono">
+      <div class="p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto overscroll-contain flex-1 font-sans">
 
         <!-- Authenticated User Profile Summary Card -->
         <div class="p-4 sm:p-5 rounded-xl bg-[#0c0714]/90 border border-red-950/80 shadow-md space-y-3.5">
@@ -2706,25 +2933,25 @@
               <span id="user-dash-email" class="text-xs text-red-400/90 font-mono block truncate" title="user.portal@cognisec.ai">user.portal@cognisec.ai</span>
             </div>
             <div class="flex items-center gap-2 flex-wrap shrink-0">
-              <span id="user-dash-role" class="px-2.5 py-1 rounded-md bg-red-950/60 text-red-300 border border-red-800/60 text-[11px] font-bold">ROLE: USER</span>
-              <span id="user-dash-status" class="px-2.5 py-1 rounded-md bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 text-[11px] font-bold">ACCOUNT: ACTIVE</span>
+              <span id="user-dash-role" class="px-2.5 py-1 rounded-md bg-red-950/60 text-red-300 border border-red-800/60 text-xs font-medium">Role: User</span>
+              <span id="user-dash-status" class="px-2.5 py-1 rounded-md bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 text-xs font-medium">Account: Active</span>
             </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 text-xs pt-0.5">
             <div class="p-3 rounded-lg bg-black/60 border border-slate-900 hover:border-red-950 transition-colors min-w-0">
               <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Active Session</span>
-              <strong id="user-dash-session" class="text-emerald-400 font-bold block truncate text-xs mt-0.5" title="Active (TLS 1.3)">Active (TLS 1.3)</strong>
+              <strong id="user-dash-session" class="text-emerald-400 font-medium block truncate text-xs mt-0.5" title="Active (TLS 1.3)">Active (TLS 1.3)</strong>
             </div>
             <div class="p-3 rounded-lg bg-black/60 border border-slate-900 hover:border-red-950 transition-colors min-w-0">
               <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Registered Device</span>
-              <strong id="user-dash-device" class="text-slate-200 font-bold block truncate text-xs mt-0.5" title="macOS / Chrome (Desktop)">macOS / Chrome (Desktop)</strong>
+              <strong id="user-dash-device" class="text-slate-200 font-medium block truncate text-xs mt-0.5" title="--">--</strong>
             </div>
             <div class="p-3 rounded-lg bg-black/60 border border-slate-900 hover:border-red-950 transition-colors min-w-0">
-              <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Zero-Trust Status</span>
-              <strong class="text-emerald-400 font-bold text-xs mt-0.5 flex items-center gap-1.5">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                TRUSTED (ALLOW)
+              <span class="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Security Status</span>
+              <strong class="text-emerald-400 font-medium text-xs mt-0.5 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                Session Verified
               </strong>
             </div>
           </div>
@@ -3047,158 +3274,601 @@
           </div>
         </div>
 
-        <!-- ================= BEHAVIORAL CALIBRATION & DYNAMICS SECTION ================= -->
-        <div class="glass-panel p-4 sm:p-5 rounded-xl border border-red-950/80 bg-black/60 space-y-4 shadow-md">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-red-950/60 pb-3">
-            <div>
-              <div class="flex items-center gap-2">
-                <label class="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                  Behavioral Calibration &amp; Telemetry Stream
-                </label>
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold">
-                  ● PRIVACY-PRESERVING
+        <!-- ================= 2D. BEHAVIOR MONITORING ================= -->
+        <div id="section-behavioral-telemetry" class="glass-panel p-4 sm:p-6 rounded-2xl border border-red-950/80 bg-[#08050e]/95 space-y-6 shadow-xl font-sans">
+          
+          <!-- Top Header & Global Status Ribbon -->
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-red-950/70 pb-4">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2.5 flex-wrap">
+                <span class="p-1.5 rounded-lg bg-red-950/80 text-red-400 border border-red-800/60 shrink-0">
+                  <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </span>
+                <h3 class="text-sm sm:text-base font-heading font-bold text-white tracking-normal">
+                  Behavior Monitoring
+                </h3>
+                <span id="bt-collector-status-pill" class="px-2.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/70 text-[11px] font-medium flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  Live Monitoring Active
+                </span>
+                <span id="bt-demo-mode-pill" class="hidden px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-700 text-[10px] font-semibold">
+                  Demo Mode Active
                 </span>
               </div>
-              <p class="text-[11px] text-slate-400 font-mono pt-0.5">
-                Calculates typing dynamics and pointer mechanics to calibrate your Zero-Trust behavioral profile.
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Continuous passive monitoring of interaction patterns to safeguard your session. Zero keystroke content is ever recorded or stored.
               </p>
             </div>
-            <div id="calibration-maturity-badge" class="px-2.5 py-1 rounded-lg bg-amber-950 text-amber-300 border border-amber-800 text-[11px] font-mono font-bold self-start sm:self-auto">
-              Status: Checking Profile...
+
+            <div class="flex items-center gap-2 self-start md:self-auto shrink-0 flex-wrap">
+              <button onclick="toggleDemoTelemetryMode()" id="bt-toggle-demo-btn" class="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-600 text-slate-300 hover:text-amber-300 text-xs font-medium transition-all cursor-pointer flex items-center gap-1" title="Toggle demonstration simulation mode">
+                <span>🧪 Demo Mode</span>
+              </button>
+              <button onclick="refreshBehavioralDashboard()" class="px-3 py-1.5 rounded-lg bg-red-950/70 hover:bg-red-900 border border-red-800/80 text-red-200 text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5" title="Fetch fresh backend profile and telemetry logs">
+                <span>↻ Refresh Profile</span>
+              </button>
             </div>
           </div>
 
-          <!-- Privacy Notice Callout -->
-          <div class="p-3 rounded-xl bg-emerald-950/20 border border-emerald-900/40 text-[11px] font-mono text-emerald-300/90 flex items-start gap-2.5">
-            <span class="text-base shrink-0">🛡️</span>
-            <div>
-              <strong class="text-emerald-300">Privacy Safeguard:</strong>
-              COGNISEC-AI measures only physical timing intervals (dwell time, flight duration, cursor velocity, and acceleration). Your typed sentences, keystroke characters, and sensitive inputs are <u>never</u> recorded, transmitted, or stored.
+          <!-- Section 1: Session & Profile Metadata Cards Grid -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
+            <!-- Profile Status -->
+            <div class="p-3 rounded-xl bg-black/60 border border-slate-900 hover:border-red-950 transition-colors">
+              <span class="text-slate-400 block text-[11px] font-medium">Profile Status</span>
+              <strong id="bt-profile-status" class="text-amber-400 font-semibold block truncate text-xs mt-1">Awaiting Check...</strong>
+            </div>
+            <!-- Session Identifier (Masked/Safe) -->
+            <div class="p-3 rounded-xl bg-black/60 border border-slate-900 hover:border-red-950 transition-colors">
+              <span class="text-slate-400 block text-[11px] font-medium">Current Session</span>
+              <strong id="bt-session-id" class="text-slate-200 font-mono font-medium block truncate text-xs mt-1" title="Session Identifier">sess_••••••••</strong>
+            </div>
+            <!-- Total Observations Recorded -->
+            <div class="p-3 rounded-xl bg-black/60 border border-slate-900 hover:border-red-950 transition-colors">
+              <span class="text-slate-400 block text-[11px] font-medium">Recorded Events</span>
+              <strong id="bt-total-obs" class="text-emerald-400 font-semibold block text-xs mt-1">-- events</strong>
+            </div>
+            <!-- Last Observation Timestamp -->
+            <div class="p-3 rounded-xl bg-black/60 border border-slate-900 hover:border-red-950 transition-colors">
+              <span class="text-slate-400 block text-[11px] font-medium">Last Observation</span>
+              <strong id="bt-last-obs-time" class="text-slate-300 font-medium block truncate text-xs mt-1">--:--:--</strong>
+            </div>
+            <!-- Baseline Sample Count -->
+            <div class="p-3 rounded-xl bg-black/60 border border-slate-900 hover:border-red-950 transition-colors">
+              <span class="text-slate-400 block text-[11px] font-medium">Normal Behavior Profile</span>
+              <strong id="bt-baseline-samples" class="text-amber-300 font-semibold block text-xs mt-1">0 / 5 (Cold)</strong>
+            </div>
+            <!-- Last Baseline Update -->
+            <div class="p-3 rounded-xl bg-black/60 border border-slate-900 hover:border-red-950 transition-colors">
+              <span class="text-slate-400 block text-[11px] font-medium">Baseline Updated</span>
+              <strong id="bt-baseline-updated" class="text-slate-300 font-medium block truncate text-xs mt-1">--</strong>
             </div>
           </div>
 
-          <!-- Two-Column Interactive Calibration Area -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-            <!-- Left: Guided Calibration Typing Exercise -->
-            <div class="space-y-3 font-mono">
-              <div class="p-3 rounded-xl bg-[#090510] border border-red-950/90 space-y-1.5">
-                <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
-                  Neutral Calibration Prompt:
+          <!-- Section 2: Zero-Trust Risk Engine & Self-Explaining Status -->
+          <div class="p-4 sm:p-5 rounded-xl bg-black/60 border border-slate-800 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-800/80">
+              <div class="flex items-center gap-2">
+                <span class="text-xs">⚖️</span>
+                <span class="text-xs font-bold text-white tracking-wide">Current Security Risk &amp; Assessment</span>
+              </div>
+              <div class="text-[11px] text-slate-400">
+                Continuous risk evaluation based on interaction telemetry
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <!-- Current Security Risk -->
+              <div class="p-3 rounded-lg bg-black/40 border border-slate-800/80">
+                <span class="text-slate-400 text-[11px] block font-medium">Current Security Risk</span>
+                <div class="flex items-baseline gap-2 mt-1">
+                  <span id="bt-hud-risk-score" class="text-base font-extrabold text-slate-400 font-mono">--</span>
+                  <span id="bt-hud-risk-category" class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-900 text-slate-400 border border-slate-700">AWAITING DATA</span>
+                </div>
+                <span class="text-[10px] text-slate-500 block mt-0.5">Policy threshold</span>
+              </div>
+
+              <!-- System Decision -->
+              <div class="p-3 rounded-lg bg-black/40 border border-slate-800/80">
+                <span class="text-slate-400 text-[11px] block font-medium">System Decision</span>
+                <div class="mt-1">
+                  <span id="bt-hud-decision" class="px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-700 text-xs font-semibold inline-block">
+                    Awaiting Data
+                  </span>
+                </div>
+                <span class="text-[10px] text-slate-500 block mt-0.5">Access control policy</span>
+              </div>
+
+              <!-- Behavioral Anomaly / Drift -->
+              <div class="p-3 rounded-lg bg-black/40 border border-slate-800/80">
+                <span class="text-slate-400 text-[11px] block font-medium">Anomaly Score</span>
+                <div class="flex items-baseline gap-2 mt-1">
+                  <span id="bt-hud-anomaly-score" class="text-base font-extrabold text-slate-400 font-mono">--</span>
+                  <span id="bt-hud-drift-status" class="text-[10px] font-semibold text-slate-400">AWAITING DATA</span>
+                </div>
+                <span class="text-[10px] text-slate-500 block mt-0.5">Statistical deviation</span>
+              </div>
+
+              <!-- Model Training Status -->
+              <div class="p-3 rounded-lg bg-black/40 border border-slate-800/80">
+                <span class="text-slate-400 text-[11px] block font-medium">Model Training Status</span>
+                <div class="mt-1 flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                  <span id="bt-hud-training-eligibility" class="text-xs font-semibold text-slate-400">Awaiting Data</span>
+                </div>
+                <span class="text-[10px] text-slate-500 block mt-0.5">Baseline integrity check</span>
+              </div>
+            </div>
+
+            <!-- Self-Explaining Risk Guidance Banner -->
+            <div id="bt-risk-status-explanation" class="p-3.5 rounded-lg bg-black/40 border border-slate-800/80 flex items-start gap-3 text-xs">
+              <div id="bt-risk-status-icon" class="text-base shrink-0 mt-0.5">🛡️</div>
+              <div class="space-y-1 min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-semibold text-slate-200">Security Assessment:</span>
+                  <span id="bt-risk-status-summary" class="font-bold text-slate-300">Checking security posture...</span>
+                </div>
+                <p id="bt-risk-status-detail" class="text-slate-400 text-[11px] leading-relaxed">
+                  Evaluating real-time behavioral interaction telemetry against your baseline profile.
+                </p>
+                <div class="flex items-center gap-2 pt-0.5 text-[11px]">
+                  <span class="text-slate-500">Action:</span>
+                  <span id="bt-risk-action-required" class="font-semibold text-slate-300">Evaluating...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Behavioral Factor Coverage (4 Dynamics Groups) -->
+          <div id="section-factor-coverage" class="p-4 sm:p-5 rounded-xl bg-black/60 border border-slate-800 space-y-3 font-sans">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="text-xs">🛡️</span>
+                <h4 class="text-xs font-bold text-white tracking-wide">
+                  Behavioral Factor Coverage
+                </h4>
+                <span id="factor-coverage-count-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-slate-400 border border-slate-700">
+                  0 / 10 Active
                 </span>
-                <p id="calibration-target-sentence" class="text-xs text-slate-200 leading-relaxed font-mono select-none bg-black/50 p-2.5 rounded border border-slate-800">
-                  The zero trust security architecture verifies every continuous behavioral signal without storing private keystrokes.
+              </div>
+              <span class="text-[11px] text-slate-400">
+                10 continuous signals across 4 categories
+              </span>
+            </div>
+
+            <!-- 4 Categories Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+
+              <!-- Group 1: Typing Patterns -->
+              <div class="p-3 rounded-lg bg-black/40 border border-slate-800 space-y-2 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between pb-1.5 border-b border-slate-800/80">
+                    <span class="text-xs font-semibold text-slate-200">Typing Patterns</span>
+                    <span class="sr-only uppercase">typing dynamics</span>
+                    <span class="text-[10px] text-slate-500">3 Signals</span>
+                  </div>
+
+                  <div class="space-y-1.5 mt-2">
+                    <!-- typing_speed_wpm -->
+                    <div class="p-2 rounded bg-[#0a0612] border border-slate-800/80">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-[11px] font-medium text-slate-300">Typing Speed</span>
+                        <span id="coverage-status-typing_speed_wpm" class="text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-500 border border-slate-800 font-bold shrink-0">AWAITING DATA</span>
+                        <span id="pill-typing-wpm" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between mt-1 text-[11px]">
+                        <span class="text-slate-500 text-[10px]">Current:</span>
+                        <span id="coverage-val-typing_speed_wpm" class="font-extrabold text-slate-400 font-mono">--</span>
+                        <span id="metric-typing-wpm-live" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-800/60 mt-1">
+                        <span>Baseline:</span>
+                        <span id="coverage-base-typing_speed_wpm" class="font-mono text-slate-400">--</span>
+                        <span id="metric-typing-wpm-base" class="hidden"></span>
+                      </div>
+                    </div>
+
+                    <!-- avg_flight_time_ms -->
+                    <div class="p-2 rounded bg-[#0a0612] border border-slate-800/80">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-[11px] font-medium text-slate-300">Flight Time</span>
+                        <span id="coverage-status-avg_flight_time_ms" class="text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-500 border border-slate-800 font-bold shrink-0">AWAITING DATA</span>
+                        <span id="pill-flight-time" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between mt-1 text-[11px]">
+                        <span class="text-slate-500 text-[10px]">Current:</span>
+                        <span id="coverage-val-avg_flight_time_ms" class="font-extrabold text-slate-400 font-mono">--</span>
+                        <span id="metric-flight-time-live" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-800/60 mt-1">
+                        <span>Baseline:</span>
+                        <span id="coverage-base-avg_flight_time_ms" class="font-mono text-slate-400">--</span>
+                        <span id="metric-flight-time-base" class="hidden"></span>
+                      </div>
+                    </div>
+
+                    <!-- avg_dwell_time_ms -->
+                    <div class="p-2 rounded bg-[#0a0612] border border-slate-800/80">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-[11px] font-medium text-slate-300">Dwell Time</span>
+                        <span id="coverage-status-avg_dwell_time_ms" class="text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-500 border border-slate-800 font-bold shrink-0">AWAITING DATA</span>
+                        <span id="pill-dwell-time" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between mt-1 text-[11px]">
+                        <span class="text-slate-500 text-[10px]">Current:</span>
+                        <span id="coverage-val-avg_dwell_time_ms" class="font-extrabold text-slate-400 font-mono">--</span>
+                        <span id="metric-dwell-time-live" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-800/60 mt-1">
+                        <span>Baseline:</span>
+                        <span id="coverage-base-avg_dwell_time_ms" class="font-mono text-slate-400">--</span>
+                        <span id="metric-dwell-time-base" class="hidden"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Group 2: Mouse Movement -->
+              <div class="p-3 rounded-lg bg-black/40 border border-slate-800 space-y-2 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between pb-1.5 border-b border-slate-800/80">
+                    <span class="text-xs font-semibold text-slate-200">Mouse Movement</span>
+                    <span class="sr-only uppercase">mouse dynamics</span>
+                    <span class="text-[10px] text-slate-500">4 Signals</span>
+                  </div>
+
+                  <div class="space-y-1.5 mt-2">
+                    <!-- mouse_velocity_avg -->
+                    <div class="p-2 rounded bg-[#0a0612] border border-slate-800/80">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-[11px] font-medium text-slate-300">Cursor Velocity</span>
+                        <span id="coverage-status-mouse_velocity_avg" class="text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-500 border border-slate-800 font-bold shrink-0">AWAITING DATA</span>
+                        <span id="pill-mouse-vel" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between mt-1 text-[11px]">
+                        <span class="text-slate-500 text-[10px]">Current:</span>
+                        <span id="coverage-val-mouse_velocity_avg" class="font-extrabold text-slate-400 font-mono">--</span>
+                        <span id="metric-mouse-vel-live" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-800/60 mt-1">
+                        <span>Baseline:</span>
+                        <span id="coverage-base-mouse_velocity_avg" class="font-mono text-slate-400">--</span>
+                        <span id="metric-mouse-vel-base" class="hidden"></span>
+                      </div>
+                    </div>
+
+                    <!-- mouse_acceleration_avg -->
+                    <div class="p-2 rounded bg-[#0a0612] border border-slate-800/80">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-[11px] font-medium text-slate-300">Cursor Accel</span>
+                        <span id="coverage-status-mouse_acceleration_avg" class="text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-500 border border-slate-800 font-bold shrink-0">AWAITING DATA</span>
+                        <span id="pill-mouse-acc" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between mt-1 text-[11px]">
+                        <span class="text-slate-500 text-[10px]">Current:</span>
+                        <span id="coverage-val-mouse_acceleration_avg" class="font-extrabold text-slate-400 font-mono">--</span>
+                        <span id="metric-mouse-acc-live" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-800/60 mt-1">
+                        <span>Baseline:</span>
+                        <span id="coverage-base-mouse_acceleration_avg" class="font-mono text-slate-400">--</span>
+                        <span id="metric-mouse-acc-base" class="hidden"></span>
+                      </div>
+                    </div>
+
+                    <!-- mouse_curvature_entropy -->
+                    <div class="p-2 rounded bg-[#0a0612] border border-slate-800/80">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-[11px] font-medium text-slate-300">Curvature Entropy</span>
+                        <span id="coverage-status-mouse_curvature_entropy" class="text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-500 border border-slate-800 font-bold shrink-0">AWAITING DATA</span>
+                        <span id="pill-mouse-curv" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between mt-1 text-[11px]">
+                        <span class="text-slate-500 text-[10px]">Current:</span>
+                        <span id="coverage-val-mouse_curvature_entropy" class="font-extrabold text-slate-400 font-mono">--</span>
+                        <span id="metric-mouse-curv-live" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-800/60 mt-1">
+                        <span>Baseline:</span>
+                        <span id="coverage-base-mouse_curvature_entropy" class="font-mono text-slate-400">--</span>
+                        <span id="metric-mouse-curv-base" class="hidden"></span>
+                      </div>
+                    </div>
+
+                    <!-- click_frequency -->
+                    <div class="p-2 rounded bg-[#0a0612] border border-slate-800/80">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-[11px] font-medium text-slate-300">Click Frequency</span>
+                        <span id="coverage-status-click_frequency" class="text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-500 border border-slate-800 font-bold shrink-0">AWAITING DATA</span>
+                        <span id="pill-click-freq" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between mt-1 text-[11px]">
+                        <span class="text-slate-500 text-[10px]">Current:</span>
+                        <span id="coverage-val-click_frequency" class="font-extrabold text-slate-400 font-mono">--</span>
+                        <span id="metric-click-freq-live" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-800/60 mt-1">
+                        <span>Baseline:</span>
+                        <span id="coverage-base-click_frequency" class="font-mono text-slate-400">--</span>
+                        <span id="metric-click-freq-base" class="hidden"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Group 3: Activity Patterns -->
+              <div class="p-3 rounded-lg bg-black/40 border border-slate-800 space-y-2 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between pb-1.5 border-b border-slate-800/80">
+                    <span class="text-xs font-semibold text-slate-200">Activity Patterns</span>
+                    <span class="sr-only uppercase">activity dynamics</span>
+                    <span class="text-[10px] text-slate-500">2 Signals</span>
+                  </div>
+
+                  <div class="space-y-1.5 mt-2">
+                    <!-- scroll_speed_avg -->
+                    <div class="p-2 rounded bg-[#0a0612] border border-slate-800/80">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-[11px] font-medium text-slate-300">Scroll Speed</span>
+                        <span id="coverage-status-scroll_speed_avg" class="text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-500 border border-slate-800 font-bold shrink-0">AWAITING DATA</span>
+                        <span id="pill-scroll-speed" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between mt-1 text-[11px]">
+                        <span class="text-slate-500 text-[10px]">Current:</span>
+                        <span id="coverage-val-scroll_speed_avg" class="font-extrabold text-slate-400 font-mono">--</span>
+                        <span id="metric-scroll-speed-live" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-800/60 mt-1">
+                        <span>Baseline:</span>
+                        <span id="coverage-base-scroll_speed_avg" class="font-mono text-slate-400">--</span>
+                        <span id="metric-scroll-speed-base" class="hidden"></span>
+                      </div>
+                    </div>
+
+                    <!-- idle_duration_sec -->
+                    <div class="p-2 rounded bg-[#0a0612] border border-slate-800/80">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-[11px] font-medium text-slate-300">Idle Duration</span>
+                        <span id="coverage-status-idle_duration_sec" class="text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-500 border border-slate-800 font-bold shrink-0">AWAITING DATA</span>
+                        <span id="pill-idle-dur" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between mt-1 text-[11px]">
+                        <span class="text-slate-500 text-[10px]">Current:</span>
+                        <span id="coverage-val-idle_duration_sec" class="font-extrabold text-slate-400 font-mono">--</span>
+                        <span id="metric-idle-dur-live" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-800/60 mt-1">
+                        <span>Baseline:</span>
+                        <span id="coverage-base-idle_duration_sec" class="font-mono text-slate-400">--</span>
+                        <span id="metric-idle-dur-base" class="hidden"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Group 4: Navigation Patterns -->
+              <div class="p-3 rounded-lg bg-black/40 border border-slate-800 space-y-2 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between pb-1.5 border-b border-slate-800/80">
+                    <span class="text-xs font-semibold text-slate-200">Navigation Patterns</span>
+                    <span class="sr-only uppercase">navigation dynamics</span>
+                    <span class="text-[10px] text-slate-500">1 Signal</span>
+                  </div>
+
+                  <div class="space-y-1.5 mt-2">
+                    <!-- navigation_entropy -->
+                    <div class="p-2 rounded bg-[#0a0612] border border-slate-800/80">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-[11px] font-medium text-slate-300">Navigation Entropy</span>
+                        <span id="coverage-status-navigation_entropy" class="text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-500 border border-slate-800 font-bold shrink-0">AWAITING DATA</span>
+                        <span id="pill-nav-entropy" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between mt-1 text-[11px]">
+                        <span class="text-slate-500 text-[10px]">Current:</span>
+                        <span id="coverage-val-navigation_entropy" class="font-extrabold text-slate-400 font-mono">--</span>
+                        <span id="metric-nav-entropy-live" class="hidden"></span>
+                      </div>
+                      <div class="flex items-baseline justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-800/60 mt-1">
+                        <span>Baseline:</span>
+                        <span id="coverage-base-navigation_entropy" class="font-mono text-slate-400">--</span>
+                        <span id="metric-nav-entropy-base" class="hidden"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Section 4: Recent Security Activity (Chronological Table) -->
+          <div class="space-y-3 font-sans">
+            <div class="flex items-center justify-between border-b border-red-950/70 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-sm">⏱️</span>
+                <h4 class="text-xs font-bold text-white tracking-wide">
+                  Recent Security Activity
+                </h4>
+                <span id="bt-timeline-count-badge" class="px-2 py-0.2 text-[10px] rounded bg-red-950/80 text-red-300 border border-red-800">0 events</span>
+              </div>
+              <span class="text-[11px] text-slate-400">Chronological security decisions &amp; telemetry observations</span>
+            </div>
+
+            <!-- Timeline Table Container -->
+            <div class="rounded-xl border border-red-950/80 bg-black/70 overflow-hidden">
+              <div class="max-h-60 overflow-y-auto overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                  <thead class="bg-[#0e0716] text-[10px] uppercase text-slate-400 sticky top-0 border-b border-slate-800">
+                    <tr>
+                      <th class="py-2.5 px-3 font-semibold">Timestamp</th>
+                      <th class="py-2.5 px-3 font-semibold">Activity Type</th>
+                      <th class="py-2.5 px-3 font-semibold">Telemetry Summary</th>
+                      <th class="py-2.5 px-3 font-semibold">Risk &amp; Decision</th>
+                      <th class="py-2.5 px-3 font-semibold text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bt-timeline-tbody" class="divide-y divide-slate-900/80 text-[11px] font-mono">
+                    <tr>
+                      <td colspan="5" class="py-6 text-center text-slate-500">
+                        Connecting to backend telemetry stream...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 5: Set Up Your Behavior Profile -->
+          <div id="section-calibration-studio" class="p-4 sm:p-5 rounded-xl bg-black/60 border border-slate-800 space-y-4 font-sans">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div>
+                <h4 class="text-xs font-bold text-white tracking-wide">
+                  Set Up Your Behavior Profile
+                </h4>
+                <p class="text-[11px] text-slate-400 pt-0.5">
+                  The system learns your usual typing and interaction patterns to help detect unusual activity. Your typed characters are not stored.
                 </p>
               </div>
-
-              <div class="space-y-1">
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-slate-400">Type prompt to calibrate:</span>
-                  <span id="calibration-progress-text" class="text-amber-400 font-bold">0 / 106 chars</span>
-                </div>
-                <textarea
-                  id="console-textarea"
-                  oninput="handleConsoleTyping(event)"
-                  placeholder="Type the neutral calibration sentence above to stream genuine timing dynamics..."
-                  class="w-full h-24 p-3 rounded-xl bg-black/80 border border-red-900/50 focus:border-red-500 text-xs font-mono text-white placeholder-slate-500 focus:outline-none resize-none transition-colors"
-                ></textarea>
-              </div>
-
-              <!-- Genuine Real-Time Measured Telemetry Indicators -->
-              <div class="grid grid-cols-3 gap-2 text-[11px] font-mono">
-                <div class="p-2 rounded-xl bg-red-950/30 border border-red-900/30 flex items-center justify-between">
-                  <span class="text-slate-400">Flight:</span>
-                  <strong id="measured-flight-time" class="text-amber-300">-- ms</strong>
-                </div>
-                <div class="p-2 rounded-xl bg-red-950/30 border border-red-900/30 flex items-center justify-between">
-                  <span class="text-slate-400">Dwell:</span>
-                  <strong id="measured-dwell-time" class="text-amber-300">-- ms</strong>
-                </div>
-                <div class="p-2 rounded-xl bg-red-950/30 border border-red-900/30 flex items-center justify-between">
-                  <span class="text-slate-400">Speed:</span>
-                  <strong id="wpm-count" class="text-emerald-400">-- WPM</strong>
-                </div>
-              </div>
-
-              <!-- Behavioral Maturity Milestones Progress Bar -->
-              <div class="p-3 rounded-xl bg-black/70 border border-slate-800/80 space-y-1.5 text-[11px]">
-                <div class="flex items-center justify-between">
-                  <span class="text-slate-400">Statistical Baseline (Welford 5):</span>
-                  <span id="maturity-welford-count" class="text-white font-bold">0 / 5 samples</span>
-                </div>
-                <div class="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
-                  <div id="maturity-welford-bar" class="bg-amber-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                </div>
-                <div class="flex items-center justify-between pt-1">
-                  <span class="text-slate-400">Isolation Forest ML Ready (25):</span>
-                  <span id="maturity-if-count" class="text-white font-bold">0 / 25 samples</span>
-                </div>
-                <div class="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
-                  <div id="maturity-if-bar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                </div>
+              <div id="calibration-maturity-badge" class="px-2.5 py-1 rounded-lg bg-slate-900 text-slate-300 border border-slate-700 text-xs font-semibold self-start sm:self-auto">
+                Status: Checking Profile...
               </div>
             </div>
 
-            <!-- Right: Real-Time Event Log & Decision Actions -->
-            <div class="flex flex-col justify-between space-y-3 font-mono text-xs">
-              <div>
-                <div class="flex items-center justify-between border-b border-red-950/60 pb-2">
-                  <span class="font-bold text-white uppercase text-[11px]">Backend Telemetry Stream Log</span>
-                  <span id="badge-auth-state" class="px-2 py-0.5 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 rounded font-bold">Session Active</span>
-                </div>
-                <div id="console-event-log" class="h-44 overflow-y-auto space-y-1.5 text-[11px] pr-1 pt-2">
-                  <div class="p-2 rounded bg-black/60 border border-emerald-950 text-emerald-400">&gt; Zero-Trust Session Active. Telemetry Stream Connected.</div>
-                </div>
+            <!-- Why Calibration Is Needed Card -->
+            <div class="p-3 rounded-lg bg-[#090510] border border-slate-800/80 text-xs text-slate-300 space-y-1">
+              <div class="font-semibold text-slate-200 flex items-center gap-1.5">
+                <span class="text-amber-400">ℹ️</span>
+                <span>Why calibration is needed</span>
               </div>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                Establishing your normal interaction baseline allows CogniSec-AI to verify your identity continuously in the background without interruptions, while immediately alerting to suspicious behavior or unauthorized access.
+              </p>
+            </div>
 
-              <!-- Verification & Developer Exhibition Controls -->
-              <div class="space-y-2 pt-2 border-t border-red-950/60">
+            <!-- Sample Progress Indicator & Profile Readiness -->
+            <div class="p-3 rounded-lg bg-black/40 border border-slate-800/80 space-y-2 text-xs">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <span id="calibration-sample-status-text" class="text-slate-300 font-medium">Valid samples collected: <strong id="calibration-samples-count" class="text-white">0 of 5 required</strong></span>
+                <span id="calibration-profile-readiness" class="text-[11px] font-semibold text-amber-300">Profile Setup in Progress</span>
+              </div>
+              <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
+                <div id="calibration-samples-bar" class="bg-amber-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <!-- Guided Typing Entry Area -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-300 font-medium">Type the prompt below to calibrate:</span>
+                <span id="calibration-progress-text" class="text-amber-400 font-bold">0 / 106 characters</span>
+              </div>
+              <p id="calibration-target-sentence" class="text-xs text-slate-200 leading-relaxed select-none bg-black/50 p-3 rounded-lg border border-slate-800 font-mono">
+                The zero trust security architecture verifies every continuous behavioral signal without storing private keystrokes.
+              </p>
+              <textarea
+                id="console-textarea"
+                oninput="handleConsoleTyping(event)"
+                placeholder="Type the sentence above at your natural pace..."
+                class="w-full h-24 p-3 rounded-xl bg-black/80 border border-slate-800 focus:border-red-500 text-xs font-mono text-white placeholder-slate-500 focus:outline-none resize-none transition-colors"
+              ></textarea>
+            </div>
+
+            <!-- Action Controls & Feedback Message -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+              <div class="flex items-center gap-2 flex-wrap">
                 <button
                   onclick="runConsoleVerification()"
                   id="btn-console-verify"
-                  class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-heading font-extrabold text-xs tracking-wider uppercase shadow-[0_0_20px_rgba(220,38,38,0.4)] cursor-pointer transition-all"
+                  class="py-2.5 px-4 rounded-lg bg-red-700 hover:bg-red-600 border border-red-600/50 text-white font-semibold text-xs tracking-normal cursor-pointer transition-colors shadow-sm"
                 >
-                  Send Behavioral Calibration Sample →
+                  Submit Calibration Sample
                 </button>
-                <div class="flex items-center justify-between gap-2">
-                  <button
-                    onclick="openModal('stepup')"
-                    id="btn-test-stepup"
-                    class="w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-amber-800/60 text-amber-300 text-[10px] font-mono font-bold tracking-wider uppercase transition-all cursor-pointer text-center"
-                    title="Exhibition & testing trigger for Step-Up verification modal"
-                  >
-                    🛠️ [DEV / EXHIBITION TEST CONTROL] Test Step-Up Modal
-                  </button>
+                <button
+                  onclick="openModal('stepup')"
+                  id="btn-test-stepup"
+                  class="py-2.5 px-3.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer text-center"
+                  title="Test additional verification challenge flow"
+                >
+                  Test Additional Verification
+                </button>
+              </div>
+              <div id="calibration-user-feedback" class="text-xs font-medium text-slate-400 hidden sm:text-right"></div>
+            </div>
+
+            <!-- Secondary Expandable Section: Advanced Technical Details & Telemetry Log -->
+            <details class="mt-3 pt-3 border-t border-slate-800/80 text-xs group">
+              <summary class="cursor-pointer text-slate-400 hover:text-slate-200 font-medium flex items-center justify-between select-none py-1">
+                <span class="flex items-center gap-2">
+                  <span>⚙️</span>
+                  <span>Advanced Model Details &amp; Telemetry Logs</span>
+                </span>
+                <span class="text-slate-500 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div class="pt-3 space-y-3 font-mono">
+                <!-- Baseline Maturity Progress Bars with plain English labels -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg bg-black/50 border border-slate-800/80 text-[11px]">
+                  <div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-slate-300 font-medium">Normal Behavior Profile:</span>
+                      <span id="maturity-welford-count" class="text-white font-bold">0 / 5 samples</span>
+                    </div>
+                    <div class="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden mt-1.5">
+                      <div id="maturity-welford-bar" class="bg-amber-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-slate-300 font-medium">Anomaly Detection Model Progress:</span>
+                      <span id="maturity-if-count" class="text-white font-bold">0 / 25 samples</span>
+                    </div>
+                    <div class="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden mt-1.5">
+                      <div id="maturity-if-bar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Telemetry Stream Ingestion Log -->
+                <div>
+                  <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                    <span class="font-medium text-slate-300 text-[11px]">Telemetry Stream Log</span>
+                    <span id="badge-auth-state" class="px-2 py-0.5 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 rounded font-bold">Session Active</span>
+                  </div>
+                  <div id="console-event-log" class="h-28 overflow-y-auto space-y-1 text-[11px] font-mono pr-1 pt-2">
+                    <div class="p-1.5 rounded bg-black/60 border border-slate-900 text-emerald-400">&gt; Session active. Telemetry stream connected.</div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </details>
           </div>
+
         </div>
 
-        <!-- ================= 2E. DEVICES & ACTIVE SESSIONS PANEL ================= -->
-        <div class="glass-panel p-4 sm:p-5 rounded-xl border border-red-950/80 bg-black/60 space-y-4 font-mono shadow-md">
+
+        <!-- ================= 2E. YOUR DEVICES AND SESSIONS ================= -->
+        <div class="glass-panel p-4 sm:p-5 rounded-xl border border-red-950/80 bg-black/60 space-y-4 font-sans shadow-md">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-red-950/60 pb-3">
             <div>
               <div class="flex items-center gap-2">
                 <span class="text-base">💻</span>
-                <label class="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                  Devices &amp; Active Sessions
-                </label>
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-800 font-semibold">
-                  HARDWARE INVENTORY
-                </span>
+                <h4 class="text-xs font-bold text-white tracking-wide">
+                  Your Devices and Sessions
+                </h4>
               </div>
-              <p class="text-[11px] text-slate-400 font-mono pt-0.5">
-                Persistent inventory of recognized hardware, observed locations, and instant session revocation.
+              <p class="text-xs text-slate-400 pt-0.5">
+                Recognized hardware inventory, observed locations, and instant session security.
               </p>
             </div>
-            <button onclick="refreshUserDevices()" class="px-3 py-1.5 rounded-lg bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto">
+            <button onclick="refreshUserDevices()" class="px-3 py-1.5 rounded-lg bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-300 text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto">
               <span>↻ Refresh Devices</span>
             </button>
           </div>
 
           <!-- Devices List Container -->
-          <div id="user-devices-list" class="space-y-3">
-            <div class="p-4 rounded-xl bg-black/60 border border-red-950 text-center text-xs text-slate-400">
+          <div id="user-devices-list" class="space-y-3 font-mono">
+            <div class="p-4 rounded-xl bg-black/60 border border-red-950 text-center text-xs text-slate-400 font-sans">
               Loading recognized devices...
             </div>
           </div>
@@ -3413,7 +4083,7 @@
         <div class="flex items-center gap-2">
           <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
           <span class="text-xs font-bold text-amber-400 tracking-wider uppercase">🔔 SECURITY ALERTS</span>
-          <span id="notif-count-badge" class="px-1.5 py-0.5 bg-red-950 border border-red-800 text-red-300 text-[10px] rounded font-bold">0 unread</span>
+          <span id="notif-count-badge" class="px-1.5 py-0.5 bg-amber-950 border border-amber-800 text-amber-300 text-[10px] rounded font-bold">1 unread (Demo)</span>
         </div>
         <div class="flex items-center gap-2">
           <button onclick="markAllNotificationsAsRead()" class="text-[10px] text-slate-400 hover:text-white underline cursor-pointer" title="Mark all read">Mark all read</button>
@@ -3423,8 +4093,45 @@
 
       <!-- Real Dynamic Notification List Container -->
       <div id="notif-list-container" class="space-y-3 overflow-y-auto pr-1 max-h-[60vh]">
-        <div class="p-4 rounded-xl bg-black/60 border border-red-950 text-center text-xs text-slate-400">
-          No security notifications recorded.
+        <!-- Demo Notification (Rendered for guest; immediately replaced with real notifications upon authentication) -->
+        <div class="p-3.5 rounded-xl bg-black/80 border border-amber-900/60 shadow-[0_0_15px_rgba(245,158,11,0.15)] space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5">
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-800 tracking-wider font-mono">DEMO PREVIEW</span>
+              <span class="text-xs font-bold text-white">New Login Detected</span>
+            </div>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 animate-pulse font-mono">PENDING CONFIRMATION</span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed font-sans">
+            An unrecognized device login attempt was registered for <strong>Boomika Ram</strong> from <span class="text-amber-300 font-mono font-bold">Bengaluru, IN (MacBook Pro M3 • IP 103.21.124.9)</span>.
+          </p>
+          <div class="text-[10px] font-mono text-slate-400 space-y-0.5">
+            <div><span class="text-slate-500">Location:</span> Bengaluru, IN (Simulated Network)</div>
+            <div><span class="text-slate-500">Timestamp:</span> Just Now (Demo Mode)</div>
+          </div>
+          <div class="flex items-center justify-between pt-1 border-t border-red-950/60">
+            <span class="text-[10px] text-amber-400 font-mono">📧 Demo Alert: Simulated Dispatch</span>
+            <button onclick="handleMarkNotificationRead()" class="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer">
+              Mark as read
+            </button>
+          </div>
+          <div id="notif-action-buttons" class="pt-2">
+            <div class="text-[11px] text-amber-300 font-bold pb-1.5 text-center font-mono">Was this login authorized by you?</div>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                onclick="handleNotificationResponse(null, 'yes')"
+                class="py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(52,211,153,0.3)] font-mono"
+              >
+                ✓ Yes, This Was Me
+              </button>
+              <button
+                onclick="handleNotificationResponse(null, 'no')"
+                class="py-2 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_15px_rgba(239,68,68,0.5)] font-mono"
+              >
+                ⛔ No, Secure Account
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

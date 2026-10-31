@@ -18,7 +18,12 @@ class Alert(Base):
     alert_type = Column(String(100), nullable=False)
     message = Column(Text, nullable=False)
     severity = Column(String(20), default="MEDIUM", nullable=False, index=True)  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
-    status = Column(String(20), default="OPEN", nullable=False, index=True)  # "OPEN", "ACKNOWLEDGED", "RESOLVED"
+    status = Column(String(20), default="OPEN", nullable=False, index=True)  # "OPEN", "ACKNOWLEDGED", "INVESTIGATING", "RESOLVED", "REOPENED"
+    assigned_to = Column(String(120), nullable=True)
+    notes = Column(Text, nullable=True)
+    resolution_reason = Column(String(255), nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolved_by = Column(String(120), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
 
     # Relationships

@@ -46,5 +46,13 @@ class DeviceResponse(BaseModel):
     first_seen: datetime.datetime
     last_seen: datetime.datetime
     active_session_count: Optional[int] = 0
+    active_session_ids: Optional[list[str]] = []
+    user_name: Optional[str] = None
+    user_email: Optional[str] = None
+    is_active: bool = False
+    provenance: str = "HISTORICAL_RECORD"  # "GENUINE_ACTIVE", "KNOWN_TEST", "HISTORICAL_RECORD"
+    is_physical_device_confirmed: bool = False
+    hardware_evidence_summary: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+

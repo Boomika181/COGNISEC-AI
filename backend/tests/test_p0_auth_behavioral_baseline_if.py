@@ -461,7 +461,21 @@ def test_isolation_forest_flags_controlled_anomalous_samples():
 # 11. Suspicious Samples Do Not Contaminate Trusted Baselines
 # -----------------------------------------------------------------------------
 def test_anti_poisoning_suspicious_samples_do_not_contaminate_baseline(db_session: Session):
-    profile = ProfileService.get_or_create_profile(db_session, user_id=99991)
+    from app.core.security import get_password_hash
+    u = db_session.query(User).filter(User.id == 99991).first()
+    if not u:
+        u = User(
+            id=99991,
+            email="antipoison99991@cognisec.ai",
+            name="AntiPoison User",
+            password_hash=get_password_hash("Test@123"),
+            role="USER",
+            account_status="ACTIVE"
+        )
+        db_session.add(u)
+        db_session.commit()
+
+    profile = ProfileService.get_or_create_profile(db_session, user_id=u.id)
     initial_samples = profile.sample_count
     poison_vector = np.array([999.0] * 10)
 

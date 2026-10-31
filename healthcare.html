@@ -58,7 +58,7 @@
     </div>
     <div class="flex items-center gap-4 text-slate-400">
       <span class="hidden md:inline">ABDM Facility: IN-KA-BLR-004921 &bull; NABH &amp; JCI Accredited</span>
-      <a href="index.html" class="px-2.5 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white font-bold transition-all text-[11px] uppercase tracking-wider flex items-center gap-1">
+      <a href="index.html" id="btn-back-to-platform" onclick="handleBackToPlatform(event)" class="px-2.5 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white font-bold transition-all text-[11px] uppercase tracking-wider flex items-center gap-1">
         <span>← Back to Platform</span>
       </a>
     </div>
@@ -174,7 +174,7 @@
             </h1>
             
             <p class="text-base text-slate-600 leading-relaxed max-w-2xl font-normal">
-              AyuSync MedCare Network unites over 120 senior physicians, advanced robotic surgery, 24/7 Level-1 trauma care, and Ayushman Bharat Digital Mission (ABDM) integration. Consult specialist doctors, book appointments, and access your diagnostic records securely.
+              AyuSync MedCare Network unites senior medical consultants, advanced surgical suites, 24/7 emergency response, and Ayushman Bharat Digital Mission (ABDM) integration. Consult specialist doctors, book verified appointments, and access clinical diagnostic records securely.
             </p>
 
             <div class="flex flex-wrap items-center gap-3 pt-2">
@@ -190,23 +190,23 @@
               </a>
             </div>
 
-            <!-- Quick Key Metrics -->
+            <!-- Verified Key Hospital Metrics -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-200/80">
               <div>
-                <span class="text-2xl font-extrabold text-slate-900 block">500+</span>
-                <span class="text-xs text-slate-500 font-medium">Critical &amp; Ward Beds</span>
+                <span class="text-2xl font-extrabold text-slate-900 block">6</span>
+                <span class="text-xs text-slate-500 font-medium">Specialty Institutes</span>
               </div>
               <div>
-                <span class="text-2xl font-extrabold text-teal-700 block">45+</span>
-                <span class="text-xs text-slate-500 font-medium">Specialties &amp; Clinics</span>
-              </div>
-              <div>
-                <span class="text-2xl font-extrabold text-slate-900 block">99.4%</span>
-                <span class="text-xs text-slate-500 font-medium">Intervention Success</span>
-              </div>
-              <div>
-                <span class="text-2xl font-extrabold text-emerald-700 block">24/7</span>
+                <span class="text-2xl font-extrabold text-teal-700 block">Level-1</span>
                 <span class="text-xs text-slate-500 font-medium">Emergency &amp; Trauma</span>
+              </div>
+              <div>
+                <span class="text-2xl font-extrabold text-slate-900 block">24/7</span>
+                <span class="text-xs text-slate-500 font-medium">Cath Lab &amp; ICU</span>
+              </div>
+              <div>
+                <span class="text-2xl font-extrabold text-emerald-700 block">ABDM</span>
+                <span class="text-xs text-slate-500 font-medium">Compliant Health Records</span>
               </div>
             </div>
           </div>
@@ -218,11 +218,11 @@
                 <div class="flex items-center gap-2.5">
                   <span class="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center text-lg font-bold">🩺</span>
                   <div>
-                    <h2 class="text-base font-bold text-slate-900">Instant OPD Booking</h2>
-                    <p class="text-xs text-slate-500">Confirmed slot in under 2 minutes</p>
+                    <h2 class="text-base font-bold text-slate-900">OPD Consultation Booking</h2>
+                    <p class="text-xs text-slate-500">Live slot validation &amp; database confirmation</p>
                   </div>
                 </div>
-                <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">No Queue</span>
+                <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200">Verified Slots</span>
               </div>
 
               <!-- Fast form triggering appointment modal -->
@@ -267,8 +267,8 @@
 
               <!-- Trust Badges -->
               <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                <span class="flex items-center gap-1">✓ Instant SMS Confirmation</span>
-                <span class="flex items-center gap-1">✓ Verified Doctor Profiles</span>
+                <span class="flex items-center gap-1">✓ Zero Trust Security Shield</span>
+                <span class="flex items-center gap-1">✓ Real-time Database Persistence</span>
               </div>
             </div>
           </div>
@@ -1262,9 +1262,9 @@
           </div>
         </div>
 
-        <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 text-left flex items-start gap-2">
-          <span>⚠️</span>
-          <p class="text-[11px] leading-relaxed"><strong>Exhibition Demonstration:</strong> This is a simulated booking for project showcase. No actual patient booking or financial transaction occurred.</p>
+        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 text-left flex items-start gap-2">
+          <span class="text-emerald-700 font-bold">✓</span>
+          <p class="text-[11px] leading-relaxed"><strong>Confirmed &amp; Registered:</strong> Your outpatient consultation has been registered in the AyuSync clinical database. Please present your booking token at the hospital reception desk on the scheduled date.</p>
         </div>
 
         <div class="flex flex-wrap gap-3 pt-2">
@@ -1432,6 +1432,8 @@
         <button onclick="closeDoctorSignInModal()" class="text-slate-400 hover:text-slate-800 text-sm p-1 cursor-pointer">✕</button>
       </div>
 
+      <div id="doctor-signin-error" class="hidden p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-mono leading-relaxed"></div>
+
       <form onsubmit="handleDoctorSignInSubmit(event)" class="space-y-4">
         <div class="space-y-1">
           <label class="text-xs font-bold text-slate-700 uppercase">Doctor Registration No / Email</label>
@@ -1571,7 +1573,12 @@
     async function handleDoctorSignInSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('btn-submit-doctor-signin');
-      btn.innerHTML = `<span>Authenticating ABHA Proximity Shield...</span>`;
+      const errBox = document.getElementById('doctor-signin-error');
+      if (errBox) {
+        errBox.classList.add('hidden');
+        errBox.textContent = '';
+      }
+      btn.innerHTML = `<span>Authenticating Physician Workstation...</span>`;
 
       const emailInput = document.getElementById('doctor-signin-email');
       const email = emailInput ? emailInput.value.trim() : '';
@@ -1579,22 +1586,44 @@
       const pass = passInput ? passInput.value : '';
       if (!email || !pass) {
         btn.innerHTML = `<span>Sign In &amp; Authorize EHR Workstation →</span>`;
+        if (errBox) {
+          errBox.textContent = "Please enter your registered physician email and password.";
+          errBox.classList.remove('hidden');
+        }
         showToast("Sign In Failed", "Enter your registered email and password.", "⚠️");
         return;
       }
 
       if (window.cognisec) {
-        const loginRes = await window.cognisec.login(email, pass, 'healthcare');
+        const loginRes = await window.cognisec.loginDoctor(email, pass);
         if (loginRes && loginRes.success && loginRes.data) {
+          const userRole = (loginRes.data.user?.role || '').toUpperCase();
+          if (userRole !== 'DOCTOR' && userRole !== 'ADMIN') {
+            btn.innerHTML = `<span>Sign In &amp; Authorize EHR Workstation →</span>`;
+            const errMsg = "Unauthorized: Physician credentials required. This account does not possess clinical doctor permissions.";
+            if (errBox) {
+              errBox.textContent = errMsg;
+              errBox.classList.remove('hidden');
+            }
+            showToast("Unauthorized Account", "Doctor credentials required.", "🚫");
+            return;
+          }
           closeDoctorSignInModal();
           btn.innerHTML = `<span>Sign In &amp; Authorize EHR Workstation →</span>`;
           syncHealthcareAuthState();
-          showToast("Clinical Identity Active", "Doctor workstation unlocked. Observation running in background (30s).", "🩺");
-          window.cognisec.startObservationFlow(loginRes.data);
+          showToast("Clinical Identity Active", `Workstation active. Welcome Dr. ${loginRes.data.user?.name || ''}.`, "🩺");
+          if (typeof window.cognisec.startObservationFlow === 'function') {
+            window.cognisec.startObservationFlow(loginRes.data);
+          }
           return;
         } else {
           btn.innerHTML = `<span>Sign In &amp; Authorize EHR Workstation →</span>`;
-          showToast("Sign In Failed", loginRes?.error || "Invalid doctor credentials.", "⚠️");
+          const errMsg = loginRes?.error || "Invalid doctor registration credentials or password.";
+          if (errBox) {
+            errBox.textContent = errMsg;
+            errBox.classList.remove('hidden');
+          }
+          showToast("Sign In Failed", errMsg, "⚠️");
           return;
         }
       }
@@ -1691,22 +1720,9 @@
       }
     }
 
-    // Vault Access Request logic (Preserved original authoritative flow)
-    async function requestEhrVaultAccess() {
-      const cs = window.cognisec;
-      const ANCHOR = 'btn-request-ehr';
-      console.info('[COGNISEC-AI][vault] EHR confidential-access click', { hasClient: !!cs, modalOpen: !!(cs && cs.isStepUpModalOpen) });
-      if (cs && cs.isStepUpModalOpen) return;
-      if (cs) cs.clearVaultAccessNotice();
-
-      if (!cs || !cs.isAuthenticated()) {
-        showToast("Doctor Authentication Required", "Please sign in with your physician credentials to access restricted EHR records.", "🔒");
-        if (cs) cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'info', title: 'Sign in required', message: 'Sign in with your physician credentials to access restricted patient records.', actions: [{ label: 'Sign in', onClick: openDoctorSignInModal }] });
-        openDoctorSignInModal();
-        return;
-      }
-
-      try {
+    // ==========================================
+    // CLINICAL EHR VAULT RENDERING & ZERO TRUST AUTHORIZATION
+    // ==========================================
     function renderEhrVaultContent(data) {
       const container = document.getElementById('ehr-vault-dynamic-content');
       if (!container) return;
@@ -1860,7 +1876,7 @@
           throw new Error('Security client vault service not available');
         }
         const resp = await cs.fetchVaultData('ehr_vault');
-        if (resp && resp.success && resp.data) {
+        if (resp && (resp.success || resp.access_granted) && resp.data) {
           renderEhrVaultContent(resp.data);
           if (loadingEl) loadingEl.classList.add('hidden');
           isEhrVaultUnlocked = true;
@@ -1897,6 +1913,21 @@
         showToast("Doctor Authentication Required", "Please sign in with your physician credentials to access restricted EHR records.", "🔒");
         if (cs) cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'info', title: 'Sign in required', message: 'Sign in with your physician credentials to access restricted patient records.', actions: [{ label: 'Sign in', onClick: openDoctorSignInModal }] });
         openDoctorSignInModal();
+        return;
+      }
+
+      const user = cs.getUser();
+      const userRole = (user?.role || '').toUpperCase();
+      if (userRole !== 'DOCTOR' && userRole !== 'ADMIN') {
+        lockEhrVault();
+        showToast("Access Denied", "Clinical EHR records are strictly restricted to verified doctors and clinical administrators.", "🚫");
+        if (cs) cs.showVaultAccessNotice({
+          anchorId: ANCHOR,
+          tone: 'error',
+          title: 'Physician Role Required',
+          message: 'Access restricted: Your authenticated account role does not possess clinical practitioner privileges to view patient clinical charts.',
+          actions: [{ label: 'Sign in with Doctor Credentials', onClick: () => { cs.clearAuth(); syncHealthcareAuthState(); openDoctorSignInModal(); } }]
+        });
         return;
       }
 
@@ -1992,6 +2023,9 @@
       isEhrVaultUnlocked = false;
       if (window.cognisec) {
         window.cognisec.revokeResourceClearance('ehr_vault');
+        if (typeof window.cognisec.relockVault === 'function') {
+          window.cognisec.relockVault('ehr_vault').catch(() => {});
+        }
       }
       const dynamicEl = document.getElementById('ehr-vault-dynamic-content');
       if (dynamicEl) dynamicEl.innerHTML = '';
@@ -2003,6 +2037,19 @@
       if (unlocked) unlocked.classList.add('hidden');
       updateContinuousVerificationPanel();
       showToast("EHR Vault Sealed", "Confidential medical records masked under Zero Trust policy.", "🔒");
+    }
+
+    async function handleBackToPlatform(e) {
+      if (e) e.preventDefault();
+      try {
+        if (window.cognisec && typeof window.cognisec.relockVault === 'function') {
+          await window.cognisec.relockVault('ehr_vault');
+        }
+      } catch (err) {
+        console.warn('Error during relock on platform exit:', err);
+      }
+      lockEhrVault();
+      window.location.href = 'index.html';
     }
 
     function triggerExhibitionStepUpTest() {
@@ -2021,25 +2068,41 @@
       const isAuth = window.cognisec ? window.cognisec.isAuthenticated() : false;
       const isVerified = window.cognisec ? window.cognisec.isFullyVerified() : false;
       const user = window.cognisec ? window.cognisec.getUser() : null;
-      isDoctorLoggedIn = isAuth;
+      const userRole = (user?.role || '').toUpperCase();
+      const isDoctor = isAuth && (userRole === 'DOCTOR' || userRole === 'ADMIN');
+      isDoctorLoggedIn = isDoctor;
 
       if (!isAuth && isEhrVaultUnlocked) {
         lockEhrVault();
       }
 
+      const statusLabel = document.getElementById('doctor-status-label');
+      const nameLabel = document.getElementById('doctor-name-label');
+      const btnSignout = document.getElementById('btn-header-signout');
+      const btnSignin = document.getElementById('btn-header-signin');
+      const btnMfa = document.getElementById('btn-header-mfa');
+      const statusDot = document.getElementById('doctor-status-dot');
+
       if (isAuth && user) {
-        const statusBadge = isVerified ? '' : ' (Observing)';
-        document.getElementById('doctor-status-label').textContent = `${user.email || ''}` + statusBadge;
-        document.getElementById('doctor-name-label').textContent = `Dr. ${user.name} (Cardiology)`;
-        document.getElementById('btn-header-signout').classList.remove('hidden');
-        document.getElementById('btn-header-signin').classList.add('hidden');
-        document.getElementById('btn-header-mfa')?.classList.remove('hidden');
-        document.getElementById('doctor-status-dot').className = isVerified
-          ? 'w-2 h-2 rounded-full bg-emerald-400'
-          : 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+        if (isDoctor) {
+          const statusBadge = isVerified ? '' : ' (Observing)';
+          if (statusLabel) statusLabel.textContent = `${user.email || ''}` + statusBadge;
+          if (nameLabel) nameLabel.textContent = `Dr. ${user.name} (${user.department || 'Consultant Physician'})`;
+          if (statusDot) statusDot.className = isVerified
+            ? 'w-2 h-2 rounded-full bg-emerald-400'
+            : 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+        } else {
+          if (statusLabel) statusLabel.textContent = `Patient Account • ${user.email || ''}`;
+          if (nameLabel) nameLabel.textContent = user.name || 'Patient';
+          if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-sky-400';
+        }
+
+        if (btnSignout) btnSignout.classList.remove('hidden');
+        if (btnSignin) btnSignin.classList.add('hidden');
+        if (btnMfa) btnMfa.classList.remove('hidden');
 
         // Check authoritative server access decision for cross-portal synchronization
-        if (isVerified) {
+        if (isVerified && isDoctor) {
           window.cognisec.checkResourceAccess('ehr_vault').then(async decision => {
             if (decision && decision.access_granted) {
               if (!isEhrVaultUnlocked) {
@@ -2050,13 +2113,18 @@
             }
           }).catch(() => {});
         }
+
+        // Auto-refresh appointments if user email is present
+        if (user.email && typeof refreshPatientAppointments === 'function') {
+          refreshPatientAppointments(user.email);
+        }
       } else {
-        document.getElementById('doctor-status-label').textContent = 'Guest Medical Officer';
-        document.getElementById('doctor-name-label').textContent = 'Not Signed In';
-        document.getElementById('btn-header-signout').classList.add('hidden');
-        document.getElementById('btn-header-signin').classList.remove('hidden');
-        document.getElementById('btn-header-mfa')?.classList.add('hidden');
-        document.getElementById('doctor-status-dot').className = 'w-2 h-2 rounded-full bg-rose-500';
+        if (statusLabel) statusLabel.textContent = 'Guest Medical Officer';
+        if (nameLabel) nameLabel.textContent = 'Not Signed In';
+        if (btnSignout) btnSignout.classList.add('hidden');
+        if (btnSignin) btnSignin.classList.remove('hidden');
+        if (btnMfa) btnMfa.classList.add('hidden');
+        if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-rose-500';
       }
 
       updateContinuousVerificationPanel();
@@ -2092,6 +2160,38 @@
       if (urlParams.get('signin') === 'true' || urlParams.get('login') === 'true') {
         openDoctorSignInModal();
       }
+
+      // Automatically relock when navigating away from clinical EHR vault section
+      document.querySelectorAll('nav a, #mobile-menu a').forEach(link => {
+        link.addEventListener('click', () => {
+          const href = link.getAttribute('href');
+          if (href && href.startsWith('#') && href !== '#restricted-ehr-vault' && isEhrVaultUnlocked) {
+            lockEhrVault();
+          }
+        });
+      });
+    });
+
+    // Server-enforced automatic relock on window navigation, unload, or back/forward
+    window.addEventListener('pagehide', () => {
+      if (isEhrVaultUnlocked) {
+        if (window.cognisec && typeof window.cognisec.relockVault === 'function') {
+          window.cognisec.relockVault('ehr_vault');
+        }
+        lockEhrVault();
+      }
+    });
+
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted || isEhrVaultUnlocked) {
+        lockEhrVault();
+      }
+    });
+
+    window.addEventListener('popstate', () => {
+      if (isEhrVaultUnlocked && location.hash !== '#restricted-ehr-vault') {
+        lockEhrVault();
+      }
     });
 
     // Password visibility toggle helper
@@ -2112,7 +2212,10 @@
     // ==========================================
     // DOCTORS DATA & DIRECTORY LOGIC
     // ==========================================
-    const DOCTORS = [
+    // ==========================================
+    // DOCTORS DATA & DIRECTORY LOGIC
+    // ==========================================
+    let DOCTORS = [
       {
         id: 'doc-1',
         name: 'Dr. Boomika Ram',
@@ -2138,7 +2241,7 @@
         experience: '22+ Years',
         reg: 'KMC #71294',
         fee: '₹1,500',
-        availability: 'Next Slot: Tomorrow 10:00 AM',
+        availability: 'Next Slot: Available',
         opdHours: 'Mon–Fri &bull; 10:00 AM – 02:00 PM',
         avatar: '👨‍⚕️',
         bio: 'Chief Neurosurgeon and Director of Stroke Program. Specializes in minimally invasive skull-base neurosurgery, intracranial aneurysms, and epilepsy surgical therapies.'
@@ -2183,7 +2286,7 @@
         experience: '12+ Years',
         reg: 'KMC #94821',
         fee: '₹1,000',
-        availability: 'Next Slot: Thursday 02:00 PM',
+        availability: 'Next Slot: Available',
         opdHours: 'Tue, Thu, Sat &bull; 02:00 PM – 06:00 PM',
         avatar: '👩‍⚕️',
         bio: 'Renowned clinical dermatologist specializing in chronic psoriasis phototherapy, pediatric atopic dermatitis, biological immunotherapy, and aesthetic laser rejuvenation.'
@@ -2205,6 +2308,36 @@
       }
     ];
 
+    async function loadHealthcareData() {
+      if (window.cognisec && typeof window.cognisec.fetchHealthcareDoctors === 'function') {
+        try {
+          const backendDocs = await window.cognisec.fetchHealthcareDoctors();
+          if (backendDocs && Array.isArray(backendDocs) && backendDocs.length > 0) {
+            DOCTORS = backendDocs.map(d => ({
+              id: d.id,
+              name: d.name,
+              degrees: d.degrees,
+              dept: d.dept,
+              deptLabel: d.dept_label,
+              room: d.room,
+              experience: d.experience,
+              reg: d.reg_no,
+              fee: `₹${d.fee_inr}`,
+              availability: d.is_available_today ? 'Available Today' : 'Next Slot: Available',
+              opdHours: d.opd_hours,
+              avatar: d.avatar || '👨‍⚕️',
+              bio: d.bio
+            }));
+            renderDoctors();
+            syncQuickDoctorOptions();
+            syncModalDoctorOptions();
+          }
+        } catch (e) {
+          console.warn('[AyuSync] Doctor catalog fetch warning:', e);
+        }
+      }
+    }
+
     let currentDoctorDeptFilter = 'all';
     let doctorSearchQuery = '';
 
@@ -2221,7 +2354,7 @@
       });
 
       if (filtered.length === 0) {
-        container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 font-mono text-xs">No doctors found matching your criteria. Try adjusting your search or department filter.</div>`;
+        container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 font-mono text-xs">No doctors currently available matching your criteria. Try adjusting your search or department filter.</div>`;
         return;
       }
 
@@ -2247,7 +2380,7 @@
             </div>
 
             <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full ${d.availability.includes('Today') ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
+              <span class="w-2 h-2 rounded-full ${d.availability.includes('Today') ? 'bg-emerald-500' : 'bg-teal-500'}"></span>
               <span class="text-[11px] font-semibold text-slate-600">${d.availability}</span>
             </div>
           </div>
@@ -2313,84 +2446,75 @@
     }
 
     // ==========================================
-    // APPOINTMENT BOOKING WIZARD LOGIC
+    // APPOINTMENT BOOKING WIZARD & DATABASE PERSISTENCE
     // ==========================================
-    const APPOINTMENTS_STORAGE_KEY = 'ayusync_patient_appointments';
-    let sampleAppointments = [
-      {
-        id: 'AYU-APT-78192',
-        doctorName: 'Dr. Boomika Ram (Cardiology)',
-        dept: 'Cardiology & Cardiac Surgery',
-        date: '2026-10-18',
-        time: '11:30 AM',
-        patientName: 'Demonstration Patient A',
-        mode: 'In-Person OPD Visit',
-        room: 'Room 204, Tower B',
-        status: 'Confirmed'
-      },
-      {
-        id: 'AYU-APT-51094',
-        doctorName: 'Dr. Sunita Mehra (Pediatrics)',
-        dept: 'Pediatrics & Child Health',
-        date: '2026-10-21',
-        time: '02:00 PM',
-        patientName: 'Demonstration Patient B',
-        mode: 'In-Person OPD Visit',
-        room: 'Room 305, Tower C',
-        status: 'Confirmed'
-      }
-    ];
+    let currentPatientAppointments = [];
 
-    function getStoredAppointments() {
-      try {
-        const stored = localStorage.getItem(APPOINTMENTS_STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          return [...parsed, ...sampleAppointments];
-        }
-      } catch (e) {}
-      return sampleAppointments;
-    }
-
-    function renderPatientAppointments() {
+    async function refreshPatientAppointments(email = null) {
       const container = document.getElementById('patient-appointments-list');
       if (!container) return;
 
-      const appointments = getStoredAppointments();
+      const user = window.cognisec ? window.cognisec.getUser() : null;
+      const targetEmail = email || user?.email || (document.getElementById('modal-patient-email')?.value?.trim());
 
-      container.innerHTML = appointments.map(apt => `
-        <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hospital-card-hover flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono text-xs">
-          <div class="flex items-center gap-4">
-            <span class="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center text-xl font-bold">🩺</span>
-            <div>
-              <div class="flex items-center gap-2">
-                <strong class="text-slate-900 text-sm font-sans font-bold">${apt.doctorName}</strong>
-                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">${apt.status}</span>
+      if (!targetEmail) {
+        container.innerHTML = `
+          <div class="text-center py-12 font-mono text-xs text-slate-400">
+            <p>No appointments to display.</p>
+            <p class="text-[11px] text-slate-500 mt-1">Book an appointment or enter your patient email to view active consultations.</p>
+          </div>`;
+        return;
+      }
+
+      if (window.cognisec && typeof window.cognisec.fetchHealthcareAppointments === 'function') {
+        try {
+          const list = await window.cognisec.fetchHealthcareAppointments(targetEmail);
+          if (list && Array.isArray(list) && list.length > 0) {
+            currentPatientAppointments = list;
+            container.innerHTML = list.map(apt => `
+              <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hospital-card-hover flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono text-xs">
+                <div class="flex items-center gap-4">
+                  <span class="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center text-xl font-bold">🩺</span>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <strong class="text-slate-900 text-sm font-sans font-bold">${apt.doctor_name}</strong>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">${apt.status}</span>
+                    </div>
+                    <span class="text-slate-500 text-xs block pt-0.5 font-sans">${apt.department.toUpperCase()} &bull; ${apt.consultation_mode}</span>
+                    <span class="text-teal-700 text-xs font-bold block pt-0.5">📅 ${apt.appointment_date} at ${apt.time_slot} &bull; ${apt.room || 'Tower B'} &bull; Token: ${apt.reference_id}</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button onclick="downloadAppointmentSlipById('${apt.reference_id}')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold transition-colors cursor-pointer">
+                    View Slip
+                  </button>
+                </div>
               </div>
-              <span class="text-slate-500 text-xs block pt-0.5 font-sans">${apt.dept} &bull; ${apt.mode}</span>
-              <span class="text-teal-700 text-xs font-bold block pt-0.5">📅 ${apt.date} at ${apt.time} &bull; ${apt.room} &bull; Ref: ${apt.id}</span>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <button onclick="showToast('Appointment Details', 'Confirmed for ${apt.patientName}. Show Ref ${apt.id} at Reception.', '📄')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold transition-colors cursor-pointer">
-              View Slip
-            </button>
-            <button onclick="showToast('Reschedule Demo', 'Slot updated for exhibition demonstration.', '🔄')" class="px-3.5 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold transition-colors cursor-pointer">
-              Reschedule
-            </button>
-          </div>
-        </div>
-      `).join('');
+            `).join('');
+            return;
+          }
+        } catch (e) {
+          console.warn('[AyuSync] Failed to retrieve appointments:', e);
+        }
+      }
+
+      container.innerHTML = `
+        <div class="text-center py-12 font-mono text-xs text-slate-400">
+          <p>No appointments found for ${targetEmail}.</p>
+          <p class="text-[11px] text-slate-500 mt-1">Book an appointment above to schedule your specialist visit.</p>
+        </div>`;
+    }
+
+    function renderPatientAppointments() {
+      refreshPatientAppointments();
     }
 
     function openAppointmentModal(preselectedDoctorId = null, preselectedDept = null) {
-      // Set today's date as min attribute to prevent past dates!
       const todayStr = new Date().toISOString().split('T')[0];
       const dateInput = document.getElementById('modal-date-input');
       if (dateInput) {
         dateInput.min = todayStr;
         if (!dateInput.value) {
-          // Default to tomorrow or today
           const tomorrow = new Date();
           tomorrow.setDate(tomorrow.getDate() + 1);
           dateInput.value = tomorrow.toISOString().split('T')[0];
@@ -2419,9 +2543,13 @@
       const docSelect = document.getElementById('modal-doc-select');
       const filtered = DOCTORS.filter(d => d.dept === dept);
       
-      docSelect.innerHTML = filtered.map(d => `
-        <option value="${d.id}">${d.name} (${d.degrees}) &bull; ${d.room}</option>
-      `).join('');
+      if (filtered.length === 0) {
+        docSelect.innerHTML = `<option value="">No specialists currently available</option>`;
+      } else {
+        docSelect.innerHTML = filtered.map(d => `
+          <option value="${d.id}">${d.name} (${d.degrees}) &bull; ${d.room}</option>
+        `).join('');
+      }
     }
 
     function syncQuickDoctorOptions() {
@@ -2429,9 +2557,13 @@
       const docSelect = document.getElementById('quick-doc-select');
       const filtered = DOCTORS.filter(d => d.dept === dept);
       
-      docSelect.innerHTML = filtered.map(d => `
-        <option value="${d.id}">${d.name} (${d.room})</option>
-      `).join('');
+      if (filtered.length === 0) {
+        docSelect.innerHTML = `<option value="">No specialists currently available</option>`;
+      } else {
+        docSelect.innerHTML = filtered.map(d => `
+          <option value="${d.id}">${d.name} (${d.room})</option>
+        `).join('');
+      }
     }
 
     function launchQuickBooking() {
@@ -2486,7 +2618,7 @@
 
     let lastConfirmedAppointment = null;
 
-    function handleAppointmentSubmit(e) {
+    async function handleAppointmentSubmit(e) {
       e.preventDefault();
 
       const name = document.getElementById('modal-patient-name').value.trim();
@@ -2497,51 +2629,90 @@
       const slot = document.getElementById('modal-selected-slot').value;
       const mode = document.getElementById('modal-mode-select').value;
 
-      if (!name || !phone || !email || !date) {
+      if (!name || !phone || !email || !date || !slot) {
         showToast("Incomplete Form", "Please fill in all required patient fields.", "⚠️");
         return;
       }
 
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (date < todayStr) {
+        showToast("Invalid Date", "Appointment date cannot be in the past.", "⚠️");
+        return;
+      }
+
       const doc = DOCTORS.find(d => d.id === docId) || DOCTORS[0];
-      const refId = '#AYU-APT-' + Math.floor(10000 + Math.random() * 90000);
+      const submitBtn = document.getElementById('btn-submit-appointment');
+      const originalText = submitBtn ? submitBtn.innerHTML : '';
+      if (submitBtn) {
+        submitBtn.innerHTML = '<span>Persisting Appointment with Healthcare Engine...</span>';
+        submitBtn.disabled = true;
+      }
 
-      lastConfirmedAppointment = {
-        id: refId,
-        doctorName: `${doc.name} (${doc.deptLabel.split(' ')[0]})`,
-        dept: doc.deptLabel,
-        date: date,
-        time: slot,
-        patientName: name,
-        mode: mode,
-        room: doc.room,
-        status: 'Confirmed'
-      };
-
-      // Save to localStorage for demo persistence
       try {
-        const stored = JSON.parse(localStorage.getItem(APPOINTMENTS_STORAGE_KEY) || '[]');
-        stored.unshift(lastConfirmedAppointment);
-        localStorage.setItem(APPOINTMENTS_STORAGE_KEY, JSON.stringify(stored));
-      } catch (err) {}
+        const bookingPayload = {
+          patient_name: name,
+          patient_phone: phone,
+          patient_email: email,
+          department: doc ? doc.dept : 'general_medicine',
+          doctor_id: doc ? doc.id : 'doc-1',
+          doctor_name: doc ? `${doc.name} (${doc.degrees})` : 'Consultant Physician',
+          appointment_date: date,
+          time_slot: slot,
+          consultation_mode: mode,
+          room: doc ? doc.room : 'Tower A'
+        };
 
-      // Update Confirmation Screen
-      document.getElementById('confirm-ref-id').textContent = refId;
-      document.getElementById('confirm-patient-name').textContent = name;
-      document.getElementById('confirm-doctor-name').textContent = `${doc.name} (${doc.degrees})`;
-      document.getElementById('confirm-slot-time').textContent = `${date} • ${slot}`;
-      document.getElementById('confirm-mode').textContent = mode;
-      document.getElementById('confirm-room').textContent = doc.room;
+        let bookedApt = null;
+        if (window.cognisec && typeof window.cognisec.bookHealthcareAppointment === 'function') {
+          const res = await window.cognisec.bookHealthcareAppointment(bookingPayload);
+          if (res && res.success && res.data) {
+            bookedApt = res.data;
+          } else {
+            throw new Error((res && res.error) || 'Failed to book appointment.');
+          }
+        } else {
+          throw new Error('Healthcare service client offline.');
+        }
 
-      // Switch to Confirmation view
-      document.getElementById('appointment-form').classList.add('hidden');
-      document.getElementById('booking-confirmation-view').classList.remove('hidden');
+        lastConfirmedAppointment = {
+          id: bookedApt.reference_id,
+          doctorName: bookedApt.doctor_name,
+          dept: doc ? doc.deptLabel : bookedApt.department,
+          date: bookedApt.appointment_date,
+          time: bookedApt.time_slot,
+          patientName: bookedApt.patient_name,
+          mode: bookedApt.consultation_mode,
+          room: bookedApt.room || (doc ? doc.room : 'Tower B'),
+          status: bookedApt.status
+        };
 
-      document.getElementById('step-indicator-1').className = 'flex items-center gap-1.5 text-emerald-700 font-bold';
-      document.getElementById('step-indicator-2').className = 'flex items-center gap-1.5 text-emerald-700 font-bold';
-      document.getElementById('step-indicator-3').className = 'flex items-center gap-1.5 text-emerald-700 font-bold';
+        // Update Confirmation Screen
+        document.getElementById('confirm-ref-id').textContent = bookedApt.reference_id;
+        document.getElementById('confirm-patient-name').textContent = bookedApt.patient_name;
+        document.getElementById('confirm-doctor-name').textContent = bookedApt.doctor_name;
+        document.getElementById('confirm-slot-time').textContent = `${bookedApt.appointment_date} • ${bookedApt.time_slot}`;
+        document.getElementById('confirm-mode').textContent = bookedApt.consultation_mode;
+        document.getElementById('confirm-room').textContent = bookedApt.room || (doc ? doc.room : 'Tower B');
 
-      renderPatientAppointments();
-      showToast("Appointment Confirmed", `Reference ${refId} created successfully.`, "✅");
+        // Switch to Confirmation view
+        document.getElementById('appointment-form').classList.add('hidden');
+        document.getElementById('booking-confirmation-view').classList.remove('hidden');
+
+        document.getElementById('step-indicator-1').className = 'flex items-center gap-1.5 text-emerald-700 font-bold';
+        document.getElementById('step-indicator-2').className = 'flex items-center gap-1.5 text-emerald-700 font-bold';
+        document.getElementById('step-indicator-3').className = 'flex items-center gap-1.5 text-emerald-700 font-bold';
+
+        refreshPatientAppointments(email);
+        showToast("Appointment Confirmed", `Token ${bookedApt.reference_id} persisted in hospital database.`, "✅");
+      } catch (err) {
+        console.error('[AyuSync] Booking error:', err);
+        showToast("Booking Failed", err.message || "Could not reserve slot.", "⚠️");
+      } finally {
+        if (submitBtn) {
+          submitBtn.innerHTML = originalText;
+          submitBtn.disabled = false;
+        }
+      }
     }
 
     function downloadAppointmentSlip() {
@@ -2551,7 +2722,7 @@
       }
       const text = `=====================================================
 AYUSYNC MEDCARE NETWORK — OUTPATIENT APPOINTMENT SLIP
-(Simulated Demonstration Record)
+(Hospital Database Confirmed Record)
 =====================================================
 Appointment Token : ${lastConfirmedAppointment.id}
 Patient Name      : ${lastConfirmedAppointment.patientName}
@@ -2574,7 +2745,41 @@ Please arrive 15 minutes prior to your consultation slot.
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showToast("Slip Downloaded", "Sample appointment slip exported as text.", "📥");
+      showToast("Slip Downloaded", "Confirmed appointment slip exported as text.", "📥");
+    }
+
+    function downloadAppointmentSlipById(refId) {
+      const apt = currentPatientAppointments.find(a => a.reference_id === refId);
+      if (!apt) {
+        downloadAppointmentSlip();
+        return;
+      }
+      const text = `=====================================================
+AYUSYNC MEDCARE NETWORK — OUTPATIENT APPOINTMENT SLIP
+(Hospital Database Confirmed Record)
+=====================================================
+Appointment Token : ${apt.reference_id}
+Patient Name      : ${apt.patient_name}
+Consulting Doctor : ${apt.doctor_name}
+Department        : ${apt.department.toUpperCase()}
+Date & Time       : ${apt.appointment_date} at ${apt.time_slot}
+Consultation Mode : ${apt.consultation_mode}
+Clinic Room       : ${apt.room || 'Tower B'}
+Hospital Campus   : AyuSync MedCare, Bengaluru Indiranagar
+ABDM Gateway      : IN-KA-BLR-004921 (NABH Accredited)
+=====================================================
+Please arrive 15 minutes prior to your consultation slot.
+=====================================================`;
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${apt.reference_id}-Slip.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Slip Downloaded", `Exported slip for token ${apt.reference_id}.`, "📥");
     }
 
     // ==========================================
@@ -2810,6 +3015,7 @@ This is a demonstration laboratory record for project showcase.
 
     // Initialize all components on load
     document.addEventListener('DOMContentLoaded', () => {
+      loadHealthcareData();
       renderDoctors();
       syncQuickDoctorOptions();
       syncModalDoctorOptions();

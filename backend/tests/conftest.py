@@ -5,11 +5,15 @@ import sys
 # Ensure backend root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# Explicitly enforce isolated test database environment before importing any app modules
+os.environ["DATABASE_URL"] = "sqlite:///./test_cognisec.db"
+os.environ["ENVIRONMENT"] = "test"
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.database.base import Base
-from app.database.connection import get_db
+from app.database.connection import get_db, get_simulator_db
 from app.main import app
 from app.core.security import get_password_hash
 from app.core.config import settings
@@ -80,15 +84,22 @@ TEST_DB_URL = "sqlite:///./test_cognisec.db"
 test_engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
+# Monkeypatch connection module so direct SessionLocal() calls in tests/services strictly use test_engine
+import app.database.connection as conn_module
+conn_module.engine = test_engine
+conn_module.SessionLocal = TestingSessionLocal
+
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
     settings.ENVIRONMENT = "test"
     settings.EXHIBITION_MODE = True
+    conn_module.engine = test_engine
+    conn_module.SessionLocal = TestingSessionLocal
     Base.metadata.drop_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
     
-    # Pre-seed test admin and user
+    # Pre-seed test admin and user in isolated SQLite test database
     db = TestingSessionLocal()
     admin = User(
         name="Test Admin",
@@ -104,8 +115,16 @@ def setup_test_db():
         role="USER",
         account_status="ACTIVE"
     )
+    doctor = User(
+        name="Dr. Boomika Ram",
+        email="dr.boomika@ayusync.med.in",
+        password_hash=get_password_hash("Doctor@123"),
+        role="DOCTOR",
+        account_status="ACTIVE"
+    )
     db.add(admin)
     db.add(user)
+    db.add(doctor)
     db.commit()
     db.close()
 
@@ -117,6 +136,26 @@ def setup_test_db():
             os.remove("./test_cognisec.db")
         except Exception:
             pass
+
+
+@pytest.fixture(autouse=True)
+def global_db_isolation():
+    """Autouse fixture ensuring every FastAPI request in all tests uses the isolated test DB."""
+    # Strict safety invariant: tests must NEVER connect to non-sqlite production DB
+    assert "sqlite" in TEST_DB_URL, f"CRITICAL: Tests attempted to use non-sqlite DB: {TEST_DB_URL}"
+
+    def override_get_db():
+        db = TestingSessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_simulator_db] = override_get_db
+    yield
+    app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(get_simulator_db, None)
 
 
 @pytest.fixture
@@ -140,6 +179,7 @@ def client(db_session):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_simulator_db] = override_get_db
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -164,7 +204,7 @@ def user_token(client, db_session):
     res = client.post("/api/auth/login", json={
         "email": "test.user@cognisec.ai",
         "password": "User@123",
-        "application": "ecommerce"
+        "application": "platform"
     })
     sid = res.json()["session_id"]
     from app.services.session_service import SessionService

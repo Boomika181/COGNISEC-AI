@@ -20,6 +20,26 @@ class SessionService:
         session_id = f"sess_{uuid.uuid4().hex[:16]}"
         now = datetime.now(timezone.utc)
         final_status = "PENDING_OBSERVATION" if is_pending_observation else status
+
+        # Terminate any existing active/pending sessions for the same user on this application and device
+        # to ensure multiple logins from the same browser/app do not stack up duplicate active sessions,
+        # while preserving valid sessions on the user's other enrolled devices.
+        if final_status in ("ACTIVE", "PENDING_OBSERVATION"):
+            try:
+                term_query = db.query(DbSession).filter(
+                    DbSession.user_id == user_id,
+                    DbSession.application == application.lower(),
+                    DbSession.status.in_(["ACTIVE", "PENDING_OBSERVATION", "STEP_UP_REQUIRED"])
+                )
+                if device_id:
+                    term_query = term_query.filter(DbSession.device_id == device_id)
+                term_query.update({
+                    "status": "TERMINATED",
+                    "logout_time": now
+                }, synchronize_session=False)
+            except Exception:
+                pass
+
         db_session = DbSession(
             id=session_id,
             user_id=user_id,
@@ -37,6 +57,51 @@ class SessionService:
         db.commit()
         db.refresh(db_session)
         return db_session
+
+    @staticmethod
+    def reap_expired_sessions(db: Session, max_lifetime_minutes: Optional[int] = None) -> int:
+        """
+        Authoritatively marks expired active sessions as TERMINATED in the database:
+        - Sessions whose token lifetime has elapsed without explicit logout.
+        - Preserves all historical session records in DB while ensuring they are not counted as active.
+        - Reconciles any orphaned duplicate active sessions per user/application.
+        """
+        from app.core.config import settings
+        lifetime = max_lifetime_minutes or getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(minutes=lifetime)
+
+        reaped = 0
+        try:
+            # 1. Terminate sessions older than token expiration cutoff
+            expired_count = db.query(DbSession).filter(
+                DbSession.status == "ACTIVE",
+                DbSession.login_time < cutoff
+            ).update({
+                "status": "TERMINATED",
+                "logout_time": DbSession.login_time + timedelta(minutes=lifetime)
+            }, synchronize_session=False)
+            reaped += expired_count
+
+            # 2. For any user with multiple active sessions on the same application, keep only the newest
+            active_sessions = db.query(DbSession).filter(
+                DbSession.status == "ACTIVE"
+            ).order_by(DbSession.login_time.desc()).all()
+
+            seen_user_apps = set()
+            for s in active_sessions:
+                key = (s.user_id, (s.application or "").lower())
+                if key in seen_user_apps:
+                    s.status = "TERMINATED"
+                    s.logout_time = s.login_time + timedelta(hours=1)
+                    reaped += 1
+                else:
+                    seen_user_apps.add(key)
+
+            db.commit()
+        except Exception:
+            db.rollback()
+        return reaped
 
     @staticmethod
     def get_session(db: Session, session_id: str) -> Optional[DbSession]:
@@ -76,6 +141,12 @@ class SessionService:
             try:
                 from app.services.step_up_service import StepUpService
                 StepUpService.purge_session_challenges(session_id)
+            except Exception:
+                pass
+
+            try:
+                from app.services.behavior_drift_service import BehavioralDriftTracker
+                BehavioralDriftTracker.clear_session(session_id)
             except Exception:
                 pass
             
@@ -120,7 +191,7 @@ class SessionService:
         application: Optional[str] = None,
         user_id: Optional[int] = None
     ) -> List[DbSession]:
-        query = db.query(DbSession).filter(DbSession.status == "ACTIVE")
+        query = db.query(DbSession).filter(DbSession.status == "ACTIVE", ~DbSession.id.like("sim_%"))
         if application:
             query = query.filter(DbSession.application == application.lower())
         if user_id:
@@ -284,6 +355,12 @@ class SessionService:
         db_session.step_up_valid_until = None
         db_session.step_up_factor = None
         db_session.step_up_risk_cleared = None
+
+        try:
+            from app.services.access_tracker import ConfidentialAccessTracker
+            ConfidentialAccessTracker.clear_denials(db_session.user_id, session_id)
+        except Exception:
+            pass
 
         db.commit()
         db.refresh(db_session)
@@ -499,7 +576,8 @@ class SessionService:
         db: Session,
         session_id: Optional[str] = None,
         user_id: Optional[int] = None,
-        application: Optional[str] = None
+        application: Optional[str] = None,
+        resource: Optional[str] = None
     ) -> int:
         """Revokes all active application grants matching the given filters."""
         query = db.query(ApplicationGrant).filter(ApplicationGrant.revoked == False)
@@ -509,7 +587,14 @@ class SessionService:
             query = query.filter(ApplicationGrant.user_id == user_id)
         if application:
             norm_app = SessionService.normalize_application(application)
-            query = query.filter(ApplicationGrant.application == norm_app)
-        count = query.update({"revoked": True})
+            if norm_app:
+                query = query.filter(ApplicationGrant.application == norm_app)
+        if resource:
+            norm_res = SessionService.normalize_resource(resource)
+            if norm_res:
+                query = query.filter(ApplicationGrant.resource == norm_res)
+        matching_grants = query.all()
+        for g in matching_grants:
+            g.revoked = True
         db.commit()
-        return count
+        return len(matching_grants)

@@ -15,6 +15,7 @@ from app.routes import (
     demo_router,
     devices_router,
     notifications_router,
+    healthcare_router,
 )
 
 # Setup logging
@@ -22,12 +23,26 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("cognisec")
 
 # Create database tables automatically upon startup and sync schema columns
-Base.metadata.create_all(bind=engine)
 try:
-    from app.database.schema_sync import sync_device_and_notification_schemas, sync_session_schema, sync_application_grants_schema
+    Base.metadata.create_all(bind=engine)
+    from app.database.schema_sync import (
+        sync_user_schema,
+        sync_device_and_notification_schemas,
+        sync_session_schema,
+        sync_application_grants_schema,
+        sync_historical_device_identities,
+        ensure_admin_account_provisioned,
+        sync_alert_schema,
+        sync_doctor_roles_and_identities
+    )
+    sync_user_schema()
     sync_device_and_notification_schemas()
     sync_session_schema()
     sync_application_grants_schema()
+    sync_historical_device_identities()
+    ensure_admin_account_provisioned()
+    sync_alert_schema()
+    sync_doctor_roles_and_identities()
 except Exception as e:
     logger.warning(f"Schema sync deferred: {e}")
 
@@ -46,6 +61,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Retry-After", "Content-Disposition"],
 )
 
 # Mount API Routers
@@ -58,6 +74,7 @@ app.include_router(admin_router, prefix=settings.API_V1_STR)
 app.include_router(demo_router, prefix=settings.API_V1_STR)
 app.include_router(devices_router, prefix=settings.API_V1_STR)
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
+app.include_router(healthcare_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

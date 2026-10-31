@@ -207,16 +207,36 @@ def login(
         detail="Too many login attempts for this account. Please wait before retrying."
     )
 
+    # Check if account is already locked
+    existing_user = AuthService.get_user_by_email(db, request.email)
+    if existing_user and existing_user.account_status != "ACTIVE":
+        if getattr(request, "doctor_required", False):
+            detail = f"Doctor account is {existing_user.account_status.lower()}. Please contact clinical administration."
+        else:
+            detail = f"Account is {existing_user.account_status.lower()}. Access denied."
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=detail,
+        )
+
     user = AuthService.authenticate_user(db, request.email, request.password)
     if not user:
-        # Record failed attempt, check for rate-limited suspicious activity alert (anti-enumeration preserved)
-        from app.services.notification_service import NotificationService
-        NotificationService.handle_failed_login(
+        # Record failed attempt, check 3-attempt lockout policy and audit
+        db_user, is_now_locked, fails = AuthService.record_failed_login(
             db=db,
             email=request.email,
             ip_address=client_ip,
             user_agent=user_agent or request.browser or ""
         )
+        if is_now_locked or (db_user and db_user.account_status != "ACTIVE"):
+            if getattr(request, "doctor_required", False):
+                detail = "Doctor account is locked. Please contact clinical administration."
+            else:
+                detail = "Account is locked. Access denied."
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=detail,
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email address or password.",
@@ -228,6 +248,19 @@ def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Account is {user.account_status.lower()}. Access denied.",
         )
+
+    # Reset failed login attempt counter upon successful authentication
+    if getattr(user, "failed_login_attempts", 0) != 0:
+        user.failed_login_attempts = 0
+        db.commit()
+
+    # Enforce role validation when doctor login is explicitly requested
+    if getattr(request, "doctor_required", False):
+        if user.role.upper() not in ("DOCTOR", "ADMIN"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Account does not possess verified Doctor credentials.",
+            )
 
     # Register or identify device with rich context & optional location
     fingerprint = request.device_fingerprint or "web_client_fp_default"
@@ -247,16 +280,17 @@ def login(
         user_agent=user_agent or request.browser
     )
 
-    # Create pending restricted session for 30-second observation window
+    # Create session: Administrators and Doctors on healthcare application are granted ACTIVE sessions immediately; regular users enter observation window
     app_name = (request.application or "platform").lower()
+    is_privileged = (user.role.upper() == "ADMIN") or (user.role.upper() == "DOCTOR" and app_name == "healthcare")
     active_session = SessionService.create_session(
         db,
         user_id=user.id,
         application=app_name,
         device_id=device.id,
         ip_address=client_ip,
-        status="PENDING_OBSERVATION",
-        is_pending_observation=True
+        status="ACTIVE" if is_privileged else "PENDING_OBSERVATION",
+        is_pending_observation=False if is_privileged else True
     )
 
     # Retrieve user's behavioral baseline from DB if established and ensure ML anomaly detector is hydrated
@@ -291,7 +325,7 @@ def login(
         email=user.email,
         session_id=active_session.id,
         session_status=active_session.status,
-        observation_seconds_remaining=settings.OBSERVATION_WINDOW_SECONDS,
+        observation_seconds_remaining=0 if is_privileged else settings.OBSERVATION_WINDOW_SECONDS,
         is_new_device=is_new,
         device_id=device.device_id,
         trust_state=device.trust_state
@@ -656,7 +690,7 @@ def request_password_reset(
         detail="Too many password reset requests. Please wait before retrying."
     )
 
-    success, message, masked_email = StepUpService.create_password_reset_challenge(
+    success, message, masked_email, email_delivered, delivery_status = StepUpService.create_password_reset_challenge(
         email=request.email,
         db=db,
         ttl_seconds=300
@@ -664,7 +698,9 @@ def request_password_reset(
     return PasswordResetResponse(
         success=success,
         masked_email=masked_email,
-        message=message
+        message=message,
+        email_delivered=email_delivered,
+        delivery_status=delivery_status
     )
 
 
@@ -693,7 +729,7 @@ def resend_password_reset(
         detail="Too many resend requests for this account. Please wait before retrying."
     )
 
-    success, message, masked_email, retry_after = StepUpService.resend_password_reset_challenge(
+    success, message, masked_email, retry_after, email_delivered, delivery_status = StepUpService.resend_password_reset_challenge(
         email=request.email,
         db=db,
         ttl_seconds=300,
@@ -709,7 +745,9 @@ def resend_password_reset(
     return PasswordResetResponse(
         success=True,
         masked_email=masked_email,
-        message=message
+        message=message,
+        email_delivered=email_delivered,
+        delivery_status=delivery_status
     )
 
 

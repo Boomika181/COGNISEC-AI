@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 
 def utc_now():
@@ -113,3 +113,52 @@ class GeoLocationService:
             "summary": f"Approximate IP Location (IP {ip})",
             "privacy_note": "Approximate location derived from public IP address. Never precise."
         }
+
+    @staticmethod
+    def haversine_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        import math
+        r = 6371.0  # Earth radius in kilometers
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        delta_phi = math.radians(lat2 - lat1)
+        delta_lambda = math.radians(lon2 - lon1)
+        a = (math.sin(delta_phi / 2.0) ** 2 +
+             math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2)
+        c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+        return r * c
+
+    @classmethod
+    def check_implausible_travel(
+        cls,
+        lat1: Optional[float],
+        lon1: Optional[float],
+        time1: Optional[datetime],
+        lat2: Optional[float],
+        lon2: Optional[float],
+        time2: Optional[datetime],
+        max_speed_kmh: float = 900.0,
+        min_distance_km: float = 200.0
+    ) -> Tuple[bool, float, float]:
+        """
+        Determines whether transit between two geographic locations exceeds physical travel limits.
+        Returns: (is_implausible, distance_km, speed_kmh)
+        """
+        if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
+            return False, 0.0, 0.0
+        if time1 is None or time2 is None:
+            return False, 0.0, 0.0
+
+        dist_km = cls.haversine_distance_km(lat1, lon1, lat2, lon2)
+        if dist_km < min_distance_km:
+            return False, dist_km, 0.0
+
+        dt_seconds = abs((time2 - time1).total_seconds())
+        if dt_seconds <= 0:
+            return True, dist_km, 99999.0
+
+        dt_hours = dt_seconds / 3600.0
+        speed_kmh = dist_km / dt_hours
+
+        is_implausible = speed_kmh > max_speed_kmh
+        return is_implausible, round(dist_km, 2), round(speed_kmh, 2)
+

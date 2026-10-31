@@ -25,6 +25,8 @@ from app.ml.feature_engineering import FeatureEngineering
 from app.ml.model_manager import ModelManager
 from app.routes.deps import get_current_user
 from app.models.user import User
+from app.models.behavior import BehaviorLog
+from app.models.session import Session as DbSession
 
 router = APIRouter(prefix="/behavior", tags=["Behavioral Telemetry"])
 
@@ -165,6 +167,8 @@ def submit_behavior_event(
         and session_status == "ACTIVE"
         and decision == "ALLOW"
         and risk_score < 0.30
+        and not is_anomaly
+        and anomaly_score < 0.50
     )
 
     # Persist verified trusted status in the BehaviorLog for post-restart hydration
@@ -235,6 +239,49 @@ def get_user_profile(
         db=db
     )
 
+    total_observations = db.query(BehaviorLog).filter(BehaviorLog.user_id == current_user.id).count()
+    latest_log = (
+        db.query(BehaviorLog)
+        .filter(BehaviorLog.user_id == current_user.id)
+        .order_by(BehaviorLog.timestamp.desc())
+        .first()
+    )
+    last_obs_ts = latest_log.timestamp if latest_log else None
+
+    # Determine enrollment status strictly based on real verified samples
+    if profile.sample_count == 0:
+        enrollment_status = "NOT_ENROLLED"
+    elif profile.sample_count < ProfileService.MIN_MATURE_SAMPLES:
+        enrollment_status = "ENROLLMENT_IN_PROGRESS"
+    else:
+        enrollment_status = "ENROLLED"
+
+    latest_decision = None
+    latest_risk_score = None
+    latest_risk_level = None
+
+    if latest_log and latest_log.raw_feature_json:
+        try:
+            extra = json.loads(latest_log.raw_feature_json)
+            if "decision" in extra:
+                latest_decision = extra["decision"]
+            if "risk_score" in extra:
+                latest_risk_score = float(extra["risk_score"])
+        except Exception:
+            pass
+
+    if latest_risk_score is not None:
+        latest_session = (
+            db.query(DbSession)
+            .filter(DbSession.user_id == current_user.id, ~DbSession.id.like("sim_%"))
+            .order_by(DbSession.login_time.desc())
+            .first()
+        )
+        if latest_session and latest_session.current_risk_level:
+            latest_risk_level = latest_session.current_risk_level
+        else:
+            latest_risk_level = "LOW" if latest_risk_score < 0.35 else "MEDIUM" if latest_risk_score < 0.70 else "HIGH"
+
     return BehaviorProfileResponse(
         id=profile.id,
         user_id=profile.user_id,
@@ -248,7 +295,13 @@ def get_user_profile(
         ml_status=ml_status,
         model_sample_count=model_samples,
         is_anomaly=is_anomaly,
-        anomaly_score=anomaly_score
+        anomaly_score=anomaly_score,
+        total_observations=total_observations,
+        last_observation_timestamp=last_obs_ts,
+        enrollment_status=enrollment_status,
+        latest_decision=latest_decision,
+        latest_risk_score=latest_risk_score,
+        latest_risk_level=latest_risk_level
     )
 
 
@@ -260,3 +313,4 @@ def get_recent_behavior_logs(
 ):
     """Retrieves recent behavior logs for the authenticated user."""
     return BehaviorService.get_user_logs(db, current_user.id, limit=limit)
+

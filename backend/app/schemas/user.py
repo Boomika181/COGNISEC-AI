@@ -8,6 +8,7 @@ class UserBase(BaseModel):
     email: EmailStr
     role: str = "USER"
     account_status: str = "ACTIVE"
+    failed_login_attempts: int = 0
 
 
 class UserCreate(UserBase):

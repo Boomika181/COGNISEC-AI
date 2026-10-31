@@ -32,6 +32,7 @@ class LoginRequest(BaseModel):
     longitude: Optional[float] = None
     location_accuracy: Optional[float] = None
     location_source: Optional[str] = None
+    doctor_required: Optional[bool] = False
 
 
 class RegisterRequest(BaseModel):
@@ -133,6 +134,8 @@ class PasswordResetResponse(BaseModel):
     success: bool
     masked_email: str
     message: str
+    email_delivered: bool = False
+    delivery_status: str = "UNKNOWN"
 
 
 class PasswordResetResendRequest(BaseModel):

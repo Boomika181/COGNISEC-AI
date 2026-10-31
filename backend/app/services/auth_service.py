@@ -65,6 +65,85 @@ class AuthService:
         if not user:
             return None
         user.password_hash = get_password_hash(new_password)
+        user.account_status = "ACTIVE"
+        user.failed_login_attempts = 0
         db.commit()
         db.refresh(user)
         return user
+
+    @staticmethod
+    def record_failed_login(
+        db: Session,
+        email: str,
+        ip_address: str,
+        user_agent: Optional[str] = None
+    ) -> tuple:
+        """
+        Records a failed authentication attempt.
+        Applies strict 3-attempt security policy:
+        - When consecutive failed attempts reaches 3, account_status becomes 'LOCKED'.
+        - Emits ACCOUNT_LOCKED security event.
+        - Invokes NotificationService for failed login telemetry & alerts.
+        Returns: (user, is_now_locked, failed_attempts_count)
+        """
+        import json
+        from app.models.security_event import SecurityEvent
+        from app.services.notification_service import NotificationService
+
+        user = AuthService.get_user_by_email(db, email)
+        if not user:
+            NotificationService.handle_failed_login(
+                db=db,
+                email=email,
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            return None, False, 0
+
+        current_fails = (getattr(user, "failed_login_attempts", 0) or 0) + 1
+        user.failed_login_attempts = current_fails
+
+        is_now_locked = False
+        if current_fails >= 3:
+            user.account_status = "LOCKED"
+            is_now_locked = True
+            sec_lock = SecurityEvent(
+                user_id=user.id,
+                application="platform",
+                event_type="ACCOUNT_LOCKED",
+                severity="HIGH",
+                anomaly_score=0.35,
+                risk_score=0.75,
+                decision="BLOCK",
+                details=json.dumps({
+                    "reason": "MAX_FAILED_LOGIN_ATTEMPTS_EXCEEDED",
+                    "failed_attempts": current_fails,
+                    "target_email": user.email,
+                    "ip_address": ip_address,
+                    "user_agent": user_agent or ""
+                })
+            )
+            db.add(sec_lock)
+
+        NotificationService.handle_failed_login(
+            db=db,
+            email=email,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+
+        db.commit()
+        db.refresh(user)
+        return user, is_now_locked, current_fails
+
+    @staticmethod
+    def reset_failed_logins(db: Session, email: str) -> Optional[User]:
+        """Clears failed login attempt counter and restores account_status to ACTIVE."""
+        user = AuthService.get_user_by_email(db, email)
+        if user:
+            user.failed_login_attempts = 0
+            user.account_status = "ACTIVE"
+            db.commit()
+            db.refresh(user)
+        return user
+

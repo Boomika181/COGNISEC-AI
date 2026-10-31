@@ -44,6 +44,7 @@ class BehaviorLogResponse(BaseModel):
     scroll_speed_avg: float
     idle_duration_sec: float
     navigation_entropy: float
+    raw_feature_json: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -55,9 +56,9 @@ class BehaviorProfileResponse(BaseModel):
     profile_version: int
     last_updated: datetime.datetime
     baseline_features: Optional[Dict[str, Any]] = None
-    baseline_status: str = "ESTABLISHED"  # "COLD_START", "LEARNING", "ESTABLISHED"
-    maturity_confidence: float = 1.0  # 0.0 to 1.0
-    is_mature: bool = True  # True if sample_count >= 5
+    baseline_status: str = "COLD_START"  # "COLD_START", "LEARNING", "ESTABLISHED"
+    maturity_confidence: float = 0.0  # 0.0 to 1.0
+    is_mature: bool = False  # True if sample_count >= 5
 
     # Machine Learning Isolation Forest Information
     ml_status: str = "ML_COLD_START"  # "ML_COLD_START", "ML_LEARNING", "ML_READY"
@@ -65,4 +66,13 @@ class BehaviorProfileResponse(BaseModel):
     is_anomaly: bool = False
     anomaly_score: float = 0.0
 
+    # Behavioral Telemetry & Identity Profile Dashboard Attributes
+    total_observations: int = 0
+    last_observation_timestamp: Optional[datetime.datetime] = None
+    enrollment_status: str = "NOT_ENROLLED"  # "NOT_ENROLLED", "ENROLLMENT_IN_PROGRESS", "ENROLLED"
+    latest_decision: Optional[str] = None
+    latest_risk_score: Optional[float] = None
+    latest_risk_level: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)
+

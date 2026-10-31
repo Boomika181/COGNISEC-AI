@@ -21,7 +21,7 @@ class ProfileService:
             initial_stats = {
                 "version": 1,
                 "model_version": "IF-v2.0-Welford",
-                "enrollment_status": "ENROLLED",
+                "enrollment_status": "NOT_ENROLLED",
                 "confidence_status": "COLD_START",
                 "confidence_score": 0.0,
                 "sample_count": 0,

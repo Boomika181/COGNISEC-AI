@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Tuple, Optional
 from sqlalchemy.orm import Session
 from app.models.session import Session as DbSession
@@ -71,37 +71,54 @@ class DecisionService:
                 session_status = "STEP_UP_REQUIRED"
                 SessionService.update_session_status(db, session_id, status=session_status, risk_level=risk_level)
 
-                # Log security event
-                sec_event = SecurityEvent(
-                    user_id=user_id,
-                    session_id=session_id,
-                    application=application.lower(),
-                    event_type="STEP_UP_CHALLENGE",
-                    severity="MEDIUM",
-                    anomaly_score=anomaly_score,
-                    risk_score=risk_score,
-                    decision=decision,
-                    details=json.dumps({"factors": contributing_factors}),
-                    timestamp=now_utc
-                )
-                db.add(sec_event)
-                db.commit()
-                db.refresh(sec_event)
-                event_id = sec_event.id
+                # Cooldown check: avoid duplicate event emission on every rapid telemetry packet
+                recent_step_event = db.query(SecurityEvent).filter(
+                    SecurityEvent.session_id == session_id,
+                    SecurityEvent.event_type == "STEP_UP_CHALLENGE",
+                    SecurityEvent.timestamp >= now_utc - timedelta(seconds=60)
+                ).order_by(SecurityEvent.timestamp.desc()).first()
 
-                # Create SOC alert
-                alert = Alert(
-                    user_id=user_id,
-                    security_event_id=sec_event.id,
-                    application=application.lower(),
-                    alert_type="STEP_UP_CHALLENGE_TRIGGERED",
-                    message=f"Step-up verification required in {application.upper()} portal. Factors: {', '.join(contributing_factors) if contributing_factors else 'Moderate risk'}",
-                    severity="MEDIUM",
-                    status="OPEN",
-                    created_at=now_utc
-                )
-                db.add(alert)
-                db.commit()
+                if not recent_step_event:
+                    # Log security event
+                    sec_event = SecurityEvent(
+                        user_id=user_id,
+                        session_id=session_id,
+                        application=application.lower(),
+                        event_type="STEP_UP_CHALLENGE",
+                        severity="MEDIUM",
+                        anomaly_score=anomaly_score,
+                        risk_score=risk_score,
+                        decision=decision,
+                        details=json.dumps({"factors": contributing_factors, "enforcement_outcome": "STEP_UP_ENFORCED"}),
+                        timestamp=now_utc
+                    )
+                    db.add(sec_event)
+                    db.commit()
+                    db.refresh(sec_event)
+                    event_id = sec_event.id
+
+                    # Create or update active SOC alert
+                    existing_open_alert = db.query(Alert).filter(
+                        Alert.user_id == user_id,
+                        Alert.alert_type == "STEP_UP_CHALLENGE_TRIGGERED",
+                        Alert.status.in_(["OPEN", "ACKNOWLEDGED", "INVESTIGATING"])
+                    ).first()
+
+                    if not existing_open_alert:
+                        alert = Alert(
+                            user_id=user_id,
+                            security_event_id=sec_event.id,
+                            application=application.lower(),
+                            alert_type="STEP_UP_CHALLENGE_TRIGGERED",
+                            message=f"Step-up verification required in {application.upper()} portal. Factors: {', '.join(contributing_factors) if contributing_factors else 'Moderate risk'}",
+                            severity="MEDIUM",
+                            status="OPEN",
+                            created_at=now_utc
+                        )
+                        db.add(alert)
+                        db.commit()
+                else:
+                    event_id = recent_step_event.id
 
         elif risk_level == "HIGH":
             decision = "RESTRICT"
@@ -109,35 +126,53 @@ class DecisionService:
             session_status = "RESTRICTED"
             SessionService.update_session_status(db, session_id, status=session_status, risk_level=risk_level)
 
-            sec_event = SecurityEvent(
-                user_id=user_id,
-                session_id=session_id,
-                application=application.lower(),
-                event_type="SESSION_RESTRICTED",
-                severity="HIGH",
-                anomaly_score=anomaly_score,
-                risk_score=risk_score,
-                decision=decision,
-                details=json.dumps({"factors": contributing_factors}),
-                timestamp=now_utc
-            )
-            db.add(sec_event)
-            db.commit()
-            db.refresh(sec_event)
-            event_id = sec_event.id
+            # Cooldown check: avoid logging identical restriction events every 2 seconds
+            recent_restricted_event = db.query(SecurityEvent).filter(
+                SecurityEvent.session_id == session_id,
+                SecurityEvent.event_type == "SESSION_RESTRICTED",
+                SecurityEvent.timestamp >= now_utc - timedelta(seconds=60)
+            ).order_by(SecurityEvent.timestamp.desc()).first()
 
-            alert = Alert(
-                user_id=user_id,
-                security_event_id=sec_event.id,
-                application=application.lower(),
-                alert_type="HIGH_RISK_SESSION_RESTRICTION",
-                message=f"Session restricted for user #{user_id} in {application.upper()}. Factors: {', '.join(contributing_factors)}",
-                severity="HIGH",
-                status="OPEN",
-                created_at=now_utc
-            )
-            db.add(alert)
-            db.commit()
+            if not recent_restricted_event:
+                sec_event = SecurityEvent(
+                    user_id=user_id,
+                    session_id=session_id,
+                    application=application.lower(),
+                    event_type="SESSION_RESTRICTED",
+                    severity="HIGH",
+                    anomaly_score=anomaly_score,
+                    risk_score=risk_score,
+                    decision=decision,
+                    details=json.dumps({"factors": contributing_factors, "enforcement_outcome": "RESTRICTED"}),
+                    timestamp=now_utc
+                )
+                db.add(sec_event)
+                db.commit()
+                db.refresh(sec_event)
+                event_id = sec_event.id
+
+                # Deduplicate open alert
+                existing_high_alert = db.query(Alert).filter(
+                    Alert.user_id == user_id,
+                    Alert.alert_type == "HIGH_RISK_SESSION_RESTRICTION",
+                    Alert.status.in_(["OPEN", "ACKNOWLEDGED", "INVESTIGATING"])
+                ).first()
+
+                if not existing_high_alert:
+                    alert = Alert(
+                        user_id=user_id,
+                        security_event_id=sec_event.id,
+                        application=application.lower(),
+                        alert_type="HIGH_RISK_SESSION_RESTRICTION",
+                        message=f"Session restricted for user #{user_id} in {application.upper()}. Factors: {', '.join(contributing_factors)}",
+                        severity="HIGH",
+                        status="OPEN",
+                        created_at=now_utc
+                    )
+                    db.add(alert)
+                    db.commit()
+            else:
+                event_id = recent_restricted_event.id
 
         else:  # CRITICAL
             decision = "TERMINATE_SESSION"

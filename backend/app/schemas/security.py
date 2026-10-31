@@ -197,3 +197,18 @@ class AccessDecisionResponse(BaseModel):
     resource: str
     application: Optional[str] = None
 
+
+class VaultRelockRequest(BaseModel):
+    session_id: str
+    resource: str  # e.g., "academic_vault", "financial_vault", "ehr_vault"
+    application: Optional[str] = None
+
+
+class VaultRelockResponse(BaseModel):
+    success: bool
+    message: str
+    resource: str
+    application: str
+    revoked_count: int
+    vault_status: str = "LOCKED"
+

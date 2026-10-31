@@ -8,6 +8,7 @@ from app.models.alert import Alert
 from app.models.adaptive_factor import AdaptiveFactor
 from app.models.notification import DeviceNotification
 from app.models.application_grant import ApplicationGrant
+from app.models.appointment import HealthcareAppointment
 
 __all__ = [
     "Base",
@@ -21,4 +22,5 @@ __all__ = [
     "AdaptiveFactor",
     "DeviceNotification",
     "ApplicationGrant",
+    "HealthcareAppointment",
 ]

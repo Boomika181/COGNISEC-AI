@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
     DATABASE_URL: str = "sqlite:///./cognisec.db"
+    SIMULATOR_DATABASE_URL: str = "sqlite:///./simulator_sandbox.db"
 
     # SMTP / Email Delivery Configuration
     SMTP_HOST: Optional[str] = "smtp.gmail.com"
@@ -36,6 +37,8 @@ class Settings(BaseSettings):
 
     # Bootstrap Secret for Controlled Development/Admin Provisioning
     BOOTSTRAP_ADMIN_KEY: Optional[str] = "cognisec_dev_bootstrap_secret_2026"
+    ADMIN_EMAIL: str = "cognisecai.security@gmail.com"
+    ADMIN_INITIAL_PASSWORD: Optional[str] = "cognisecai2026"
 
     # Observation Window Configuration (Default 30s as required by policy)
     OBSERVATION_WINDOW_SECONDS: int = 30
@@ -44,6 +47,15 @@ class Settings(BaseSettings):
     RISK_THRESHOLD_LOW: float = 0.30
     RISK_THRESHOLD_MEDIUM: float = 0.65
     RISK_THRESHOLD_HIGH: float = 0.85
+
+    # Confidential Access Denial Detection Policy
+    CONFIDENTIAL_ACCESS_DENIAL_WINDOW_SECONDS: int = 60
+    CONFIDENTIAL_ACCESS_DENIAL_THRESHOLD: int = 5
+    CONFIDENTIAL_ACCESS_DEDUP_WINDOW_SECONDS: float = 1.0
+
+    # Continuous Behavioral Drift Detection Policy
+    BEHAVIORAL_DRIFT_WINDOW_SIZE: int = 4
+    BEHAVIORAL_DRIFT_THRESHOLD: float = 0.50
 
     # Machine Learning & Behavioral Intelligence Configuration
     ML_IF_N_ESTIMATORS: int = 100

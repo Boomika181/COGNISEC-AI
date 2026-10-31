@@ -125,7 +125,7 @@
     </div>
     <div class="flex items-center gap-4 text-slate-400">
       <span class="hidden md:inline">SSO Session: Encrypted (TLS 1.3)</span>
-      <a href="index.html" class="px-3 py-1 rounded bg-sky-500 text-black font-bold hover:bg-sky-400 transition-all text-[11px] uppercase tracking-wider">
+      <a href="index.html" id="btn-back-to-platform" onclick="handleBackToPlatform(event)" class="px-3 py-1 rounded bg-sky-500 text-black font-bold hover:bg-sky-400 transition-all text-[11px] uppercase tracking-wider">
         ← Back to Platform
       </a>
     </div>
@@ -1505,6 +1505,9 @@
       isAcademicVaultUnlocked = false;
       if (window.cognisec) {
         window.cognisec.revokeResourceClearance('academic_vault');
+        if (typeof window.cognisec.relockVault === 'function') {
+          window.cognisec.relockVault('academic_vault').catch(() => {});
+        }
       }
       const contentEl = document.getElementById('academic-vault-dynamic-content');
       if (contentEl) contentEl.innerHTML = '';
@@ -1518,6 +1521,19 @@
       document.getElementById('academic-vault-unlocked')?.classList.add('hidden');
       updateContinuousVerificationPanel();
       showToast("Academic Record Locked", "Confidential student vault re-sealed under Zero Trust policy.", "🔒");
+    }
+
+    async function handleBackToPlatform(e) {
+      if (e) e.preventDefault();
+      try {
+        if (window.cognisec && typeof window.cognisec.relockVault === 'function') {
+          await window.cognisec.relockVault('academic_vault');
+        }
+      } catch (err) {
+        console.warn('Error during relock on platform exit:', err);
+      }
+      lockAcademicVault();
+      window.location.href = 'index.html';
     }
 
     function triggerExhibitionStepUpTest() {
@@ -1611,6 +1627,38 @@
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('signin') === 'true' || urlParams.get('login') === 'true') {
         openStudentSignInModal();
+      }
+
+      // Automatically relock when navigating away from confidential vault section
+      document.querySelectorAll('.subnav-link').forEach(link => {
+        link.addEventListener('click', () => {
+          const href = link.getAttribute('href');
+          if (href && href !== '#confidential-student-records' && isAcademicVaultUnlocked) {
+            lockAcademicVault();
+          }
+        });
+      });
+    });
+
+    // Server-enforced automatic relock on window navigation, unload, or back/forward
+    window.addEventListener('pagehide', () => {
+      if (isAcademicVaultUnlocked) {
+        if (window.cognisec && typeof window.cognisec.relockVault === 'function') {
+          window.cognisec.relockVault('academic_vault');
+        }
+        lockAcademicVault();
+      }
+    });
+
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted || isAcademicVaultUnlocked) {
+        lockAcademicVault();
+      }
+    });
+
+    window.addEventListener('popstate', () => {
+      if (isAcademicVaultUnlocked && location.hash !== '#confidential-student-records') {
+        lockAcademicVault();
       }
     });
 

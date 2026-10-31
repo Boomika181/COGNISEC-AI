@@ -41,3 +41,40 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# Isolated Simulator Sandbox Database Engine
+# Ensures attack simulation test executions cannot contaminate live development SOC inventory or sessions
+sim_db_url = getattr(settings, "SIMULATOR_DATABASE_URL", "sqlite:///./simulator_sandbox.db")
+if sim_db_url.startswith("postgres://"):
+    sim_db_url = sim_db_url.replace("postgres://", "postgresql://", 1)
+
+sim_engine_kwargs = {"pool_pre_ping": True}
+if sim_db_url.startswith("sqlite"):
+    sim_engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+simulator_engine = create_engine(sim_db_url, **sim_engine_kwargs)
+if sim_db_url.startswith("sqlite"):
+    @event.listens_for(simulator_engine, "connect")
+    def set_sim_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON;")
+        cursor.close()
+
+SimulatorSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=simulator_engine)
+_simulator_schema_initialized = False
+
+
+def get_simulator_db():
+    """FastAPI Dependency providing an isolated sandbox database for attack simulations."""
+    global _simulator_schema_initialized
+    if not _simulator_schema_initialized:
+        from app.database.base import Base
+        Base.metadata.create_all(bind=simulator_engine)
+        _simulator_schema_initialized = True
+    db = SimulatorSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+

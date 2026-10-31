@@ -26,7 +26,24 @@ def seed_database():
     now_utc = datetime.now(timezone.utc)
 
     try:
-        # 1. Admin Account
+        # 1. Primary SOC Admin Account
+        primary_admin_email = "cognisecai.security@gmail.com"
+        primary_admin = db.query(User).filter(User.email == primary_admin_email).first()
+        if not primary_admin:
+            primary_admin = User(
+                name="CogniSec SOC Administrator",
+                email=primary_admin_email,
+                password_hash=get_password_hash("cognisecai2026"),
+                role="ADMIN",
+                account_status="ACTIVE",
+                created_at=now_utc
+            )
+            db.add(primary_admin)
+            db.commit()
+            db.refresh(primary_admin)
+            print(f"✓ Seeded Primary Admin: {primary_admin.email}")
+
+        # 1B. Secondary Admin Account
         admin_email = "admin.soc@cognisec.ai"
         admin = db.query(User).filter(User.email == admin_email).first()
         if not admin:
@@ -62,24 +79,24 @@ def seed_database():
 
         # 3. Portal Demo Users
         portal_users = [
-            ("Jane Doe (VIP)", "customer.jane@auraluxe.com", "Customer@123", "ecommerce"),
-            ("Alex Mercer (CS Major)", "student.alex@veritas.edu", "Student@123", "college"),
-            ("Dr. Sarah Lin, MD", "dr.sarah@aetheriahealth.org", "Doctor@123", "healthcare"),
-            ("Student Demo", "2021bce0492@bits-pilani.ac.in", "Student@123", "college"),
-            ("Dr. Boomika Ram", "dr.boomika@ayusync.med.in", "Doctor@123", "healthcare"),
-            ("Boomika Ram (Customer)", "boomika.ram@cognisec.ai", "Customer@123", "ecommerce"),
-            ("Customer Default", "customer@cognisec.ai", "Customer@123", "ecommerce")
+            ("Jane Doe (VIP)", "customer.jane@auraluxe.com", "Customer@123", "ecommerce", "USER"),
+            ("Alex Mercer (CS Major)", "student.alex@veritas.edu", "Student@123", "college", "USER"),
+            ("Dr. Sarah Lin, MD", "dr.sarah@aetheriahealth.org", "Doctor@123", "healthcare", "DOCTOR"),
+            ("Student Demo", "2021bce0492@bits-pilani.ac.in", "Student@123", "college", "USER"),
+            ("Dr. Boomika Ram", "dr.boomika@ayusync.med.in", "Doctor@123", "healthcare", "DOCTOR"),
+            ("Boomika Ram (Customer)", "boomika.ram@cognisec.ai", "Customer@123", "ecommerce", "USER"),
+            ("Customer Default", "customer@cognisec.ai", "Customer@123", "ecommerce", "USER")
         ]
 
         created_users = [admin, user]
-        for name, email, pwd, app in portal_users:
+        for name, email, pwd, app, r in portal_users:
             p_user = db.query(User).filter(User.email == email).first()
             if not p_user:
                 p_user = User(
                     name=name,
                     email=email,
                     password_hash=get_password_hash(pwd),
-                    role="USER",
+                    role=r,
                     account_status="ACTIVE",
                     created_at=now_utc
                 )
@@ -89,60 +106,14 @@ def seed_database():
                 created_users.append(p_user)
                 print(f"✓ Seeded Portal User: {p_user.email}")
             else:
+                if p_user.role != r:
+                    p_user.role = r
+                    db.commit()
                 created_users.append(p_user)
 
-        # 4. Seed Devices & Baselines for normal users
+        # 4. Initialize genuine uncalibrated baselines for normal users (clean cold-start)
         for u in created_users:
-            dev = db.query(Device).filter(Device.user_id == u.id).first()
-            if not dev:
-                dev = Device(
-                    user_id=u.id,
-                    device_fingerprint=f"fp_macbook_tpm_{u.id}_982a",
-                    browser="Chrome 128.0 (macOS)",
-                    os="macOS Sonoma 14.5",
-                    device_type="Desktop",
-                    is_trusted=True,
-                    first_seen=now_utc - timedelta(days=15),
-                    last_seen=now_utc
-                )
-                db.add(dev)
-
-            prof = db.query(BehaviorProfile).filter(BehaviorProfile.user_id == u.id).first()
-            if not prof:
-                prof = BehaviorProfile(
-                    user_id=u.id,
-                    sample_count=12,
-                    profile_version=2,
-                    last_updated=now_utc,
-                    baseline_features=json.dumps({
-                        "means": {
-                            "typing_speed_wpm": 68.4,
-                            "avg_flight_time_ms": 118.2,
-                            "avg_dwell_time_ms": 86.5,
-                            "mouse_velocity_avg": 680.0,
-                            "mouse_acceleration_avg": 410.0,
-                            "mouse_curvature_entropy": 0.46,
-                            "click_frequency": 1.3,
-                            "scroll_speed_avg": 380.0,
-                            "idle_duration_sec": 2.1,
-                            "navigation_entropy": 0.38
-                        },
-                        "stds": {
-                            "typing_speed_wpm": 6.2,
-                            "avg_flight_time_ms": 12.5,
-                            "avg_dwell_time_ms": 8.0,
-                            "mouse_velocity_avg": 65.0,
-                            "mouse_acceleration_avg": 45.0,
-                            "mouse_curvature_entropy": 0.05,
-                            "click_frequency": 0.25,
-                            "scroll_speed_avg": 40.0,
-                            "idle_duration_sec": 0.8,
-                            "navigation_entropy": 0.04
-                        }
-                    })
-                )
-                db.add(prof)
-
+            ProfileService.get_or_create_profile(db, u.id)
         db.commit()
 
         # 5. Seed initial security alerts for SOC Dashboard demonstration

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any, Union
 from sqlalchemy.orm import Session
 from app.models.device import Device
 from app.models.session import Session as UserSession
@@ -71,10 +71,29 @@ class DeviceService:
             Device.device_fingerprint == safe_fingerprint
         ).first()
 
+        # If fingerprint is generic or missing, match against existing unverified device to avoid duplicate stacking
+        if not device and safe_fingerprint in ("unknown_fp", "unknown", ""):
+            device = db.query(Device).filter(
+                Device.user_id == user_id,
+                Device.device_fingerprint.in_(["unknown_fp", "unknown", ""]),
+                Device.browser_name == ua_info["browser_name"],
+                Device.os_name == ua_info["os_name"]
+            ).first()
+
         if device:
             # Existing device recognized: update last seen & environmental evidence
             device.last_seen = now
             device.last_ip = (client_ip or device.last_ip or "127.0.0.1")[:45]
+            if nickname and nickname.strip() and not nickname.strip().startswith("Device #"):
+                device.nickname = nickname.strip()[:95]
+            elif device.nickname and (device.nickname.startswith("Device #") or device.nickname == "Unverified Device"):
+                if ua_info["os_name"] != "Unknown" and ua_info["browser_name"] != "Unknown":
+                    device.nickname = f"{ua_info['os_name']} · {ua_info['browser_name']}"
+                elif ua_info["os_name"] != "Unknown":
+                    device.nickname = f"{ua_info['os_name']} ({ua_info['device_type']})"
+                else:
+                    device.nickname = "Identity not verified"
+
             if user_agent:
                 device.browser = browser_raw
                 device.browser_name = ua_info["browser_name"]
@@ -85,6 +104,9 @@ class DeviceService:
                 device.os_version = ua_info["os_version"]
             if ua_info["device_type"] != "Unknown":
                 device.device_type = ua_info["device_type"]
+
+            # Ensure is_trusted boolean and trust_state remain strictly synchronized
+            device.is_trusted = (device.trust_state == "TRUSTED")
 
             # Update location if fresh location was provided
             if geo_info["location_source"] in ("GPS", "IP_APPROXIMATE"):
@@ -112,7 +134,18 @@ class DeviceService:
         initial_trust_state = "TRUSTED" if is_first_device else "PENDING_CONFIRMATION"
         is_trusted_bool = bool(is_first_device)
 
-        default_nickname = nickname or (f"My {ua_info['os_name']} {ua_info['device_type']}" if ua_info['os_name'] != "Unknown" else f"Device #{existing_devices_count + 1}")
+        if nickname and nickname.strip() and not nickname.strip().startswith("Device #"):
+            default_nickname = nickname.strip()[:95]
+        elif ua_info["os_name"] != "Unknown" and ua_info["browser_name"] != "Unknown":
+            default_nickname = f"{ua_info['os_name']} · {ua_info['browser_name']}"
+        elif ua_info["os_name"] != "Unknown":
+            default_nickname = f"{ua_info['os_name']} {ua_info['device_type']}"
+        elif effective_platform and effective_platform not in ("Desktop", "Unknown"):
+            default_nickname = f"{effective_platform} {ua_info['device_type']}"
+        elif ua_info["browser_name"] != "Unknown":
+            default_nickname = f"{ua_info['browser_name']} ({ua_info['device_type']})"
+        else:
+            default_nickname = "Unverified Device"
 
         new_device = Device(
             user_id=user_id,
@@ -248,3 +281,21 @@ class DeviceService:
         db.commit()
         db.refresh(device)
         return device
+
+    @staticmethod
+    def get_all_devices(db: Session, limit: int = 100) -> List[Device]:
+        """Returns all registered devices across enterprise users, ordered by recent activity."""
+        return db.query(Device).order_by(Device.last_seen.desc()).limit(limit).all()
+
+    @staticmethod
+    def set_device_trust(db: Session, device_id_or_pk: Any, is_trusted: bool) -> Optional[Device]:
+        """Administrative trust state modification."""
+        device = DeviceService.get_device_by_id(db, str(device_id_or_pk))
+        if not device:
+            return None
+        device.is_trusted = is_trusted
+        device.trust_state = "TRUSTED" if is_trusted else "REVOKED"
+        db.commit()
+        db.refresh(device)
+        return device
+

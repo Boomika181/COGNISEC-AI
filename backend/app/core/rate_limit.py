@@ -70,6 +70,13 @@ class InMemoryRateLimiter:
         with self._lock:
             self._records.clear()
 
+    def clear_keys_matching(self, pattern: str):
+        """Removes all keys matching or containing pattern (used during administrative testing resets)."""
+        with self._lock:
+            keys_to_delete = [k for k in self._records if pattern in k]
+            for k in keys_to_delete:
+                self._records.pop(k, None)
+
 
 # Global singleton instance
 rate_limiter = InMemoryRateLimiter(enabled=True)

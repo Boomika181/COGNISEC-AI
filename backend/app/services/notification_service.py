@@ -1,5 +1,6 @@
 import secrets
 import logging
+import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Tuple, Dict, Any
 from sqlalchemy.orm import Session
@@ -36,9 +37,13 @@ class NotificationService:
         Creates a persistent new device login notification record and dispatches an email alert.
         """
         now = utc_now()
+        if device.browser_name and device.os_name and device.browser_name != "Unknown" and device.os_name != "Unknown":
+            env_str = f"{device.browser_name} on {device.os_name}"
+        else:
+            env_str = "Unverified Environment"
+
         dev_summary = (
-            f"{device.browser_name or 'Browser'} on {device.os_name or 'OS'} "
-            f"({device.nickname or device.device_type})"
+            f"{env_str} ({device.nickname or device.device_type or 'Unverified Device'})"
         )
         loc_str = location_summary or (
             f"{device.city}, {device.country} ({device.location_source})"
@@ -98,7 +103,7 @@ class NotificationService:
         db.add(sec_event)
         db.commit()
 
-        dev_nickname = device.nickname or (f"{device.browser_name} on {device.os_name}" if device.browser_name else device.device_type)
+        dev_nickname = device.nickname or (f"{device.browser_name} on {device.os_name}" if (device.browser_name and device.os_name and device.browser_name != "Unknown" and device.os_name != "Unknown") else "Unverified Device")
         is_recog = bool(device.is_trusted)
 
         # 3. Dispatch security alert email to registered owner address
@@ -179,11 +184,17 @@ class NotificationService:
                 user_id=user.id,
                 application="platform",
                 event_type="LOGIN_ATTEMPT_FAILED",
-                severity="LOW",
-                anomaly_score=0.1,
-                risk_score=0.15,
-                decision="ALLOW",
-                details=f"Failed authentication attempt for target '{email}' from IP {ip_address}."
+                severity="MEDIUM",
+                anomaly_score=0.2,
+                risk_score=0.4,
+                decision="DENY",
+                details=json.dumps({
+                    "auth_outcome": "FAILURE",
+                    "enforcement_outcome": "BLOCKED",
+                    "reason": "INVALID_CREDENTIALS",
+                    "target_email": email,
+                    "ip_address": ip_address
+                }) if "json" in globals() else f"Failed authentication attempt for target '{email}' from IP {ip_address}."
             )
             db.add(sec_event)
             db.commit()

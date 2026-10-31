@@ -991,12 +991,13 @@ class CognisecClient {
     this.mousePoints = [];
     this.scrollSpeeds = [];
     this.navigationHistory = [];
-    this.lastInteractionTime = Date.now();
-    this.lastTelemetryDispatchTime = Date.now();
+    this.lastInteractionTime = null;
+    this.hasRealInteraction = false;
+    this.lastTelemetryDispatchTime = null;
     this.clickCount = 0;
     this.scrollDeltaSum = 0;
     this.telemetryInterval = null;
-    this.sequenceNumber = 0;
+    this.sequenceNumber = parseInt(localStorage.getItem('cognisec_seq_' + (this.sessionId || '')) || '0', 10);
 
     // Step-up lifecycle & state synchronization
     this.sessionStatus = localStorage.getItem('cognisec_session_status') || 'ACTIVE';
@@ -1148,6 +1149,57 @@ class CognisecClient {
     return box;
   }
 
+  getDefaultResourceForApp(app) {
+    const normalized = (app || '').toLowerCase().trim();
+    if (normalized === 'college') return 'academic_vault';
+    if (normalized === 'shopping') return 'financial_vault';
+    if (normalized === 'healthcare') return 'ehr_vault';
+    return null;
+  }
+
+  async relockVault(resource = null) {
+    const targetResource = resource || this.getDefaultResourceForApp(this.application);
+    if (!targetResource) return { success: false, message: 'No target resource specified' };
+
+    // 1. Immediately revoke in-memory authorization clearance
+    this.revokeResourceClearance(targetResource);
+
+    // 2. Clear any cached responses in memory
+    if (this._vaultCache) {
+      delete this._vaultCache[targetResource];
+    }
+
+    // 3. Authoritative server-side revocation
+    if (this.token && this.sessionId) {
+      try {
+        const payload = JSON.stringify({
+          session_id: this.sessionId,
+          resource: targetResource,
+          application: this.application || 'platform'
+        });
+
+        const res = await fetch(`${COGNISEC_API_BASE}/security/vault/relock`, {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: payload,
+          keepalive: true
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          console.info('[COGNISEC-AI][vault] Server-enforced relock completed for', targetResource, data);
+          window.dispatchEvent(new CustomEvent('cognisec:vault_relocked', { detail: { resource: targetResource } }));
+          return data;
+        }
+      } catch (err) {
+        console.warn('[COGNISEC-AI][vault] Failed to contact server for relock:', err);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('cognisec:vault_relocked', { detail: { resource: targetResource } }));
+    return { success: true, vault_status: 'LOCKED', resource: targetResource };
+  }
+
   async signOutAndRestart() {
     try { await this.logout(); } catch (_) { try { this.clearAuth(); } catch (__) {} }
     window.location.reload();
@@ -1156,14 +1208,15 @@ class CognisecClient {
   async fetchVaultData(resource) {
     if (!this.token || !this.sessionId) {
       throw new Error("Unauthenticated");
-
     }
     const res = await fetch(`${COGNISEC_API_BASE}/security/vault/${encodeURIComponent(resource)}?session_id=${encodeURIComponent(this.sessionId)}`, {
       method: 'GET',
-      headers: this.getHeaders()
+      headers: this.getHeaders(),
+      cache: 'no-store'
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      this.revokeResourceClearance(resource);
       throw new Error(err.detail || "Vault access denied by Zero Trust policy.");
     }
     return await res.json();
@@ -1177,8 +1230,9 @@ class CognisecClient {
     this.mousePoints = [];
     this.scrollSpeeds = [];
     this.navigationHistory = [];
-    this.lastInteractionTime = Date.now();
-    this.lastTelemetryDispatchTime = Date.now();
+    this.lastInteractionTime = null;
+    this.hasRealInteraction = false;
+    this.lastTelemetryDispatchTime = null;
     this.clickCount = 0;
     this.scrollDeltaSum = 0;
     this.sequenceNumber = 0;
@@ -1205,6 +1259,8 @@ class CognisecClient {
     const clean = category.toLowerCase().replace(/[^a-z0-9_-]/g, '').substring(0, 30);
     if (!clean || clean === 'password') return;
     this.navigationHistory.push({ category: clean, t: Date.now() });
+    this.hasRealInteraction = true;
+    this.lastInteractionTime = Date.now();
     if (this.navigationHistory.length > 30) {
       this.navigationHistory.shift();
     }
@@ -1367,8 +1423,7 @@ class CognisecClient {
     window.dispatchEvent(new CustomEvent('cognisec:auth_change', { detail: { isAuthenticated: false, user: null } }));
   }
 
-  // --- AUTHENTICATION ---
-  async login(email, password, application = 'platform', customFingerprint = null, locationData = null, nickname = null) {
+  async login(email, password, application = 'platform', customFingerprint = null, locationData = null, nickname = null, options = {}) {
     try {
       const fingerprint = customFingerprint || await this.getDeviceFingerprint();
       const loginPayload = {
@@ -1378,7 +1433,8 @@ class CognisecClient {
         device_fingerprint: fingerprint,
         browser: navigator.userAgent,
         os: navigator.platform,
-        nickname: nickname || undefined
+        nickname: nickname || undefined,
+        doctor_required: !!options.doctorRequired
       };
 
       if (locationData && locationData.latitude != null) {
@@ -1412,6 +1468,7 @@ class CognisecClient {
       const data = await res.json();
       this.token = data.access_token;
       this.sessionId = data.session_id;
+      this.sequenceNumber = parseInt(localStorage.getItem('cognisec_seq_' + (this.sessionId || '')) || '0', 10);
       const isSessionActive = data.session_status === 'ACTIVE';
       this.sessionStatus = data.session_status || 'PENDING_OBSERVATION';
       this.user = {
@@ -1436,6 +1493,65 @@ class CognisecClient {
     } catch (error) {
       console.warn('[COGNISEC-AI] Login error:', error.message);
       return { success: false, error: error.message, details: error.raw ? error.raw.detail : null };
+    }
+  }
+
+  async loginDoctor(email, password, customFingerprint = null, locationData = null, nickname = null) {
+    return await this.login(email, password, 'healthcare', customFingerprint, locationData, nickname, { doctorRequired: true });
+  }
+
+  // --- HEALTHCARE PORTAL & APPOINTMENT SERVICES ---
+  async fetchHealthcareDepartments() {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/healthcare/departments`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch departments:', e);
+      return [];
+    }
+  }
+
+  async fetchHealthcareDoctors(dept = null) {
+    try {
+      const url = dept && dept !== 'all'
+        ? `${COGNISEC_API_BASE}/healthcare/doctors?dept=${encodeURIComponent(dept)}`
+        : `${COGNISEC_API_BASE}/healthcare/doctors`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch doctors:', e);
+      return [];
+    }
+  }
+
+  async bookHealthcareAppointment(appointmentData) {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/healthcare/appointments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(appointmentData)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || `Appointment booking failed with status ${res.status}`);
+      }
+      return { success: true, data };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  async fetchHealthcareAppointments(email = null) {
+    try {
+      if (!email) return [];
+      const res = await fetch(`${COGNISEC_API_BASE}/healthcare/appointments?email=${encodeURIComponent(email)}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch patient appointments:', e);
+      return [];
     }
   }
 
@@ -1773,10 +1889,25 @@ class CognisecClient {
     const emailInput = document.getElementById('pwd-reset-email');
     const btn = document.getElementById('btn-request-pwd-reset');
     const errBox = document.getElementById('pwd-reset-err-1');
-    if (!emailInput || !emailInput.value.trim()) return;
-    const email = emailInput.value.trim();
 
     if (errBox) errBox.classList.add('hidden');
+
+    if (!emailInput || !emailInput.value.trim()) {
+      if (errBox) {
+        errBox.textContent = 'Please enter your registered email address.';
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
+    const email = emailInput.value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (errBox) {
+        errBox.textContent = 'Please enter a valid email address (e.g. user@gmail.com).';
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
+
     if (btn) {
       btn.disabled = true;
       btn.innerHTML = `<span>Sending Verification Code...</span>`;
@@ -1789,9 +1920,20 @@ class CognisecClient {
       const desc = document.getElementById('pwd-reset-step2-desc');
       if (s1) s1.classList.add('hidden');
       if (s2) s2.classList.remove('hidden');
-      if (desc) desc.textContent = data.message || `Verification code sent to ${data.masked_email || email}.`;
+
+      if (desc) {
+        if (data.email_delivered === true) {
+          desc.className = 'text-xs font-mono text-emerald-400 leading-relaxed';
+          desc.textContent = `✓ Verification code sent to ${data.masked_email || email} via Gmail SMTP. Check your inbox and spam folder.`;
+        } else {
+          desc.className = 'text-xs font-mono text-amber-400 leading-relaxed';
+          desc.textContent = data.message || `If ${email} is registered, a verification code was dispatched. Please check your inbox.`;
+        }
+      }
       this._lastResetEmail = email;
       this._startResetCooldownTimer(30);
+      const otpInput = document.getElementById('pwd-reset-otp');
+      if (otpInput) setTimeout(() => otpInput.focus(), 60);
     } catch (err) {
       if (errBox) {
         errBox.textContent = err.message || 'Failed to dispatch recovery code.';
@@ -1807,10 +1949,17 @@ class CognisecClient {
 
   async resendPasswordResetFromModal() {
     const email = this._lastResetEmail || document.getElementById('pwd-reset-email')?.value?.trim();
-    if (!email) return;
     const btn = document.getElementById('btn-pwd-reset-resend');
     const errBox = document.getElementById('pwd-reset-err-2');
     const succBox = document.getElementById('pwd-reset-succ-2');
+
+    if (!email) {
+      if (errBox) {
+        errBox.textContent = 'Missing email context. Please enter your email in Step 1.';
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
 
     if (btn && btn.disabled) return;
 
@@ -1824,7 +1973,13 @@ class CognisecClient {
     try {
       const data = await this.resendPasswordReset(email);
       if (succBox) {
-        succBox.textContent = data.message || `A new code was dispatched to ${data.masked_email || email}.`;
+        if (data.email_delivered === true) {
+          succBox.className = 'p-3 rounded-xl bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs font-mono leading-relaxed';
+          succBox.textContent = `✓ Fresh verification code dispatched to ${data.masked_email || email} via Gmail SMTP.`;
+        } else {
+          succBox.className = 'p-3 rounded-xl bg-amber-950/80 border border-amber-800 text-amber-300 text-xs font-mono leading-relaxed';
+          succBox.textContent = data.message || `If this account is registered, a new verification code was dispatched.`;
+        }
         succBox.classList.remove('hidden');
       }
       this._startResetCooldownTimer(30);
@@ -1833,8 +1988,9 @@ class CognisecClient {
         errBox.textContent = err.message || 'Failed to resend code.';
         errBox.classList.remove('hidden');
       }
-      if (err.status === 429) {
-        const secs = parseInt(err.retryAfter, 10) || 30;
+      const match = err.message && err.message.match(/wait (\d+) second/i);
+      const secs = parseInt(err.retryAfter, 10) || (match ? parseInt(match[1], 10) : (err.status === 429 ? 30 : null));
+      if (secs) {
         this._startResetCooldownTimer(secs);
       } else {
         if (btn) {
@@ -1863,15 +2019,31 @@ class CognisecClient {
     if (errBox) errBox.classList.add('hidden');
     if (succBox) succBox.classList.add('hidden');
 
-    if (!otp || otp.length !== 6) {
+    if (!otp) {
       if (errBox) {
-        errBox.textContent = 'Please enter a valid 6-digit verification code.';
+        errBox.textContent = 'Please enter the 6-digit verification code dispatched to your email.';
         errBox.classList.remove('hidden');
       }
       return;
     }
 
-    if (!pass || pass.length < 8) {
+    if (!/^[0-9]{6}$/.test(otp)) {
+      if (errBox) {
+        errBox.textContent = 'Verification code must be exactly 6 digits (0-9).';
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (!pass) {
+      if (errBox) {
+        errBox.textContent = 'Please enter a new password.';
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (pass.length < 8) {
       if (errBox) {
         errBox.textContent = 'Password must be at least 8 characters long.';
         errBox.classList.remove('hidden');
@@ -1911,6 +2083,14 @@ class CognisecClient {
       return;
     }
 
+    if (!confirm) {
+      if (errBox) {
+        errBox.textContent = 'Please confirm your new password.';
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
+
     if (pass !== confirm) {
       if (errBox) {
         errBox.textContent = 'Passwords do not match. Please verify both fields.';
@@ -1927,6 +2107,7 @@ class CognisecClient {
     try {
       const res = await this.verifyPasswordReset(email, otp, pass, confirm);
       if (succBox) {
+        succBox.className = 'p-3 rounded-xl bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs font-mono leading-relaxed';
         succBox.textContent = res.message || 'Password successfully updated! You may now sign in.';
         succBox.classList.remove('hidden');
       }
@@ -2399,6 +2580,7 @@ class CognisecClient {
         }
       }
       lastKeyTime = now;
+      this.hasRealInteraction = true;
       this.lastInteractionTime = Date.now();
     }, { passive: true });
 
@@ -2420,6 +2602,7 @@ class CognisecClient {
           if (this.dwellTimings.length > 50) this.dwellTimings.shift();
         }
       }
+      this.hasRealInteraction = true;
       this.lastInteractionTime = Date.now();
     }, { passive: true });
 
@@ -2447,12 +2630,14 @@ class CognisecClient {
         if (this.mousePoints.length > 60) this.mousePoints.shift();
         lastMouseTime = now;
       }
+      this.hasRealInteraction = true;
       this.lastInteractionTime = Date.now();
     }, { passive: true });
 
     // 3. Clicks, Scrolls & Categorical Navigation Events
     window.addEventListener('click', (e) => {
       this.clickCount++;
+      this.hasRealInteraction = true;
       this.lastInteractionTime = Date.now();
 
       // Extract coarse, privacy-preserving section/category tag (never inputs or credentials)
@@ -2497,6 +2682,7 @@ class CognisecClient {
         lastScrollX = currentScrollX;
         lastScrollTime = now;
       }
+      this.hasRealInteraction = true;
       this.lastInteractionTime = Date.now();
     }, { passive: true });
 
@@ -2504,13 +2690,149 @@ class CognisecClient {
     window.addEventListener('hashchange', () => {
       const hash = (window.location.hash || '').replace('#', '');
       if (hash) this.recordNavigationEvent(hash);
+      this.hasRealInteraction = true;
       this.lastInteractionTime = Date.now();
     });
     window.addEventListener('popstate', () => {
       const path = (window.location.pathname || '').split('/').pop().replace('.html', '') || 'root';
       this.recordNavigationEvent(path);
+      this.hasRealInteraction = true;
       this.lastInteractionTime = Date.now();
     });
+  }
+
+  getLiveTelemetryMetrics() {
+    const nowMs = performance.now();
+    const recentKeyPresses = (this.keyPressTimings || []).filter(k => (nowMs - k.t) <= 30000);
+    const recentDwells = (this.dwellTimings || []).filter(d => (nowMs - d.t) <= 30000);
+    const recentPoints = (this.mousePoints || []).filter(p => (nowMs - p.t) <= 30000);
+
+    let avgFlight = 0.0;
+    let avgDwell = 0.0;
+    let wpm = 0.0;
+
+    if (recentDwells.length >= 2) {
+      const dwells = recentDwells.map(d => d.dwell);
+      avgDwell = dwells.reduce((a, b) => a + b, 0) / dwells.length;
+    }
+
+    if (recentKeyPresses.length >= 2) {
+      const flights = recentKeyPresses.map(k => k.flight);
+      avgFlight = flights.reduce((a, b) => a + b, 0) / flights.length;
+      const effectiveDwell = avgDwell > 0 ? avgDwell : 60.0;
+      const cycleMs = avgFlight + effectiveDwell;
+      const calculatedWpm = Math.round(60000 / (5 * cycleMs));
+      wpm = Math.min(250.0, Math.max(5.0, calculatedWpm));
+    }
+
+    let avgVel = 0.0;
+    let avgAcc = 0.0;
+    let curvatureEntropy = 0.0;
+
+    if (recentPoints.length >= 3) {
+      const segmentVelocities = [];
+      for (let i = 1; i < recentPoints.length; i++) {
+        const p1 = recentPoints[i - 1];
+        const p2 = recentPoints[i];
+        const dtMs = Math.max(1, p2.t - p1.t);
+        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        if (dist > 0 && dtMs >= 4) {
+          const v = (dist / dtMs) * 1000;
+          segmentVelocities.push(v);
+        }
+      }
+
+      if (segmentVelocities.length >= 2) {
+        avgVel = Math.min(10000.0, segmentVelocities.reduce((a, b) => a + b, 0) / segmentVelocities.length);
+        let accSum = 0;
+        let accCount = 0;
+        for (let j = 1; j < segmentVelocities.length; j++) {
+          const dv = Math.abs(segmentVelocities[j] - segmentVelocities[j - 1]);
+          const dtSec = Math.max(0.005, (recentPoints[j].t - recentPoints[j - 1].t) / 1000);
+          accSum += (dv / dtSec);
+          accCount++;
+        }
+        if (accCount > 0) avgAcc = Math.min(50000.0, accSum / accCount);
+      }
+
+      const turningAngles = [];
+      for (let i = 2; i < recentPoints.length; i++) {
+        const p0 = recentPoints[i - 2];
+        const p1 = recentPoints[i - 1];
+        const p2 = recentPoints[i];
+        const dx1 = p1.x - p0.x;
+        const dy1 = p1.y - p0.y;
+        const dx2 = p2.x - p1.x;
+        const dy2 = p2.y - p1.y;
+        const d1 = Math.hypot(dx1, dy1);
+        const d2 = Math.hypot(dx2, dy2);
+        if (d1 >= 2.0 && d2 >= 2.0) {
+          let diff = Math.abs(Math.atan2(dy2, dx2) - Math.atan2(dy1, dx1));
+          if (diff > Math.PI) diff = (2 * Math.PI) - diff;
+          turningAngles.push(diff);
+        }
+      }
+      if (turningAngles.length >= 3) {
+        const numBins = 6;
+        const binCounts = new Array(numBins).fill(0);
+        const binWidth = Math.PI / numBins;
+        for (const angle of turningAngles) {
+          binCounts[Math.min(numBins - 1, Math.floor(angle / binWidth))]++;
+        }
+        let entropy = 0.0;
+        for (let b = 0; b < numBins; b++) {
+          if (binCounts[b] > 0) {
+            const p = binCounts[b] / turningAngles.length;
+            entropy -= p * Math.log(p);
+          }
+        }
+        curvatureEntropy = Math.min(5.0, Math.max(0.0, entropy));
+      }
+    }
+
+    let navEntropy = 0.0;
+    const nowTime = Date.now();
+    const navs = (this.navigationHistory || []).filter(item => (nowTime - item.t) <= 600000);
+    if (navs.length >= 2) {
+      const counts = {};
+      for (const item of navs) counts[item.category] = (counts[item.category] || 0) + 1;
+      let h = 0.0;
+      for (const cat in counts) {
+        const p = counts[cat] / navs.length;
+        h -= p * Math.log(p);
+      }
+      navEntropy = Math.min(5.0, Math.max(0.0, h));
+    }
+
+    let avgScrollSpeed = 0.0;
+    const scrolls = (this.scrollSpeeds || []).filter(s => (nowMs - s.t) <= 30000);
+    if (scrolls.length > 0) {
+      avgScrollSpeed = Math.min(20000.0, scrolls.reduce((a, b) => a + b.speed, 0) / scrolls.length);
+    }
+
+    const intervalSec = this.lastTelemetryDispatchTime ? Math.max(1, (Date.now() - this.lastTelemetryDispatchTime) / 1000) : 6.0;
+    const clickFreq = Math.min(100.0, (this.clickCount || 0) / intervalSec);
+    const idleSeconds = (this.hasRealInteraction && this.lastInteractionTime) ? Math.max(0, (Date.now() - this.lastInteractionTime) / 1000) : 0;
+
+    return {
+      typing_speed_wpm: Number(wpm.toFixed(1)),
+      avg_flight_time_ms: Number(avgFlight.toFixed(1)),
+      avg_dwell_time_ms: Number(avgDwell.toFixed(1)),
+      mouse_velocity_avg: Number(avgVel.toFixed(1)),
+      mouse_acceleration_avg: Number(avgAcc.toFixed(1)),
+      mouse_curvature_entropy: Number(curvatureEntropy.toFixed(2)),
+      click_frequency: Number(clickFreq.toFixed(2)),
+      scroll_speed_avg: Number(avgScrollSpeed.toFixed(1)),
+      idle_duration_sec: Number((Math.round(idleSeconds * 10) / 10).toFixed(1)),
+      navigation_entropy: Number(navEntropy.toFixed(2)),
+      sample_counts: {
+        keystrokes: recentDwells.length,
+        mouse_points: recentPoints.length,
+        clicks: this.clickCount || 0,
+        scrolls: scrolls.length,
+        navigations: navs.length
+      }
+    };
   }
 
   computeTelemetrySnapshot() {
@@ -2674,10 +2996,10 @@ class CognisecClient {
     this.clickCount = 0;
 
     // 6. Idle Duration in seconds
-    const idleSeconds = Math.max(0, (Date.now() - this.lastInteractionTime) / 1000);
+    const idleSeconds = (this.hasRealInteraction && this.lastInteractionTime) ? Math.max(0, (Date.now() - this.lastInteractionTime) / 1000) : 0.0;
 
     return {
-      session_id: this.sessionId || 'sess_demo_default',
+      session_id: this.sessionId || '',
       application: this.application,
       typing_speed_wpm: Number(wpm.toFixed(1)),
       avg_flight_time_ms: Number(avgFlight.toFixed(1)),
@@ -2691,7 +3013,13 @@ class CognisecClient {
       navigation_entropy: Number(navEntropy.toFixed(2)),
       context_signals: { is_new_device: false },
       timestamp: Date.now() / 1000,
-      sequence_number: ++this.sequenceNumber,
+      sequence_number: (() => {
+        const seq = ++this.sequenceNumber;
+        if (this.sessionId) {
+          try { localStorage.setItem('cognisec_seq_' + this.sessionId, String(seq)); } catch (_) {}
+        }
+        return seq;
+      })(),
       telemetry_nonce: 'nonce_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36)
     };
   }
@@ -2760,6 +3088,7 @@ class CognisecClient {
         this.openStepUpModal({ reason: result.user_message });
       }
 
+      window.dispatchEvent(new CustomEvent('cognisec:telemetry_dispatched', { detail: result }));
       return { success: true, data: result };
     } catch (e) {
       console.error('[COGNISEC-AI] Network error sending telemetry:', e.message);
@@ -2795,9 +3124,23 @@ class CognisecClient {
     return null;
   }
 
-  async fetchSocEvents(limit = 20) {
+  async fetchSocRiskDistribution() {
     try {
-      const res = await fetch(`${COGNISEC_API_BASE}/admin/events?limit=${limit}`, {
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/risk-distribution`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch risk distribution:', e);
+    }
+    return null;
+  }
+
+  async fetchSocEvents(limit = 20, scope = 'all') {
+    try {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (scope && scope !== 'all') params.set('scope', scope);
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/events?${params.toString()}`, {
         headers: this.getHeaders()
       });
       if (res.ok) return await res.json();
@@ -2807,9 +3150,14 @@ class CognisecClient {
     return [];
   }
 
-  async fetchSocAlerts(limit = 20) {
+  async fetchSocAlerts(limit = 100, status = '', severity = '', userId = null, scope = 'all') {
     try {
-      const res = await fetch(`${COGNISEC_API_BASE}/admin/alerts?limit=${limit}`, {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (status && status !== 'ALL') params.set('status', status);
+      if (severity && severity !== 'ALL') params.set('severity', severity);
+      if (userId) params.set('user_id', String(userId));
+      if (scope && scope !== 'all') params.set('scope', scope);
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/alerts?${params.toString()}`, {
         headers: this.getHeaders()
       });
       if (res.ok) return await res.json();
@@ -2819,9 +3167,14 @@ class CognisecClient {
     return [];
   }
 
-  async fetchSocSessions(limit = 20) {
+  async fetchSocSessions(limit = 100, status = '', riskLevel = '', search = '', scope = 'all') {
     try {
-      const res = await fetch(`${COGNISEC_API_BASE}/admin/sessions?limit=${limit}`, {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (status && status !== 'ALL') params.set('status', status);
+      if (riskLevel && riskLevel !== 'ALL') params.set('risk_level', riskLevel);
+      if (search) params.set('search', search);
+      if (scope && scope !== 'all') params.set('scope', scope);
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/sessions?${params.toString()}`, {
         headers: this.getHeaders()
       });
       if (res.ok) return await res.json();
@@ -2831,26 +3184,31 @@ class CognisecClient {
     return [];
   }
 
-  async fetchSocDevices() {
+  async fetchSocUsers(limit = 100, scope = 'all') {
     try {
-      const res = await fetch(`${COGNISEC_API_BASE}/admin/devices`, {
-        headers: this.getHeaders()
-      });
-      if (res.ok) return await res.json();
-    } catch (e) {
-      console.warn('[COGNISEC-AI] Failed to fetch devices:', e);
-    }
-    return [];
-  }
-
-  async fetchSocUsers(limit = 20) {
-    try {
-      const res = await fetch(`${COGNISEC_API_BASE}/admin/users?limit=${limit}`, {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (scope && scope !== 'all') params.set('scope', scope);
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/users?${params.toString()}`, {
         headers: this.getHeaders()
       });
       if (res.ok) return await res.json();
     } catch (e) {
       console.warn('[COGNISEC-AI] Failed to fetch users:', e);
+    }
+    return [];
+  }
+
+  async fetchSocDevices(scope = 'all') {
+    try {
+      const params = new URLSearchParams();
+      if (scope && scope !== 'all') params.set('scope', scope);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/devices${queryStr}`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch devices:', e);
     }
     return [];
   }
@@ -2867,44 +3225,95 @@ class CognisecClient {
     return null;
   }
 
-  async fetchMyProfile() {
+  async fetchSocIncident(incidentId) {
     try {
-      const res = await fetch(`${COGNISEC_API_BASE}/behavior/profile`, {
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/incidents/${incidentId}`, {
         headers: this.getHeaders()
       });
       if (res.ok) return await res.json();
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Failed to fetch incident #${incidentId}`);
     } catch (e) {
-      console.warn('[COGNISEC-AI] Failed to fetch my profile:', e);
+      console.warn('[COGNISEC-AI] Failed to fetch incident:', e);
+      throw e;
     }
-    return null;
   }
 
-  async resolveAlert(alertId, status = 'RESOLVED', notes = '') {
+  async triageSocAlert(alertId, status = 'RESOLVED', notes = '', assignedTo = null, resolutionReason = '') {
     try {
+      const payload = {
+        status,
+        notes: notes || null,
+        assigned_to: assignedTo || null,
+        resolution_reason: resolutionReason || null
+      };
       const res = await fetch(`${COGNISEC_API_BASE}/admin/alerts/${alertId}/resolve`, {
         method: 'POST',
         headers: this.getHeaders(),
-        body: JSON.stringify({ status, resolution_notes: notes || 'Handled in SOC Console' })
+        body: JSON.stringify(payload)
       });
       if (res.ok) return await res.json();
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Failed to triage alert #${alertId}`);
     } catch (e) {
-      console.warn('[COGNISEC-AI] Failed to resolve alert:', e);
+      console.warn('[COGNISEC-AI] Failed to triage alert:', e);
+      throw e;
     }
-    return null;
   }
 
-  async updateDeviceTrust(deviceId, isTrusted) {
+  async fetchSocAuditLogs(action = '', limit = 100) {
     try {
-      const res = await fetch(`${COGNISEC_API_BASE}/admin/devices/${deviceId}/trust?is_trusted=${isTrusted}`, {
-        method: 'POST',
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (action && action !== 'ALL') params.set('action', action);
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/audit-logs?${params.toString()}`, {
         headers: this.getHeaders()
       });
       if (res.ok) return await res.json();
     } catch (e) {
-      console.warn('[COGNISEC-AI] Failed to update device trust:', e);
+      console.warn('[COGNISEC-AI] Failed to fetch audit logs:', e);
+    }
+    return [];
+  }
+
+  async fetchSocAnalytics(timeWindow = '24h') {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/analytics?time_window=${encodeURIComponent(timeWindow)}`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch analytics:', e);
     }
     return null;
   }
+
+  async fetchSocSystemHealth() {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/system-health`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch system health:', e);
+    }
+    return null;
+  }
+
+  async triggerSocRescan() {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/rescan`, {
+        method: 'POST',
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to execute system re-scan');
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to trigger rescan:', e);
+      throw e;
+    }
+  }
+
 
   async simulateAttack(scenario, application = 'ecommerce') {
     try {
@@ -3022,6 +3431,22 @@ class CognisecClient {
       }
       const data = await res.json().catch(() => ({}));
       return { success: false, error: data.detail || 'Failed to fetch behavior profile' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  async getBehaviorLogs(limit = 20) {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/behavior/logs?limit=${limit}`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, data };
+      }
+      const data = await res.json().catch(() => ({}));
+      return { success: false, error: data.detail || 'Failed to fetch behavior logs' };
     } catch (e) {
       return { success: false, error: e.message };
     }
@@ -4843,7 +5268,7 @@ class CognisecClient {
     return stored;
   }
 
-  async requestDeviceLocation(timeoutMs = 6000) {
+  async requestDeviceLocation(timeoutMs = 3500) {
     if (!navigator.geolocation) {
       return { source: 'UNAVAILABLE', error: 'Browser does not support geolocation' };
     }
@@ -4881,15 +5306,29 @@ class CognisecClient {
   }
 
   async getDevices() {
+    const res = await fetch(`${COGNISEC_API_BASE}/devices`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Failed to load devices (HTTP ${res.status})`);
+    }
+    return await res.json();
+  }
+
+  async confirmDevice(deviceId) {
     try {
-      const res = await fetch(`${COGNISEC_API_BASE}/devices`, {
+      const res = await fetch(`${COGNISEC_API_BASE}/devices/${deviceId}/confirm`, {
+        method: 'POST',
         headers: this.getHeaders()
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Failed to confirm device (${res.status})`);
+      }
       return await res.json();
     } catch (e) {
-      console.warn('[COGNISEC-AI] getDevices error:', e.message);
-      return [];
+      return { status: 'error', message: e.message };
     }
   }
 
@@ -4927,24 +5366,34 @@ class CognisecClient {
   }
 
   async getNotifications(unreadOnly = false) {
-    try {
-      const url = `${COGNISEC_API_BASE}/notifications` + (unreadOnly ? '?unread_only=true' : '');
-      const res = await fetch(url, { headers: this.getHeaders() });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (e) {
-      console.warn('[COGNISEC-AI] getNotifications error:', e.message);
+    if (!this.isAuthenticated()) {
       return { notifications: [], unread_count: 0, total_count: 0 };
     }
+    const url = `${COGNISEC_API_BASE}/notifications` + (unreadOnly ? '?unread_only=true' : '');
+    const res = await fetch(url, { headers: this.getHeaders() });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const message = err.detail || `HTTP ${res.status}`;
+      const error = new Error(message);
+      error.status = res.status;
+      throw error;
+    }
+    return await res.json();
   }
 
   async markNotificationRead(notificationId) {
+    if (!this.isAuthenticated() || !notificationId) {
+      return { status: 'noop' };
+    }
     try {
       const res = await fetch(`${COGNISEC_API_BASE}/notifications/${notificationId}/read`, {
         method: 'POST',
         headers: this.getHeaders()
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
       return await res.json();
     } catch (e) {
       return { status: 'error', message: e.message };
@@ -4952,12 +5401,18 @@ class CognisecClient {
   }
 
   async markAllNotificationsRead() {
+    if (!this.isAuthenticated()) {
+      return { status: 'noop' };
+    }
     try {
       const res = await fetch(`${COGNISEC_API_BASE}/notifications/mark-all-read`, {
         method: 'POST',
         headers: this.getHeaders()
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
       return await res.json();
     } catch (e) {
       return { status: 'error', message: e.message };
@@ -4965,6 +5420,9 @@ class CognisecClient {
   }
 
   async respondToNotification(notificationId, decision) {
+    if (!this.isAuthenticated() || !notificationId) {
+      return { status: 'noop' };
+    }
     try {
       const res = await fetch(`${COGNISEC_API_BASE}/notifications/${notificationId}/respond`, {
         method: 'POST',

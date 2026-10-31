@@ -464,10 +464,10 @@ window.syncAuthStateUI = function() {
 
     if (profName) profName.textContent = user.name;
     if (profRole) profRole.textContent = isAdmin ? 'Security Administrator (SOC)' : 'Verified Enterprise User';
-    if (profId) profId.textContent = `ID: USR-00${user.id || '1'}`;
+    if (profId) profId.textContent = user.id ? `ID: USR-00${user.id}` : 'ID: --';
     if (profSession) profSession.textContent = `Account: ${user.account_status || 'ACTIVE'} • Session: ACTIVE`;
-    if (profDevice) profDevice.textContent = `${navigator.platform || 'macOS / Desktop'} • ${isAdmin ? 'Primary SOC Console' : 'Enterprise User Client'}`;
-    if (profSessionId) profSessionId.textContent = `Active Session: ${window.cognisec.sessionId || 'Active'}`;
+    if (profDevice) profDevice.textContent = `${navigator.platform || 'Desktop'} • ${isAdmin ? 'Primary SOC Console' : 'Enterprise User Client'}`;
+    if (profSessionId) profSessionId.textContent = window.cognisec && window.cognisec.sessionId ? `Active Session: ${window.cognisec.sessionId}` : 'Active';
     if (profLogoutBtn) profLogoutBtn.classList.remove('hidden');
     if (profActionBtn) {
       profActionBtn.innerHTML = `<span>${isAdmin ? 'Open SOC Command Center →' : 'Open User Dashboard →'}</span>`;
@@ -477,8 +477,11 @@ window.syncAuthStateUI = function() {
     if (userDashEmail) userDashEmail.textContent = user.email;
     if (userDashRole) userDashRole.textContent = `ROLE: ${user.role}`;
     if (userDashStatus) userDashStatus.textContent = `ACCOUNT: ${user.account_status || 'ACTIVE'}`;
-    if (userDashSession) userDashSession.textContent = `Session ID: ${window.cognisec.sessionId || 'Active (TLS 1.3)'}`;
-    if (userDashDevice) userDashDevice.textContent = `${navigator.platform || 'macOS / Desktop'} • Chrome (Desktop)`;
+    if (userDashSession) userDashSession.textContent = `Session ID: ${window.cognisec && window.cognisec.sessionId ? window.cognisec.sessionId : 'Active (TLS 1.3)'}`;
+    if (userDashDevice) {
+      const devLabel = (typeof window.getSuggestedDeviceLabel === 'function' ? window.getSuggestedDeviceLabel() : null) || (navigator.userAgent.includes('Firefox') ? 'Firefox' : (navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome')) ? 'Safari' : navigator.userAgent.includes('Edg') ? 'Edge' : 'Browser');
+      userDashDevice.textContent = userDashDevice.title = `${navigator.platform || 'Desktop'} • ${devLabel}`;
+    }
 
     if (typeof refreshAdaptiveMfaStatus === 'function') {
       refreshAdaptiveMfaStatus();
@@ -489,6 +492,12 @@ window.syncAuthStateUI = function() {
     if (navbarLogoutBtn) {
       navbarLogoutBtn.classList.add('hidden');
       navbarLogoutBtn.classList.remove('flex');
+    }
+    if (notifBell) {
+      notifBell.classList.remove('hidden');
+    }
+    if (typeof window.refreshNotifications === 'function') {
+      window.refreshNotifications();
     }
 
     if (profName) profName.textContent = 'Enterprise User';
@@ -503,7 +512,7 @@ window.syncAuthStateUI = function() {
     if (userDashRole) userDashRole.textContent = 'ROLE: GUEST';
     if (userDashStatus) userDashStatus.textContent = 'ACCOUNT: UNAUTHENTICATED';
     if (userDashSession) userDashSession.textContent = 'No Active Session';
-    if (userDashDevice) userDashDevice.textContent = `${navigator.platform || 'macOS / Desktop'} • Chrome (Desktop)`;
+    if (userDashDevice) userDashDevice.textContent = '--';
   }
 };
 
@@ -537,6 +546,9 @@ window.openAppropriateDashboard = function() {
 window.handleLogout = async function() {
   if (window.cognisec) {
     await window.cognisec.logout();
+  }
+  if (typeof window._resetNotificationGuestState === 'function') {
+    window._resetNotificationGuestState();
   }
   closeModal('dashboard');
   closeModal('liveDemo');
@@ -588,19 +600,27 @@ window.openModal = function(id) {
     }
   }
 
-  // Display clear alert if session expired or terminated
-  if (id === 'login' && window.cognisec && window.cognisec.sessionExpiredMessage) {
-    const errUser = document.getElementById('login-error-user');
-    const errSoc = document.getElementById('login-error-soc');
-    if (errUser) {
-      errUser.textContent = window.cognisec.sessionExpiredMessage;
-      errUser.classList.remove('hidden');
+  // Display clear alert if session expired or terminated, and suggest device label
+  if (id === 'login') {
+    if (window.cognisec && window.cognisec.sessionExpiredMessage) {
+      const errUser = document.getElementById('login-error-user');
+      const errSoc = document.getElementById('login-error-soc');
+      if (errUser) {
+        errUser.textContent = window.cognisec.sessionExpiredMessage;
+        errUser.classList.remove('hidden');
+      }
+      if (errSoc) {
+        errSoc.textContent = window.cognisec.sessionExpiredMessage;
+        errSoc.classList.remove('hidden');
+      }
+      window.cognisec.sessionExpiredMessage = null;
     }
-    if (errSoc) {
-      errSoc.textContent = window.cognisec.sessionExpiredMessage;
-      errSoc.classList.remove('hidden');
+    const nicknameInput = document.getElementById('login-device-nickname');
+    if (nicknameInput && typeof window.getSuggestedDeviceLabel === 'function') {
+      const suggestedLabel = window.getSuggestedDeviceLabel();
+      nicknameInput.value = suggestedLabel;
+      nicknameInput.placeholder = `e.g. ${suggestedLabel}`;
     }
-    window.cognisec.sessionExpiredMessage = null;
   }
 
   const modal = document.getElementById(`modal-${id}`);
@@ -619,6 +639,12 @@ window.openModal = function(id) {
     }
     if (typeof refreshMaturityProgress === 'function') {
       refreshMaturityProgress();
+    }
+    if (typeof refreshBehavioralDashboard === 'function') {
+      refreshBehavioralDashboard();
+    }
+    if (typeof startLiveTelemetryMonitoring === 'function') {
+      startLiveTelemetryMonitoring();
     }
     if (typeof refreshUserDevices === 'function') {
       refreshUserDevices();
@@ -644,6 +670,12 @@ window.closeModal = function(id) {
 
   if (id === 'dashboard') {
     stopSocPolling();
+  }
+
+  if (id === 'liveDemo') {
+    if (typeof stopLiveTelemetryMonitoring === 'function') {
+      stopLiveTelemetryMonitoring();
+    }
   }
 };
 
@@ -678,10 +710,26 @@ function stopSocPolling() {
   }
 }
 
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 async function loadSocDashboardData() {
   if (!window.cognisec || !window.cognisec.isAdmin()) return;
+
+  const opEmailEl = document.getElementById('soc-operator-email-val');
+  if (opEmailEl && window.cognisec && window.cognisec.user) {
+    opEmailEl.textContent = window.cognisec.user.email;
+  }
+
+  // 1. High-Level SOC KPI Metrics
   try {
-    // 1. High-Level SOC KPI Metrics
     const metrics = await window.cognisec.fetchSocMetrics();
     if (metrics) {
       const sessionsEl = document.getElementById('soc-stat-sessions');
@@ -689,21 +737,145 @@ async function loadSocDashboardData() {
       const blockedEl = document.getElementById('soc-stat-blocked');
       const devicesEl = document.getElementById('soc-stat-devices');
       const alertsEl = document.getElementById('soc-stat-alerts');
+      const anomalyEl = document.getElementById('soc-risk-anomaly');
 
       if (sessionsEl) sessionsEl.textContent = Number(metrics.live_sessions_count).toLocaleString();
-      if (trustedEl) trustedEl.textContent = Number(metrics.trusted_users_count).toLocaleString();
+      if (trustedEl) trustedEl.textContent = Number(metrics.active_users_count || metrics.trusted_users_count).toLocaleString();
       if (blockedEl) blockedEl.textContent = Number(metrics.blocked_sessions_count).toLocaleString();
-      if (devicesEl) devicesEl.textContent = Number(metrics.total_devices_count).toLocaleString();
+      if (devicesEl) devicesEl.textContent = Number(metrics.active_devices_count).toLocaleString();
       if (alertsEl) alertsEl.textContent = Number(metrics.active_alerts_count).toLocaleString();
+      if (anomalyEl) {
+        anomalyEl.textContent = `ANOMALY RATE: ${metrics.anomaly_rate_label || (metrics.anomaly_rate_percent + '%')}`;
+        anomalyEl.title = `Evaluated ${metrics.anomaly_rate_observations || 0} genuine security events in the past 24 hours. Rate: ${metrics.anomaly_rate_percent}%`;
+      }
+
+      const usersSub = document.getElementById('soc-stat-users-sub');
+      if (usersSub && metrics.persisted_users_count !== undefined) {
+        usersSub.textContent = `${metrics.active_users_count} Live · ${metrics.persisted_users_count} In DB`;
+        usersSub.title = `Genuine Active: ${metrics.active_users_count} | Seeded Demo: ${metrics.seeded_demo_accounts_count || 0} | Known Test: ${metrics.known_test_accounts_count || 0} | Unknown Historical: ${metrics.unknown_provenance_accounts_count || 0} (Total: ${metrics.persisted_users_count})`;
+      }
+      const devSub = document.getElementById('soc-stat-devices-sub');
+      if (devSub && metrics.persisted_devices_count !== undefined) {
+        devSub.textContent = `${metrics.active_devices_count} Live · ${metrics.persisted_devices_count} In DB`;
+        devSub.title = `1 physical device with live authenticated session. 101 historical persisted development records (physical hardware unconfirmed; no active connection).`;
+      }
+      const blockedSub = document.getElementById('soc-stat-blocked-sub');
+      if (blockedSub) {
+        blockedSub.textContent = `${metrics.restricted_sessions_count || 0} Restr · ${metrics.revoked_devices_count || 0} Dev`;
+        blockedSub.title = `Active Security Enforcements: ${metrics.restricted_sessions_count || 0} restricted sessions + ${metrics.revoked_devices_count || 0} revoked devices. (Historical closed sessions: ${metrics.terminated_sessions_count || 0})`;
+      }
+      const alertsSub = document.getElementById('soc-stat-alerts-sub');
+      if (alertsSub && metrics.open_alerts_count !== undefined) {
+        alertsSub.textContent = `${metrics.open_alerts_count} Open · ${metrics.total_alerts_count || metrics.open_alerts_count} Total`;
+        alertsSub.title = `Unresolved alerts awaiting triage: ${metrics.open_alerts_count} Open + ${metrics.reopened_alerts_count || 0} Reopened (${metrics.resolved_alerts_count || 0} resolved)`;
+      }
+    }
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to load SOC metrics:', err);
+  }
+
+  // 2. Risk Distribution & Verification Activity
+  try {
+    const riskDist = await window.cognisec.fetchSocRiskDistribution();
+    const lowEl = document.getElementById('soc-risk-low');
+    const medEl = document.getElementById('soc-risk-med');
+    const highEl = document.getElementById('soc-risk-high');
+    const stepEl = document.getElementById('soc-risk-stepup');
+
+    if (riskDist) {
+      if (lowEl) lowEl.textContent = Number(riskDist.low_risk_sessions || 0).toLocaleString();
+      if (medEl) medEl.textContent = Number(riskDist.medium_risk_sessions || 0).toLocaleString();
+      if (highEl) highEl.textContent = Number((riskDist.high_risk_sessions || 0) + (riskDist.critical_risk_sessions || 0)).toLocaleString();
+      if (stepEl) stepEl.textContent = Number(riskDist.step_up_verified_count || 0).toLocaleString();
+    } else {
+      if (lowEl) lowEl.textContent = '0';
+      if (medEl) medEl.textContent = '0';
+      if (highEl) highEl.textContent = '0';
+      if (stepEl) stepEl.textContent = '0';
+    }
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to load risk distribution:', err);
+    ['soc-risk-low', 'soc-risk-med', 'soc-risk-high', 'soc-risk-stepup'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '0';
+    });
+  }
+
+  // 3. Real Security Alerts (Overview and Logs tabs)
+  try {
+    const alertsScopeSelect = document.getElementById('soc-alerts-scope-select');
+    const alertsScope = alertsScopeSelect ? alertsScopeSelect.value : 'genuine';
+    const alerts = await window.cognisec.fetchSocAlerts(50, '', '', null, alertsScope);
+    window._cachedSocAlerts = alerts || [];
+    const overviewAlertsEl = document.getElementById('soc-overview-alerts');
+    const logsAlertsContainer = document.getElementById('soc-all-alerts-container');
+    const logsAlertsCount = document.getElementById('soc-logs-alerts-count');
+
+    if (logsAlertsCount) logsAlertsCount.textContent = `${(alerts || []).length} Incidents Logged`;
+
+    const openAlerts = (alerts || []).filter(a => a.status === 'OPEN');
+    const overviewBadge = document.getElementById('soc-overview-alerts-badge');
+    if (overviewBadge) overviewBadge.textContent = `${openAlerts.length} OPEN`;
+
+    if (overviewAlertsEl) {
+      if (openAlerts.length > 0) {
+        overviewAlertsEl.innerHTML = '';
+        openAlerts.forEach(al => {
+          const timeStr = new Date(al.created_at).toLocaleTimeString('en-US', { hour12: false });
+          const card = document.createElement('div');
+          card.className = 'p-3.5 rounded-xl bg-red-950/30 border border-red-800/70 space-y-2 font-mono text-xs';
+          card.innerHTML = `
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${al.severity === 'CRITICAL' ? 'bg-red-600 text-white' : 'bg-amber-950 text-amber-300'}">${al.severity}</span>
+                ${al.is_simulated ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800">[SIMULATED SCENARIO]</span>' : ''}
+                <strong class="text-white font-bold">${escapeHtml(al.alert_type.replace(/_/g, ' '))}</strong>
+              </div>
+              <span class="text-slate-500 text-[10px]">[${timeStr}]</span>
+            </div>
+            <p class="text-slate-300 text-[11px] leading-relaxed">${escapeHtml(al.message)}</p>
+            <div class="flex flex-wrap items-center justify-between pt-1 gap-2">
+              <span class="text-[10px] text-slate-400">Target: ${escapeHtml(al.user_name || 'User')} (${escapeHtml(al.user_email || '')})</span>
+              <div class="flex items-center gap-1.5">
+                <button onclick="window.openIncidentInvestigation(${al.id})" class="px-2 py-0.5 rounded bg-red-950 hover:bg-red-900 border border-red-700 text-red-300 text-[10px] font-bold cursor-pointer transition-all">🔍 Inspect</button>
+                <button onclick="window.triageQuickAlert(${al.id}, 'ACKNOWLEDGED')" class="px-2 py-0.5 rounded bg-amber-950 hover:bg-amber-900 border border-amber-700 text-amber-300 text-[10px] font-bold cursor-pointer">Acknowledge</button>
+                <button onclick="window.triageResolvePrompt(${al.id})" class="px-2 py-0.5 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 text-emerald-300 text-[10px] font-bold cursor-pointer">Resolve</button>
+              </div>
+            </div>
+          `;
+          overviewAlertsEl.appendChild(card);
+        });
+      } else {
+        overviewAlertsEl.innerHTML = `<div class="p-8 text-center text-slate-500 font-mono text-xs">✓ No open security alerts. All systems operational.</div>`;
+      }
     }
 
-    // 2. Real Security Events Stream (Overview Tab & Logs Tab)
-    const events = await window.cognisec.fetchSocEvents(15);
+    if (logsAlertsContainer) {
+      window.renderSocAlertsList(alerts || []);
+    }
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to load alerts:', err);
+    const overviewAlertsEl = document.getElementById('soc-overview-alerts');
+    if (overviewAlertsEl) {
+      overviewAlertsEl.innerHTML = `<div class="p-8 text-center text-red-400 font-mono text-xs">Failed to load security alerts. <button onclick="window.loadSocDashboardData()" class="underline text-slate-300 hover:text-white cursor-pointer ml-1.5 font-bold">Retry</button></div>`;
+    }
+  }
+
+  // 4. Real Security Events Feed
+  try {
+    const eventsScopeSelect = document.getElementById('soc-events-scope-select');
+    const eventsScope = eventsScopeSelect ? eventsScopeSelect.value : 'genuine';
+    const events = await window.cognisec.fetchSocEvents(50, eventsScope);
     const logsEl = document.getElementById('soc-live-logs');
+    const allEventsContainer = document.getElementById('soc-all-events-container');
+    const logsEventsCount = document.getElementById('soc-logs-events-count');
+
+    if (logsEventsCount) logsEventsCount.textContent = `${(events || []).length} Events Streamed`;
+
     if (logsEl) {
       if (events && events.length > 0) {
         logsEl.innerHTML = '';
-        events.forEach(ev => {
+        events.slice(0, 15).forEach(ev => {
           const timeStr = new Date(ev.timestamp).toLocaleTimeString('en-US', { hour12: false });
           const isClean = ev.severity === 'LOW';
           const isCritical = ev.severity === 'CRITICAL' || ev.decision === 'TERMINATE_SESSION';
@@ -712,149 +884,1158 @@ async function loadSocDashboardData() {
           newLog.innerHTML = `
             <div class="flex items-center gap-3">
               <span class="${isClean ? 'text-emerald-400' : 'text-red-400'} font-bold">${isClean ? '🟢' : '🔴'} [${timeStr}]</span>
-              <span class="text-white font-bold">${ev.event_type.replace(/_/g, ' ')} (${(ev.application || 'PLATFORM').toUpperCase()})</span>
-              <span class="text-slate-400 text-[10px]">&bull; User: ${ev.user_name || 'Portal User'} &bull; Severity: <span class="${isClean ? 'text-emerald-400' : 'text-red-400'} font-bold">${ev.severity}</span></span>
+              ${ev.is_simulated ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800">[SIMULATED]</span>' : ''}
+              <span class="text-white font-bold">${escapeHtml(ev.event_type.replace(/_/g, ' '))} (${(ev.application || 'PLATFORM').toUpperCase()})</span>
+              <span class="text-slate-400 text-[10px]">&bull; User: ${escapeHtml(ev.user_name || 'Portal User')} &bull; Severity: <span class="${isClean ? 'text-emerald-400' : 'text-red-400'} font-bold">${ev.severity}</span></span>
             </div>
-            <span class="px-2.5 py-0.5 ${isClean ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-red-950 text-red-400 border-red-800'} border rounded text-[10px] font-bold">${ev.decision}</span>
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 ${isClean ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-red-950 text-red-400 border-red-800'} border rounded text-[10px] font-bold">${ev.decision}</span>
+              ${ev.id ? `<button onclick="window.openIncidentInvestigation(${ev.id})" class="px-2 py-0.5 rounded bg-black border border-slate-700 text-slate-300 hover:text-white text-[10px] font-mono cursor-pointer transition-all">🔍 Inspect</button>` : ''}
+            </div>
           `;
           logsEl.appendChild(newLog);
         });
       } else {
-        logsEl.innerHTML = `<div class="text-center p-4 text-slate-500 font-mono text-xs">No security events recorded yet. Zero-Trust monitoring active.</div>`;
+        logsEl.innerHTML = `<div class="p-8 text-center text-slate-500 font-mono text-xs">No security events recorded yet. Zero-Trust monitoring active.</div>`;
       }
     }
 
-    // 3. Real Security Alerts Feed with Interactive Resolution
-    const alerts = await window.cognisec.fetchSocAlerts(10);
-    const fullLogsTab = document.getElementById('dash-content-logs');
-    if (fullLogsTab) {
-      let alertsHtml = `
-        <div class="p-6 rounded-2xl bg-black/60 border border-red-900/50 space-y-4">
-          <div class="flex items-center justify-between pb-3 border-b border-red-950">
-            <h4 class="font-heading font-bold text-sm text-white uppercase flex items-center gap-2">
-              <span>🚨</span> Real-Time Security Alerts &amp; Incident Resolution
-            </h4>
-            <span class="text-xs text-red-400 font-mono font-bold">${alerts.length} Incidents Logged</span>
-          </div>
-      `;
+    if (allEventsContainer) {
+      window.renderSocEventsTable(events || []);
+    }
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to load security events:', err);
+    const logsEl = document.getElementById('soc-live-logs');
+    if (logsEl) {
+      logsEl.innerHTML = `<div class="p-8 text-center text-red-400 font-mono text-xs">Failed to load security event feed. <button onclick="window.loadSocDashboardData()" class="underline text-slate-300 hover:text-white cursor-pointer ml-1.5 font-bold">Retry</button></div>`;
+    }
+  }
 
-      if (alerts && alerts.length > 0) {
-        alertsHtml += `<div class="space-y-3">`;
-        alerts.forEach(al => {
-          const isResolved = al.status === 'RESOLVED';
-          const isAck = al.status === 'ACKNOWLEDGED';
-          const timeStr = new Date(al.created_at).toLocaleTimeString('en-US', { hour12: false });
-          alertsHtml += `
-            <div class="p-4 rounded-xl ${isResolved ? 'bg-black/40 border-slate-800' : 'bg-red-950/30 border-red-800/80'} border flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-              <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                  <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono ${al.severity === 'CRITICAL' ? 'bg-red-600 text-white' : 'bg-amber-950 text-amber-300'}">${al.severity}</span>
-                  <strong class="text-white font-mono font-bold">${al.alert_type.replace(/_/g, ' ')}</strong>
-                  <span class="text-slate-500 text-[10px]">[${timeStr}]</span>
-                </div>
-                <p class="text-slate-300 text-[11px]">${al.message}</p>
-                <div class="text-[10px] text-slate-400">User: ${al.user_name} (${al.user_email}) &bull; App: ${(al.application || 'PLATFORM').toUpperCase()}</div>
-              </div>
-              <div class="flex items-center gap-2 shrink-0">
-                ${!isResolved ? `
-                  <button onclick="window.resolveSocAlert(${al.id}, 'ACKNOWLEDGED')" class="px-3 py-1 rounded bg-amber-950 hover:bg-amber-900 border border-amber-700 text-amber-300 font-mono text-[10px] font-bold cursor-pointer transition-all">Acknowledge</button>
-                  <button onclick="window.resolveSocAlert(${al.id}, 'RESOLVED')" class="px-3 py-1 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 text-emerald-300 font-mono text-[10px] font-bold cursor-pointer transition-all">Resolve Alert</button>
-                ` : `
-                  <span class="px-3 py-1 rounded bg-slate-900 text-emerald-400 border border-emerald-900 font-mono text-[10px] font-bold">✅ RESOLVED</span>
-                `}
-              </div>
-            </div>
+  // 5. Active Sessions & User Management
+  try {
+    const sessions = await window.cognisec.fetchSocSessions(50);
+    window._cachedSocSessions = sessions || [];
+    const sessionsContainer = document.getElementById('soc-sessions-table-container');
+    const sessionsCountBadge = document.getElementById('soc-sessions-count-badge');
+
+    const activeSessions = (sessions || []).filter(s => s.status === 'ACTIVE');
+    if (sessionsCountBadge) sessionsCountBadge.textContent = `${activeSessions.length} ACTIVE SESSIONS`;
+
+    if (sessionsContainer) {
+      window.renderSocSessionsTable(sessions || []);
+    }
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to load sessions:', err);
+  }
+
+  // 6. Enterprise Users Directory
+  try {
+    const users = await window.cognisec.fetchSocUsers(100);
+    const usersContainer = document.getElementById('soc-users-table-container');
+    const usersCountBadge = document.getElementById('soc-users-count-badge');
+    const userSelect = document.getElementById('soc-behavior-user-select');
+
+    if (usersCountBadge) usersCountBadge.textContent = `${(users || []).length} REGISTERED`;
+
+    if (userSelect && users && users.length > 0) {
+      const currentSelected = userSelect.value;
+      userSelect.innerHTML = '';
+      users.forEach((u, idx) => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = `${u.name} (${u.email}) — ${u.baseline_status || 'COLD_START'}`;
+        if (currentSelected ? u.id == currentSelected : idx === 0) opt.selected = true;
+        userSelect.appendChild(opt);
+      });
+      if (userSelect.value) {
+        window.inspectUserBehavior(userSelect.value);
+      }
+    }
+
+    if (usersContainer) {
+      if (users && users.length > 0) {
+        let usersTableHtml = `
+          <table class="w-full text-left font-mono text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-red-950 text-slate-400 text-[10px] uppercase">
+                <th class="py-2.5 px-3">User</th>
+                <th class="py-2.5 px-3">Role</th>
+                <th class="py-2.5 px-3">Status</th>
+                <th class="py-2.5 px-3">Data Provenance</th>
+                <th class="py-2.5 px-3">Devices</th>
+                <th class="py-2.5 px-3">Active Sessions</th>
+                <th class="py-2.5 px-3">Behavior Baseline</th>
+                <th class="py-2.5 px-3">Member Since</th>
+                <th class="py-2.5 px-3 text-right">Inspect</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-red-950/40">
+        `;
+        users.forEach(u => {
+          const isAct = u.account_status === 'ACTIVE';
+          const joinStr = new Date(u.created_at).toLocaleDateString();
+
+          let provBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-slate-400 border border-slate-700">📜 HISTORICAL</span>';
+          if (u.is_active || u.provenance === 'GENUINE_ACTIVE') {
+            provBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">🟢 GENUINE LIVE</span>';
+          } else if (u.provenance === 'SEEDED_DEMO') {
+            provBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-950 text-sky-400 border border-sky-800">👤 SEEDED DEMO</span>';
+          } else if (u.provenance === 'KNOWN_TEST') {
+            provBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800">🧪 KNOWN TEST</span>';
+          }
+
+          usersTableHtml += `
+            <tr class="hover:bg-red-950/10 transition-colors">
+              <td class="py-2.5 px-3">
+                <strong class="text-white block">${escapeHtml(u.name)}</strong>
+                <span class="text-slate-500 text-[10px]">${escapeHtml(u.email)}</span>
+              </td>
+              <td class="py-2.5 px-3">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${u.role === 'ADMIN' ? 'bg-purple-950 text-purple-300 border border-purple-800' : 'bg-slate-900 text-slate-400'}">${u.role}</span>
+              </td>
+              <td class="py-2.5 px-3">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isAct ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}">${u.account_status}</span>
+              </td>
+              <td class="py-2.5 px-3">
+                ${provBadge}
+              </td>
+              <td class="py-2.5 px-3 text-sky-400 font-bold">${u.registered_devices_count || 0}</td>
+              <td class="py-2.5 px-3 text-emerald-400 font-bold">${u.active_sessions_count || 0}</td>
+              <td class="py-2.5 px-3">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${u.sample_count > 15 ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-300'}">${u.baseline_status || 'COLD_START'} (${u.sample_count || 0})</span>
+              </td>
+              <td class="py-2.5 px-3 text-slate-400 text-[10px]">${joinStr}</td>
+              <td class="py-2.5 px-3 text-right">
+                <button onclick="window.switchDashboardTab('behavior'); window.inspectUserBehavior(${u.id});" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[10px] font-bold cursor-pointer">View Telemetry →</button>
+              </td>
+            </tr>
           `;
         });
-        alertsHtml += `</div>`;
+        usersTableHtml += `</tbody></table>`;
+        usersContainer.innerHTML = usersTableHtml;
       } else {
-        alertsHtml += `<div class="p-8 text-center text-slate-500 font-mono text-xs">No active security alerts. All systems operational.</div>`;
+        usersContainer.innerHTML = `<div class="p-6 text-center text-slate-500 font-mono text-xs">No users found.</div>`;
       }
-      alertsHtml += `</div>`;
-      fullLogsTab.innerHTML = alertsHtml;
     }
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to load users:', err);
+  }
 
-    // 4. Real Behavioral Baseline & Isolation Forest Status Tab
-    const prof = await window.cognisec.fetchMyProfile();
-    const behaviorTab = document.getElementById('dash-content-behavior');
-    if (behaviorTab && prof) {
-      const mlColor = prof.ml_status === 'ML_READY' ? 'text-emerald-400 border-emerald-800 bg-emerald-950' : 'text-amber-300 border-amber-800 bg-amber-950';
-      const means = prof.baseline_features?.means || {};
-      behaviorTab.innerHTML = `
-        <div class="p-6 rounded-2xl bg-black/60 border border-red-900/50 space-y-6">
-          <div class="flex items-center justify-between pb-3 border-b border-red-950">
-            <h4 class="font-heading font-bold text-sm text-white uppercase flex items-center gap-2">
-              <span>🧠</span> Isolation Forest &amp; Welford Behavioral Engine
-            </h4>
-            <span class="px-3 py-1 rounded border font-mono text-xs font-bold ${mlColor}">
-              STATUS: ${prof.ml_status}
-            </span>
-          </div>
+  // 7. Enterprise Hardware Device Inventory
+  try {
+    const devices = await window.cognisec.fetchSocDevices();
+    window._cachedSocDevices = devices || [];
+    const devicesContainer = document.getElementById('soc-devices-table-container');
+    const devicesCountBadge = document.getElementById('soc-devices-count-badge');
 
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
-            <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-1">
-              <span class="text-slate-400 text-[10px]">Statistical Baseline</span>
-              <strong class="text-white block text-sm font-bold">${prof.baseline_status}</strong>
-              <span class="text-slate-500 text-[10px]">Confidence: ${Math.round(prof.maturity_confidence * 100)}%</span>
-            </div>
-            <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-1">
-              <span class="text-slate-400 text-[10px]">Trusted Training Samples</span>
-              <strong class="text-white block text-sm font-bold">${prof.sample_count} Samples</strong>
-              <span class="text-slate-500 text-[10px]">Model Buffer: ${prof.model_sample_count || prof.sample_count}</span>
-            </div>
-            <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-1">
-              <span class="text-slate-400 text-[10px]">Machine Learning Model</span>
-              <strong class="text-emerald-400 block text-sm font-bold">Isolation Forest (50 Trees)</strong>
-              <span class="text-slate-500 text-[10px]">Contamination Rate: 5%</span>
-            </div>
-          </div>
+    if (devicesCountBadge) devicesCountBadge.textContent = `${(devices || []).length} REGISTERED DEVICES`;
 
-          <div class="space-y-3">
-            <h5 class="text-xs font-mono font-bold text-slate-300 uppercase">Learned 10-Dimensional Feature Means:</h5>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-[11px]">
-              <div class="p-2.5 rounded-lg bg-black/40 border border-slate-800">
-                <span class="text-slate-400 block text-[10px]">Typing Speed</span>
-                <strong class="text-emerald-400">${means.typing_speed_wpm || 68.0} WPM</strong>
-              </div>
-              <div class="p-2.5 rounded-lg bg-black/40 border border-slate-800">
-                <span class="text-slate-400 block text-[10px]">Flight Time</span>
-                <strong class="text-emerald-400">${means.avg_flight_time_ms || 118.0} ms</strong>
-              </div>
-              <div class="p-2.5 rounded-lg bg-black/40 border border-slate-800">
-                <span class="text-slate-400 block text-[10px]">Dwell Time</span>
-                <strong class="text-emerald-400">${means.avg_dwell_time_ms || 86.0} ms</strong>
-              </div>
-              <div class="p-2.5 rounded-lg bg-black/40 border border-slate-800">
-                <span class="text-slate-400 block text-[10px]">Mouse Velocity</span>
-                <strong class="text-emerald-400">${means.mouse_velocity_avg || 650.0} px/s</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
+    if (devicesContainer) {
+      window.renderSocDevicesTable(devices || []);
     }
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to load devices:', err);
+  }
 
-  } catch (e) {
-    console.warn('[COGNISEC-AI] Failed to load dashboard data:', e);
+  // 8. Measurable System Health & Command Status
+  try {
+    await window.loadSocSystemHealth();
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to load health telemetry:', err);
   }
 }
 
+// Render Functions for SOC Views
+window.renderSocAlertsList = function(alerts) {
+  const container = document.getElementById('soc-all-alerts-container');
+  if (!container) return;
+  if (!alerts || alerts.length === 0) {
+    container.innerHTML = `<div class="p-6 text-center text-slate-500 font-mono text-xs">No alerts found matching filter criteria.</div>`;
+    return;
+  }
+  container.innerHTML = '';
+  alerts.forEach(al => {
+    const isResolved = al.status === 'RESOLVED';
+    const isAck = al.status === 'ACKNOWLEDGED';
+    const isInv = al.status === 'INVESTIGATING';
+    const isReopened = al.status === 'REOPENED';
+    const timeStr = new Date(al.created_at).toLocaleString();
+    const card = document.createElement('div');
+    card.className = `p-3.5 rounded-xl border ${isResolved ? 'bg-black/40 border-slate-800' : 'bg-red-950/20 border-red-800/60'} flex flex-col md:flex-row md:items-center justify-between gap-3 font-mono text-xs transition-all`;
+    card.innerHTML = `
+      <div class="space-y-1.5 flex-1 min-w-0">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold ${al.severity === 'CRITICAL' ? 'bg-red-600 text-white' : 'bg-amber-950 text-amber-300'}">${al.severity}</span>
+          ${al.is_simulated ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800">[SIMULATED SCENARIO]</span>' : ''}
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isResolved ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : (isInv ? 'bg-purple-950 text-purple-300 border border-purple-800' : (isAck ? 'bg-sky-950 text-sky-300 border border-sky-800' : (isReopened ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-red-950 text-red-400 border border-red-800')))}">
+            STATUS: ${al.status}
+          </span>
+          <strong class="text-white font-bold">${escapeHtml(al.alert_type.replace(/_/g, ' '))}</strong>
+          <span class="text-slate-500 text-[10px]">[${timeStr}]</span>
+        </div>
+        <p class="text-slate-300 text-[11px] leading-relaxed">${escapeHtml(al.message)}</p>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-400">
+          <span>Target: <strong class="text-slate-300">${escapeHtml(al.user_name || 'User')}</strong> (${escapeHtml(al.user_email || '')})</span>
+          <span>App: <strong class="text-slate-300">${(al.application || 'PLATFORM').toUpperCase()}</strong></span>
+          ${al.assigned_to ? `<span>Assignee: <strong class="text-sky-300">${escapeHtml(al.assigned_to)}</strong></span>` : ''}
+          ${al.resolved_by ? `<span>Resolved By: <strong class="text-emerald-300">${escapeHtml(al.resolved_by)}</strong></span>` : ''}
+        </div>
+        ${al.notes ? `<div class="p-2 rounded bg-black/60 border border-red-950 text-[10px] text-slate-300 font-mono">📝 Notes: ${escapeHtml(al.notes)}</div>` : ''}
+        ${al.resolution_reason ? `<div class="p-2 rounded bg-emerald-950/30 border border-emerald-900/60 text-[10px] text-emerald-300 font-mono">✓ Resolution Reason: ${escapeHtml(al.resolution_reason)}</div>` : ''}
+      </div>
+      <div class="flex flex-wrap items-center gap-1.5 shrink-0 self-start md:self-center">
+        <button onclick="window.openIncidentInvestigation(${al.id})" class="px-2.5 py-1 rounded bg-red-950 hover:bg-red-900 border border-red-700 text-red-300 text-[10px] font-bold cursor-pointer transition-all">🔍 Inspect</button>
+        ${!isResolved ? `
+          <button onclick="window.triageQuickAlert(${al.id}, 'ACKNOWLEDGED')" class="px-2.5 py-1 rounded bg-sky-950 hover:bg-sky-900 border border-sky-700 text-sky-300 text-[10px] font-bold cursor-pointer">Acknowledge</button>
+          <button onclick="window.triageQuickAlert(${al.id}, 'INVESTIGATING')" class="px-2.5 py-1 rounded bg-purple-950 hover:bg-purple-900 border border-purple-700 text-purple-300 text-[10px] font-bold cursor-pointer">Investigate</button>
+          <button onclick="window.triageResolvePrompt(${al.id})" class="px-2.5 py-1 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 text-emerald-300 text-[10px] font-bold cursor-pointer">Resolve</button>
+        ` : `
+          <button onclick="window.triageQuickAlert(${al.id}, 'REOPENED')" class="px-2.5 py-1 rounded bg-amber-950 hover:bg-amber-900 border border-amber-700 text-amber-300 text-[10px] font-bold cursor-pointer">Reopen</button>
+        `}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+};
+
+window.renderSocEventsTable = function(events) {
+  const container = document.getElementById('soc-all-events-container');
+  if (!container) return;
+  if (!events || events.length === 0) {
+    container.innerHTML = `<div class="p-6 text-center text-slate-500 font-mono text-xs">No security events found.</div>`;
+    return;
+  }
+  let eventsTableHtml = `
+    <table class="w-full text-left font-mono text-xs border-collapse">
+      <thead>
+        <tr class="border-b border-red-950 text-slate-400 text-[10px] uppercase">
+          <th class="py-2.5 px-3">Timestamp</th>
+          <th class="py-2.5 px-3">Event Type</th>
+          <th class="py-2.5 px-3">Target User</th>
+          <th class="py-2.5 px-3">App</th>
+          <th class="py-2.5 px-3">Severity</th>
+          <th class="py-2.5 px-3">Anomaly</th>
+          <th class="py-2.5 px-3">Decision</th>
+          <th class="py-2.5 px-3 text-right">Inspect</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-red-950/40">
+  `;
+  events.forEach(ev => {
+    const timeStr = new Date(ev.timestamp).toLocaleString();
+    const isCritical = ev.severity === 'CRITICAL' || ev.decision === 'TERMINATE_SESSION';
+    const isLow = ev.severity === 'LOW';
+    eventsTableHtml += `
+      <tr class="hover:bg-red-950/10 transition-colors">
+        <td class="py-2.5 px-3 text-slate-400 text-[11px] whitespace-nowrap">${timeStr}</td>
+        <td class="py-2.5 px-3 text-white font-bold">
+          ${ev.is_simulated ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-950 text-purple-300 border border-purple-800 mr-1.5">[SIMULATED]</span>' : ''}
+          ${escapeHtml(ev.event_type.replace(/_/g, ' '))}
+        </td>
+        <td class="py-2.5 px-3 text-slate-300">${escapeHtml(ev.user_name || 'Unknown')}</td>
+        <td class="py-2.5 px-3 text-slate-400 uppercase text-[10px]">${escapeHtml(ev.application)}</td>
+        <td class="py-2.5 px-3">
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isCritical ? 'bg-red-600 text-white' : (isLow ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-300')}">${ev.severity}</span>
+        </td>
+        <td class="py-2.5 px-3 font-mono text-slate-300">${Number(ev.anomaly_score).toFixed(2)}</td>
+        <td class="py-2.5 px-3">
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isCritical ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-slate-900 text-slate-300 border border-slate-800'}">${ev.decision}</span>
+        </td>
+        <td class="py-2.5 px-3 text-right">
+          ${ev.id ? `<button onclick="window.openIncidentInvestigation(${ev.id})" class="px-2.5 py-0.5 rounded bg-black border border-slate-700 text-slate-300 hover:text-white text-[10px] font-mono font-bold cursor-pointer transition-all">🔍 Inspect</button>` : '—'}
+        </td>
+      </tr>
+    `;
+  });
+  eventsTableHtml += `</tbody></table>`;
+  container.innerHTML = eventsTableHtml;
+};
+
+window.renderSocSessionsTable = function(sessions) {
+  const container = document.getElementById('soc-sessions-table-container');
+  if (!container) return;
+  if (!sessions || sessions.length === 0) {
+    container.innerHTML = `<div class="p-6 text-center text-slate-500 font-mono text-xs">No sessions found matching filters.</div>`;
+    return;
+  }
+  let sessTableHtml = `
+    <table class="w-full text-left font-mono text-xs border-collapse">
+      <thead>
+        <tr class="border-b border-red-950 text-slate-400 text-[10px] uppercase">
+          <th class="py-2.5 px-3">Session ID</th>
+          <th class="py-2.5 px-3">User</th>
+          <th class="py-2.5 px-3">Application</th>
+          <th class="py-2.5 px-3">IP &amp; Device</th>
+          <th class="py-2.5 px-3">Risk Level</th>
+          <th class="py-2.5 px-3">Status</th>
+          <th class="py-2.5 px-3">Login Time</th>
+          <th class="py-2.5 px-3 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-red-950/40">
+  `;
+  sessions.forEach(s => {
+    const isActive = s.status === 'ACTIVE';
+    const isTerminated = s.status === 'TERMINATED' || s.status === 'REVOKED';
+    const isRestricted = s.status === 'RESTRICTED';
+    const isStepUp = s.status === 'STEP_UP_REQUIRED';
+    const timeStr = new Date(s.login_time).toLocaleTimeString();
+    sessTableHtml += `
+      <tr class="hover:bg-red-950/10 transition-colors">
+        <td class="py-2.5 px-3 text-slate-400 font-mono text-[11px] whitespace-nowrap" title="${s.id}">
+          ${s.is_simulated ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-950 text-purple-300 border border-purple-800 mr-1.5">[SIMULATED]</span>' : ''}
+          ${s.id.substring(0, 16)}...
+        </td>
+        <td class="py-2.5 px-3">
+          <strong class="text-white block">${escapeHtml(s.user_name || 'User')}</strong>
+          <span class="text-slate-500 text-[10px]">${escapeHtml(s.user_email || '')}</span>
+        </td>
+        <td class="py-2.5 px-3 uppercase text-[10px] text-slate-300 font-bold">${escapeHtml(s.application)}</td>
+        <td class="py-2.5 px-3 text-slate-300 text-[11px]">
+          <div>${escapeHtml(s.ip_address || '127.0.0.1')}</div>
+          <span class="text-slate-500 text-[10px]">${escapeHtml(s.device_nickname || 'Client Browser')}</span>
+        </td>
+        <td class="py-2.5 px-3">
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.current_risk_level === 'CRITICAL' || s.current_risk_level === 'HIGH' ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-emerald-950 text-emerald-400 border border-emerald-800'}">${s.current_risk_level}</span>
+        </td>
+        <td class="py-2.5 px-3">
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isActive ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : (isRestricted ? 'bg-amber-950 text-amber-300 border border-amber-800' : (isStepUp ? 'bg-purple-950 text-purple-300 border border-purple-800' : 'bg-slate-900 text-slate-500 border border-slate-800'))}">
+            ${s.status}
+          </span>
+        </td>
+        <td class="py-2.5 px-3 text-slate-400 text-[10px] whitespace-nowrap">${timeStr}</td>
+        <td class="py-2.5 px-3 text-right">
+          <div class="flex items-center justify-end gap-1.5">
+            <button onclick="window.openIncidentInvestigation('${s.id}')" class="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[10px] font-bold cursor-pointer transition-all">🔍 Inspect</button>
+            ${isActive ? `
+              <button onclick="window.terminateSocSession('${s.id}')" class="px-2.5 py-1 rounded bg-red-950 hover:bg-red-800 border border-red-700 text-red-300 font-mono text-[10px] font-bold cursor-pointer transition-all">⛔ Terminate</button>
+            ` : `
+              <span class="text-slate-600 text-[10px] font-mono">${s.status}</span>
+            `}
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+  sessTableHtml += `</tbody></table>`;
+  container.innerHTML = sessTableHtml;
+};
+
+window.renderSocDevicesTable = function(devices) {
+  const container = document.getElementById('soc-devices-table-container');
+  if (!container) return;
+  if (!devices || devices.length === 0) {
+    container.innerHTML = `<div class="p-6 text-center text-slate-500 font-mono text-xs">No devices found in this queue.</div>`;
+    return;
+  }
+  let devTableHtml = `
+    <table class="w-full text-left font-mono text-xs border-collapse">
+      <thead>
+        <tr class="border-b border-red-950 text-slate-400 text-[10px] uppercase">
+          <th class="py-2.5 px-3">Device &amp; Fingerprint Hash</th>
+          <th class="py-2.5 px-3">Account Owner</th>
+          <th class="py-2.5 px-3">Browser &amp; OS</th>
+          <th class="py-2.5 px-3">Network &amp; Location</th>
+          <th class="py-2.5 px-3">Trust State</th>
+          <th class="py-2.5 px-3">Hardware &amp; Provenance</th>
+          <th class="py-2.5 px-3">Sessions</th>
+          <th class="py-2.5 px-3">Last Seen</th>
+          <th class="py-2.5 px-3 text-right">Administrative Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-red-950/40">
+  `;
+  devices.forEach(d => {
+    const isTrusted = d.trust_state === 'TRUSTED';
+    const isRevoked = d.trust_state === 'REVOKED';
+    const isPending = d.trust_state === 'PENDING_CONFIRMATION';
+    const lastSeenStr = new Date(d.last_seen || d.first_seen).toLocaleDateString();
+    const devIdent = d.device_id || `dev_${d.id}`;
+    const isUnverified = (d.nickname === 'Identity not verified');
+
+    const provBadge = d.is_active ?
+      '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-700">🟢 LIVE ACTIVE</span>' :
+      (d.provenance === 'KNOWN_TEST' ?
+        '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-950 text-purple-300 border border-purple-800">🧪 KNOWN TEST</span>' :
+        '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-900 text-slate-400 border border-slate-700">📜 HISTORICAL</span>');
+
+    const hwEvidence = d.is_physical_device_confirmed ?
+      `<div class="text-[10px] text-emerald-400 font-bold" title="${escapeHtml(d.hardware_evidence_summary || '')}">✓ Physical Hardware Confirmed</div>` :
+      `<div class="text-[10px] text-slate-500" title="${escapeHtml(d.hardware_evidence_summary || 'Physical hardware unconfirmed; historical record')}">⚠️ Hardware Unconfirmed</div>`;
+
+    devTableHtml += `
+      <tr class="hover:bg-red-950/10 transition-colors">
+        <td class="py-2.5 px-3">
+          <strong class="${isUnverified ? 'text-amber-400' : 'text-white'} block">${escapeHtml(d.nickname || 'Unlabeled Device')}</strong>
+          <span class="text-slate-500 text-[10px] font-mono" title="Client Browser SHA-256 Fingerprint Hash">${escapeHtml(devIdent)}</span>
+        </td>
+        <td class="py-2.5 px-3">
+          <strong class="text-slate-300 block">${escapeHtml(d.user_name || 'Owner')}</strong>
+          <span class="text-slate-500 text-[10px]">${escapeHtml(d.user_email || '')}</span>
+        </td>
+        <td class="py-2.5 px-3 text-slate-300 text-[11px]">
+          <div>${escapeHtml(d.browser_name || d.browser || 'Browser')} ${d.browser_version || ''}</div>
+          <span class="text-slate-500 text-[10px]">${escapeHtml(d.os_name || d.os || 'OS')} (${escapeHtml(d.device_type || 'Desktop')})</span>
+        </td>
+        <td class="py-2.5 px-3 text-slate-400 text-[11px]">
+          <div>${escapeHtml(d.last_ip || '127.0.0.1')}</div>
+          <span class="text-slate-500 text-[10px]">${escapeHtml(d.city ? `${d.city}, ${d.country || ''}` : 'Local network')}</span>
+        </td>
+        <td class="py-2.5 px-3">
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isTrusted ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : (isRevoked ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-amber-950 text-amber-300 border border-amber-800')}">${d.trust_state}</span>
+        </td>
+        <td class="py-2.5 px-3">
+          ${provBadge}
+          ${hwEvidence}
+        </td>
+        <td class="py-2.5 px-3 ${d.is_active ? 'text-emerald-400 font-bold' : 'text-slate-500'}">${d.active_session_count || 0} active</td>
+        <td class="py-2.5 px-3 text-slate-400 text-[10px] whitespace-nowrap">${lastSeenStr}</td>
+        <td class="py-2.5 px-3 text-right">
+          <div class="flex items-center justify-end gap-1.5">
+            ${!isTrusted ? `
+              <button onclick="window.confirmSocDevice('${devIdent}')" class="px-2 py-0.5 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 text-emerald-300 font-mono text-[10px] font-bold cursor-pointer transition-all">✓ Confirm Trust</button>
+            ` : ''}
+            ${!isRevoked ? `
+              <button onclick="window.revokeSocDevice('${devIdent}')" class="px-2 py-0.5 rounded bg-red-950 hover:bg-red-900 border border-red-700 text-red-300 font-mono text-[10px] font-bold cursor-pointer transition-all">Revoke Access</button>
+            ` : `
+              <span class="text-red-500 text-[10px] font-mono">REVOKED</span>
+            `}
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+  devTableHtml += `</tbody></table>`;
+  container.innerHTML = devTableHtml;
+};
+
+// Filter Handlers
+window.filterSocSessions = async function() {
+  if (!window.cognisec) return;
+  const searchInput = document.getElementById('soc-sessions-search');
+  const statusSelect = document.getElementById('soc-sessions-status');
+  const riskSelect = document.getElementById('soc-sessions-risk');
+  const scopeSelect = document.getElementById('soc-sessions-scope');
+
+  const search = searchInput ? searchInput.value.trim() : '';
+  const status = statusSelect && statusSelect.value !== 'ALL' ? statusSelect.value : null;
+  const risk = riskSelect && riskSelect.value !== 'ALL' ? riskSelect.value : null;
+  const scope = scopeSelect ? scopeSelect.value : 'all';
+
+  try {
+    const sessions = await window.cognisec.fetchSocSessions(50, status, risk, search, scope);
+    window._cachedSocSessions = sessions || [];
+    window.renderSocSessionsTable(sessions || []);
+    const sessionsCountBadge = document.getElementById('soc-sessions-count-badge');
+    if (sessionsCountBadge) {
+      sessionsCountBadge.textContent = `${(sessions || []).length} FILTERED`;
+    }
+  } catch (e) {
+    console.error('Failed to filter sessions:', e);
+  }
+};
+
+window.filterSocDevices = function(queue) {
+  const container = document.getElementById('soc-device-queue-pills');
+  if (container) {
+    const pills = container.querySelectorAll('button');
+    pills.forEach(p => {
+      p.className = 'px-2.5 py-1 rounded-lg text-[10px] font-bold bg-black border border-red-900/60 text-slate-300 hover:bg-red-950/40 cursor-pointer transition-all';
+    });
+    const filterKey = queue === 'PENDING_CONFIRMATION' ? 'pending' : (queue === 'KNOWN_TEST' ? 'test' : queue.toLowerCase());
+    const activeBtn = document.getElementById(`dev-filter-${filterKey}`);
+    if (activeBtn) {
+      activeBtn.className = 'px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-600 text-white cursor-pointer transition-all';
+    }
+  }
+
+  const allDevices = window._cachedSocDevices || [];
+  let filtered = allDevices;
+  if (queue === 'ACTIVE') {
+    filtered = allDevices.filter(d => d.is_active);
+  } else if (queue === 'PENDING_CONFIRMATION') {
+    filtered = allDevices.filter(d => d.trust_state === 'PENDING_CONFIRMATION');
+  } else if (queue === 'TRUSTED') {
+    filtered = allDevices.filter(d => d.trust_state === 'TRUSTED');
+  } else if (queue === 'REVOKED') {
+    filtered = allDevices.filter(d => d.trust_state === 'REVOKED');
+  } else if (queue === 'KNOWN_TEST') {
+    filtered = allDevices.filter(d => d.provenance === 'KNOWN_TEST');
+  } else if (queue === 'INSUFFICIENT') {
+    filtered = allDevices.filter(d => (d.trust_state !== 'TRUSTED' && d.trust_state !== 'REVOKED') || d.nickname === 'Identity not verified');
+  }
+
+  window.renderSocDevicesTable(filtered);
+};
+
+window.filterSocAlerts = async function(status) {
+  const container = document.getElementById('soc-alert-status-pills');
+  if (container) {
+    const pills = container.querySelectorAll('button');
+    pills.forEach(p => {
+      p.className = 'px-2.5 py-0.5 rounded font-bold bg-black border border-red-900/60 text-slate-400 hover:bg-red-950/40 cursor-pointer';
+    });
+    const keyMap = { 'ALL': 'all', 'OPEN': 'open', 'REOPENED': 'reopened', 'ACKNOWLEDGED': 'ack', 'INVESTIGATING': 'inv', 'RESOLVED': 'res' };
+    const activeBtn = document.getElementById(`alert-pill-${keyMap[status] || 'all'}`);
+    if (activeBtn) {
+      activeBtn.className = 'px-2.5 py-0.5 rounded font-bold bg-red-600 text-white cursor-pointer';
+    }
+  }
+
+  try {
+    const scopeSelect = document.getElementById('soc-alerts-scope-select');
+    const scope = scopeSelect ? scopeSelect.value : 'all';
+    const alerts = await window.cognisec.fetchSocAlerts(50, status === 'ALL' ? null : status, null, null, scope);
+    window._cachedSocAlerts = alerts || [];
+    window.renderSocAlertsList(alerts || []);
+    const countEl = document.getElementById('soc-logs-alerts-count');
+    if (countEl) countEl.textContent = `${(alerts || []).length} Alerts (${status || 'ALL'})`;
+  } catch (e) {
+    console.error('Failed to filter alerts:', e);
+  }
+};
+
+window.onSocScopeChange = async function(target, scope) {
+  if (!window.cognisec) return;
+  if (target === 'alerts') {
+    try {
+      const alerts = await window.cognisec.fetchSocAlerts(50, '', '', null, scope);
+      window._cachedSocAlerts = alerts || [];
+      const openAlerts = (alerts || []).filter(a => a.status === 'OPEN');
+      const overviewAlertsEl = document.getElementById('soc-overview-alerts');
+      const overviewBadge = document.getElementById('soc-overview-alerts-badge');
+      if (overviewBadge) overviewBadge.textContent = `${openAlerts.length} OPEN`;
+      if (overviewAlertsEl) {
+        if (openAlerts.length > 0) {
+          overviewAlertsEl.innerHTML = '';
+          openAlerts.forEach(al => {
+            const timeStr = new Date(al.created_at).toLocaleTimeString('en-US', { hour12: false });
+            const card = document.createElement('div');
+            card.className = 'p-3.5 rounded-xl bg-red-950/30 border border-red-800/70 space-y-2 font-mono text-xs';
+            card.innerHTML = `
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold ${al.severity === 'CRITICAL' ? 'bg-red-600 text-white' : 'bg-amber-950 text-amber-300'}">${al.severity}</span>
+                  ${al.is_simulated ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800">[SIMULATED SCENARIO]</span>' : ''}
+                  <strong class="text-white font-bold">${escapeHtml(al.alert_type.replace(/_/g, ' '))}</strong>
+                </div>
+                <span class="text-slate-500 text-[10px]">[${timeStr}]</span>
+              </div>
+              <p class="text-slate-300 text-[11px] leading-relaxed">${escapeHtml(al.message)}</p>
+              <div class="flex flex-wrap items-center justify-between pt-1 gap-2">
+                <span class="text-slate-400 text-[10px]">App: <span class="text-white uppercase">${al.application}</span> &bull; Status: <span class="text-amber-400 font-bold">${al.status}</span></span>
+                <button onclick="window.triageAlert(${al.id}, 'ACKNOWLEDGED')" class="px-2.5 py-1 rounded bg-amber-950 border border-amber-700 text-amber-300 hover:text-white text-[10px] font-bold cursor-pointer transition-all">Acknowledge</button>
+              </div>
+            `;
+            overviewAlertsEl.appendChild(card);
+          });
+        } else {
+          overviewAlertsEl.innerHTML = `<div class="p-6 text-center text-slate-500 font-mono text-xs">No active threats for selected scope. Zero-Trust perimeter secure.</div>`;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to change alerts scope:', e);
+    }
+  } else if (target === 'events') {
+    try {
+      const events = await window.cognisec.fetchSocEvents(50, scope);
+      const logsEl = document.getElementById('soc-live-logs');
+      if (logsEl) {
+        if (events && events.length > 0) {
+          logsEl.innerHTML = '';
+          events.slice(0, 15).forEach(ev => {
+            const timeStr = new Date(ev.timestamp).toLocaleTimeString('en-US', { hour12: false });
+            const isClean = ev.severity === 'LOW';
+            const isCritical = ev.severity === 'CRITICAL' || ev.decision === 'TERMINATE_SESSION';
+            const newLog = document.createElement('div');
+            newLog.className = `p-3 rounded-xl bg-black/50 border ${isClean ? 'border-emerald-950' : (isCritical ? 'border-red-600 bg-red-950/20' : 'border-amber-950')} flex items-center justify-between font-mono text-[11px] animate-fade-in transition-all`;
+            newLog.innerHTML = `
+              <div class="flex items-center gap-3">
+                <span class="${isClean ? 'text-emerald-400' : 'text-red-400'} font-bold">${isClean ? '🟢' : '🔴'} [${timeStr}]</span>
+                ${ev.is_simulated ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800">[SIMULATED]</span>' : ''}
+                <span class="text-white font-bold">${escapeHtml(ev.event_type.replace(/_/g, ' '))} (${(ev.application || 'PLATFORM').toUpperCase()})</span>
+                <span class="text-slate-400 text-[10px]">&bull; User: ${escapeHtml(ev.user_name || 'Portal User')} &bull; Severity: <span class="${isClean ? 'text-emerald-400' : 'text-red-400'} font-bold">${ev.severity}</span></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 ${isClean ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-red-950 text-red-400 border-red-800'} border rounded text-[10px] font-bold">${ev.decision}</span>
+                ${ev.id ? `<button onclick="window.openIncidentInvestigation(${ev.id})" class="px-2 py-0.5 rounded bg-black border border-slate-700 text-slate-300 hover:text-white text-[10px] font-mono cursor-pointer transition-all">🔍 Inspect</button>` : ''}
+              </div>
+            `;
+            logsEl.appendChild(newLog);
+          });
+        } else {
+          logsEl.innerHTML = `<div class="p-8 text-center text-slate-500 font-mono text-xs">No events matching selected scope. Zero-Trust monitoring active.</div>`;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to change events scope:', e);
+    }
+  }
+};
+
+window.loadSocAuditLogs = async function(actionFilter) {
+  const container = document.getElementById('soc-audit-table-container');
+  if (!container || !window.cognisec) return;
+  try {
+    container.innerHTML = `<div class="p-6 text-center text-slate-500 font-mono text-xs">Loading audit trail records...</div>`;
+    const logs = await window.cognisec.fetchSocAuditLogs(actionFilter === 'ALL' ? null : actionFilter, 50);
+    if (!logs || logs.length === 0) {
+      container.innerHTML = `<div class="p-6 text-center text-slate-500 font-mono text-xs">No administrative actions logged yet.</div>`;
+      return;
+    }
+    let html = `
+      <table class="w-full text-left font-mono text-xs border-collapse">
+        <thead>
+          <tr class="border-b border-red-950 text-slate-400 text-[10px] uppercase">
+            <th class="py-2.5 px-3">Timestamp</th>
+            <th class="py-2.5 px-3">Administrator</th>
+            <th class="py-2.5 px-3">Action</th>
+            <th class="py-2.5 px-3">Target Resource</th>
+            <th class="py-2.5 px-3">Outcome</th>
+            <th class="py-2.5 px-3">Notes / Reason</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-red-950/40">
+    `;
+    logs.forEach(l => {
+      const timeStr = new Date(l.timestamp).toLocaleString();
+      const isSuccess = l.outcome === 'SUCCESS';
+      html += `
+        <tr class="hover:bg-red-950/10 transition-colors">
+          <td class="py-2.5 px-3 text-slate-400 text-[11px] whitespace-nowrap">${timeStr}</td>
+          <td class="py-2.5 px-3 text-white font-bold">${escapeHtml(l.operator_email || 'admin')}</td>
+          <td class="py-2.5 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-300 border border-red-800">${escapeHtml(l.action)}</span>
+          </td>
+          <td class="py-2.5 px-3 text-slate-300 font-mono text-[11px]">${escapeHtml(l.target_resource_id ? `${l.target_resource_type}: ${l.target_resource_id}` : l.target_resource_type)}</td>
+          <td class="py-2.5 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isSuccess ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-red-950 text-red-400 border border-red-800'}">${l.outcome}</span>
+          </td>
+          <td class="py-2.5 px-3 text-slate-400 text-[11px]">${escapeHtml(l.reason || '—')}</td>
+        </tr>
+      `;
+    });
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div class="p-6 text-center text-red-400 font-mono text-xs">Failed to load audit logs: ${e.message}</div>`;
+  }
+};
+
+window.loadSocAnalytics = async function(timeWindow) {
+  ['24h', '7d', '30d'].forEach(w => {
+    const btn = document.getElementById(`analytics-btn-${w}`);
+    if (btn) {
+      if (w === timeWindow) btn.className = 'px-3 py-1 rounded-lg text-[11px] font-bold bg-red-600 text-white cursor-pointer';
+      else btn.className = 'px-3 py-1 rounded-lg text-[11px] font-bold bg-black border border-red-900/60 text-slate-300 hover:bg-red-950/40 cursor-pointer';
+    }
+  });
+
+  if (!window.cognisec) return;
+  try {
+    const data = await window.cognisec.fetchSocAnalytics(timeWindow);
+    if (!data) return;
+
+    const authTotalEl = document.getElementById('analytics-stat-auth-total');
+    const authRateEl = document.getElementById('analytics-stat-auth-rate');
+    const allowEl = document.getElementById('analytics-stat-allow');
+    const stepUpEl = document.getElementById('analytics-stat-stepup');
+    const stepUpRateEl = document.getElementById('analytics-stat-stepup-rate');
+    const restEl = document.getElementById('analytics-stat-restricted');
+    const termEl = document.getElementById('analytics-stat-terminated');
+    const alertsEl = document.getElementById('analytics-stat-alerts');
+    const alertsRateEl = document.getElementById('analytics-stat-alerts-rate');
+
+    if (authTotalEl) authTotalEl.textContent = Number(data.total_auth_attempts || 0).toLocaleString();
+    if (authRateEl) authRateEl.textContent = `${data.auth_success_rate_percent || 0}% Success`;
+    if (allowEl) allowEl.textContent = Number(data.risk_decisions?.allow || 0).toLocaleString();
+    if (stepUpEl) stepUpEl.textContent = Number(data.step_up_challenges?.required || 0).toLocaleString();
+    if (stepUpRateEl) stepUpRateEl.textContent = `${data.step_up_challenges?.verified || 0} Verified`;
+    if (restEl) restEl.textContent = Number(data.session_enforcement?.restricted || 0).toLocaleString();
+    if (termEl) termEl.textContent = Number(data.session_enforcement?.terminated || 0).toLocaleString();
+    if (alertsEl) alertsEl.textContent = Number(data.alerts_lifecycle?.resolved || 0).toLocaleString();
+    if (alertsRateEl) {
+      const openCount = data.alerts_lifecycle?.opened || 0;
+      const resCount = data.alerts_lifecycle?.resolved || 0;
+      const rate = (openCount + resCount) > 0 ? Math.round((resCount / (openCount + resCount)) * 100) : 100;
+      alertsRateEl.textContent = `${rate}% Triage Rate`;
+    }
+  } catch (e) {
+    console.error('Failed to load analytics:', e);
+  }
+};
+
+window.loadSocSystemHealth = async function() {
+  if (!window.cognisec) return;
+  try {
+    const h = await window.cognisec.fetchSocSystemHealth();
+    if (!h) return;
+
+    const dbText = document.getElementById('health-db-status-text');
+    const dbLat = document.getElementById('health-db-latency');
+    const teleStatus = document.getElementById('health-telemetry-status');
+    const lastEvent = document.getElementById('health-last-event');
+    const lastEventSub = document.getElementById('health-last-event-sub');
+    const activeSess = document.getElementById('health-active-sessions');
+
+    if (dbText) dbText.textContent = h.database_connected ? 'CONNECTED' : 'OFFLINE';
+    if (dbLat) dbLat.textContent = `Ping Latency: ${h.database_latency_ms} ms (Real DB)`;
+    if (teleStatus) teleStatus.textContent = h.telemetry_pipeline_status || 'ACTIVE';
+    if (lastEvent) lastEvent.textContent = h.last_event_timestamp ? new Date(h.last_event_timestamp).toLocaleTimeString() : 'None';
+    if (activeSess) activeSess.textContent = `${h.active_sessions_count} Active`;
+
+    // Dynamic Command Footer status indicator
+    const footerText = document.getElementById('soc-engine-status-text');
+    const footerDot = document.getElementById('soc-engine-status-dot');
+    if (footerText && footerDot) {
+      if (h.database_connected) {
+        footerDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+        footerText.className = 'text-emerald-400 font-bold';
+        footerText.textContent = `SOC ENGINE ONLINE • DB CONNECTED (${h.database_latency_ms}ms) • PIPELINE ${h.telemetry_pipeline_status || 'ACTIVE'}`;
+      } else {
+        footerDot.className = 'w-2 h-2 rounded-full bg-red-500';
+        footerText.className = 'text-red-400 font-bold';
+        footerText.textContent = 'SOC ENGINE STATUS • DATABASE DISCONNECTED';
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load system health:', e);
+    const footerText = document.getElementById('soc-engine-status-text');
+    const footerDot = document.getElementById('soc-engine-status-dot');
+    if (footerText && footerDot) {
+      footerDot.className = 'w-2 h-2 rounded-full bg-amber-500';
+      footerText.className = 'text-amber-400 font-bold';
+      footerText.textContent = 'SOC ENGINE STATUS • HEALTH CHECK PENDING';
+    }
+  }
+};
+
+// Incident Investigation View
+window.openIncidentInvestigation = async function(incidentId) {
+  if (!window.cognisec) return;
+  openModal('incident-investigation');
+  const body = document.getElementById('inc-modal-body');
+  const idBadge = document.getElementById('inc-modal-id-badge');
+  const statusBadge = document.getElementById('inc-modal-status-badge');
+  const sevBadge = document.getElementById('inc-modal-severity-badge');
+
+  if (body) body.innerHTML = `<div class="p-12 text-center text-slate-500 font-mono text-xs">Correlating persistent identity, device, session, and behavioral vectors for incident #${incidentId}...</div>`;
+  if (idBadge) idBadge.textContent = `ID: ${incidentId}`;
+
+  try {
+    const dossier = await window.cognisec.fetchSocIncident(incidentId);
+    if (!dossier) {
+      if (body) body.innerHTML = `<div class="p-8 text-center text-red-400 font-mono text-xs">Incident or correlated session not found.</div>`;
+      return;
+    }
+
+    if (statusBadge) {
+      statusBadge.textContent = dossier.status;
+      statusBadge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${dossier.status === 'RESOLVED' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-amber-950 text-amber-300 border border-amber-800'}`;
+    }
+    if (sevBadge) {
+      sevBadge.textContent = dossier.severity;
+      sevBadge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${dossier.severity === 'CRITICAL' ? 'bg-red-600 text-white' : 'bg-amber-950 text-amber-300 border border-amber-800'}`;
+    }
+
+    const u = dossier.user || {};
+    const d = dossier.device || {};
+    const s = dossier.session || {};
+    const r = dossier.risk_assessment || {};
+    const b = dossier.behavioral_signals || {};
+    const sigs = b.observed_signals || {};
+    const base = b.user_baseline || {};
+    const devMap = b.deviation_status || {};
+    const timeline = dossier.related_timeline || [];
+    const actions = dossier.admin_actions || [];
+
+    const featuresDef = [
+      { key: "typing_speed_wpm", name: "Typing Speed", unit: "WPM" },
+      { key: "avg_flight_time_ms", name: "Flight Time", unit: "ms" },
+      { key: "avg_dwell_time_ms", name: "Dwell Time", unit: "ms" },
+      { key: "mouse_velocity_avg", name: "Mouse Velocity", unit: "px/s" },
+      { key: "mouse_acceleration_avg", name: "Mouse Acceleration", unit: "px/s²" },
+      { key: "mouse_curvature_entropy", name: "Curvature Entropy", unit: "bits" },
+      { key: "click_frequency", name: "Click Frequency", unit: "clicks/s" },
+      { key: "scroll_speed_avg", name: "Scroll Speed", unit: "px/s" },
+      { key: "idle_duration_sec", name: "Idle Duration", unit: "s" },
+      { key: "navigation_entropy", name: "Navigation Entropy", unit: "bits" }
+    ];
+
+    body.innerHTML = `
+      <!-- Row 1: Correlated Identities (User, Session, Device) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
+        <!-- User Identity -->
+        <div class="p-3.5 rounded-xl bg-black/70 border border-red-950 space-y-1">
+          <span class="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1.5">
+            <span>👤</span> Correlated User
+          </span>
+          <strong class="text-white block text-sm">${escapeHtml(u.name || 'Unknown User')}</strong>
+          <div class="text-[11px] text-slate-300">${escapeHtml(u.email || 'No email')}</div>
+          <div class="text-[10px] text-slate-500 pt-1">Role: <span class="text-slate-300 font-bold">${u.role || 'USER'}</span> &bull; Account: <span class="text-emerald-400 font-bold">${u.account_status || 'ACTIVE'}</span></div>
+        </div>
+
+        <!-- Session Context -->
+        <div class="p-3.5 rounded-xl bg-black/70 border border-red-950 space-y-1">
+          <span class="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1.5">
+            <span>⚡</span> Correlated Session
+          </span>
+          <strong class="text-white block text-sm font-mono">${s.id ? escapeHtml(s.id.substring(0, 18)) + '...' : 'Direct Event'}</strong>
+          <div class="text-[11px] text-slate-300">Status: <span class="text-emerald-400 font-bold">${s.status || 'ACTIVE'}</span> &bull; Risk: <span class="text-amber-300 font-bold">${s.current_risk_level || 'LOW'}</span></div>
+          <div class="text-[10px] text-slate-500 pt-1">App: ${(s.application || dossier.application || 'PLATFORM').toUpperCase()} &bull; IP: ${escapeHtml(s.ip_address || '127.0.0.1')}</div>
+        </div>
+
+        <!-- Device Identity & Fingerprint -->
+        <div class="p-3.5 rounded-xl bg-black/70 border border-red-950 space-y-1">
+          <span class="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1.5">
+            <span>💻</span> Device &amp; Browser Identity
+          </span>
+          <strong class="text-white block text-sm">${escapeHtml(d.nickname || 'Web Client')}</strong>
+          <div class="text-[10px] text-slate-400 font-mono truncate" title="SHA-256 Client Browser Fingerprint">${escapeHtml(d.device_fingerprint || 'Unbound')}</div>
+          <div class="text-[10px] text-slate-500 pt-1">Trust: <span class="${d.trust_state === 'TRUSTED' ? 'text-emerald-400' : 'text-amber-300'} font-bold">${d.trust_state || 'UNTRUSTED'}</span> &bull; OS: ${escapeHtml(d.os || 'OS')}</div>
+        </div>
+      </div>
+
+      <!-- Row 2: Zero Trust Decision & Enforcement Assessment -->
+      <div class="p-4 rounded-xl bg-black/80 border border-red-900/60 space-y-3 font-mono text-xs">
+        <div class="flex items-center justify-between pb-2 border-b border-red-950">
+          <div class="flex items-center gap-2">
+            <span class="text-amber-400 font-bold">🛡️</span>
+            <strong class="text-white uppercase tracking-wider text-xs">Zero Trust Risk Assessment &amp; Policy Decision</strong>
+          </div>
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold ${r.risk_decision === 'ALLOW' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-red-950 text-red-400 border border-red-800'}">
+            DECISION: ${r.risk_decision || 'ALLOW'}
+          </span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div class="p-2.5 rounded bg-black/50 border border-red-950">
+            <span class="text-slate-500 text-[10px] block">Observed Risk Score</span>
+            <strong class="text-base text-white">${Number(r.risk_score || 0).toFixed(2)}</strong>
+          </div>
+          <div class="p-2.5 rounded bg-black/50 border border-red-950">
+            <span class="text-slate-500 text-[10px] block">Anomaly Score</span>
+            <strong class="text-base text-amber-300">${Number(r.anomaly_score || 0).toFixed(2)}</strong>
+          </div>
+          <div class="p-2.5 rounded bg-black/50 border border-red-950">
+            <span class="text-slate-500 text-[10px] block">Enforcement Result</span>
+            <strong class="text-base text-emerald-400">${r.enforcement_outcome || 'ACCESS_GRANTED'}</strong>
+          </div>
+          <div class="p-2.5 rounded bg-black/50 border border-red-950">
+            <span class="text-slate-500 text-[10px] block">Step-Up Outcome</span>
+            <strong class="text-base text-purple-300">${dossier.step_up_challenges?.length > 0 ? dossier.step_up_challenges[0].outcome : 'NONE'}</strong>
+          </div>
+        </div>
+        <div class="text-[11px] text-slate-300 pt-1">
+          <span class="text-slate-500">Decision Rationale:</span> ${escapeHtml(r.decision_reason || dossier.message || 'Evaluated under Zero Trust continuous verification policy.')}
+        </div>
+      </div>
+
+      <!-- Row 3: 10 Behavioral Signals vs User Baseline -->
+      <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-3 font-mono text-xs">
+        <div class="flex items-center justify-between pb-2 border-b border-red-950">
+          <div class="flex items-center gap-2">
+            <span class="text-purple-400 font-bold">🧠</span>
+            <strong class="text-white uppercase tracking-wider text-xs">10-Dimensional Behavioral Signals vs Learned Baseline</strong>
+          </div>
+          <span class="text-[10px] text-slate-400">Baseline Status: <strong class="text-slate-200">${b.baseline_status || 'COLD_START'}</strong> (${b.baseline_samples || 0} Samples)</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+          ${featuresDef.map(f => {
+            const obsVal = sigs[f.key];
+            const hasObs = obsVal !== undefined && obsVal !== null;
+            const meanVal = base.means && base.means[f.key];
+            const stdVal = base.stds && base.stds[f.key];
+            const status = devMap[f.key] || (hasObs ? 'NORMAL' : 'AWAITING BASELINE DATA');
+            const isDev = status === 'HIGH DEVIATION' || status === 'ELEVATED';
+            return `
+              <div class="p-2.5 rounded-lg bg-black/50 border ${isDev ? 'border-amber-700 bg-amber-950/20' : 'border-red-950/60'} space-y-1">
+                <span class="text-slate-400 text-[10px] block truncate" title="${f.name}">${f.name}</span>
+                <strong class="${hasObs ? (isDev ? 'text-amber-300' : 'text-emerald-400') : 'text-slate-500'} text-xs block">
+                  ${hasObs ? `${Number(obsVal).toFixed(2)} ${f.unit}` : '—'}
+                </strong>
+                <span class="text-[9px] text-slate-500 block truncate">
+                  ${meanVal !== undefined && meanVal !== null ? `Base: ${Number(meanVal).toFixed(1)} ±${Number(stdVal || 0).toFixed(1)}` : 'No baseline'}
+                </span>
+                <span class="inline-block px-1.5 py-0.2 rounded text-[9px] font-bold ${isDev ? 'bg-amber-900 text-amber-200' : 'bg-slate-900 text-slate-400'}">${status}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <div class="text-[10px] text-slate-500 italic">
+          * Private keystroke contents, passwords, OTPs, and cognitive security answers are cryptographically masked and never logged.
+        </div>
+      </div>
+
+      <!-- Row 4: Chronological Correlated Timeline -->
+      <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-3 font-mono text-xs">
+        <div class="flex items-center justify-between pb-2 border-b border-red-950">
+          <div class="flex items-center gap-2">
+            <span class="text-red-400 font-bold">⏱️</span>
+            <strong class="text-white uppercase tracking-wider text-xs">Chronological Correlated Event Timeline</strong>
+          </div>
+          <span class="text-[10px] text-slate-500">${timeline.length} Events Correlated by User &amp; Session</span>
+        </div>
+        <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+          ${timeline.length > 0 ? timeline.map(ev => {
+            const timeStr = new Date(ev.timestamp).toLocaleTimeString();
+            return `
+              <div class="p-2.5 rounded bg-black/50 border border-red-950/60 flex items-center justify-between text-[11px]">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-500 text-[10px]">[${timeStr}]</span>
+                  <strong class="text-white">${escapeHtml(ev.event_type.replace(/_/g, ' '))}</strong>
+                  <span class="text-slate-400 text-[10px]">(${escapeHtml(ev.application || 'platform')})</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded text-[9px] font-bold ${ev.severity === 'CRITICAL' ? 'bg-red-600 text-white' : 'bg-slate-900 text-slate-300'}">${ev.severity}</span>
+                  <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-black border border-slate-800 text-slate-300">${ev.decision}</span>
+                </div>
+              </div>
+            `;
+          }).join('') : '<div class="text-slate-500 text-center py-4">No correlated timeline events recorded.</div>'}
+        </div>
+      </div>
+
+      <!-- Row 5: Administrative Triage & Incident Notes Controls -->
+      <div class="p-4 rounded-xl bg-gradient-to-r from-red-950/40 via-black to-red-950/40 border border-red-800/60 space-y-3 font-mono text-xs">
+        <div class="flex items-center justify-between pb-2 border-b border-red-950">
+          <div class="flex items-center gap-2">
+            <span class="text-red-400 font-bold">📝</span>
+            <strong class="text-white uppercase tracking-wider text-xs">Incident Response &amp; Administrator Triage</strong>
+          </div>
+          <span class="text-[10px] text-slate-400">Authenticated SOC Administrator Action</span>
+        </div>
+
+        <form id="inc-triage-form" onsubmit="window.submitIncidentTriage(event, ${incidentId})" class="space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="text-slate-400 text-[11px] block mb-1">Update Status:</label>
+              <select id="inc-triage-status" class="w-full px-3 py-1.5 rounded-lg bg-black border border-red-900/60 text-white text-xs focus:outline-none focus:border-red-500">
+                <option value="OPEN" ${dossier.status === 'OPEN' ? 'selected' : ''}>OPEN</option>
+                <option value="ACKNOWLEDGED" ${dossier.status === 'ACKNOWLEDGED' ? 'selected' : ''}>ACKNOWLEDGED</option>
+                <option value="INVESTIGATING" ${dossier.status === 'INVESTIGATING' ? 'selected' : ''}>INVESTIGATING</option>
+                <option value="RESOLVED" ${dossier.status === 'RESOLVED' ? 'selected' : ''}>RESOLVED</option>
+                <option value="REOPENED" ${dossier.status === 'REOPENED' ? 'selected' : ''}>REOPENED</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-slate-400 text-[11px] block mb-1">Assign Analyst:</label>
+              <input id="inc-triage-assigned" type="email" value="${escapeHtml(dossier.assigned_to || '')}" placeholder="analyst@cognisec.ai" class="w-full px-3 py-1.5 rounded-lg bg-black border border-red-900/60 text-white text-xs focus:outline-none focus:border-red-500">
+            </div>
+            <div>
+              <label class="text-slate-400 text-[11px] block mb-1">Resolution Reason (if resolving):</label>
+              <input id="inc-triage-reason" type="text" value="${escapeHtml(dossier.resolution_reason || '')}" placeholder="e.g. False positive confirmed via OTP" class="w-full px-3 py-1.5 rounded-lg bg-black border border-red-900/60 text-white text-xs focus:outline-none focus:border-red-500">
+            </div>
+          </div>
+          <div>
+            <label class="text-slate-400 text-[11px] block mb-1">Investigation Notes &amp; Findings:</label>
+            <textarea id="inc-triage-notes" rows="2" placeholder="Record technical forensic notes or rationale..." class="w-full px-3 py-1.5 rounded-lg bg-black border border-red-900/60 text-white text-xs focus:outline-none focus:border-red-500">${escapeHtml(dossier.notes || '')}</textarea>
+          </div>
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-[10px] text-slate-500">All lifecycle transitions are recorded in the security audit trail.</span>
+            <button type="submit" class="px-4 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.5)] transition-all">
+              Save Triage Update →
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+
+  } catch (e) {
+    if (body) body.innerHTML = `<div class="p-8 text-center text-red-400 font-mono text-xs">Failed to load incident dossier: ${e.message}</div>`;
+  }
+};
+
+window.submitIncidentTriage = async function(event, incidentId) {
+  if (event) event.preventDefault();
+  const statusEl = document.getElementById('inc-triage-status');
+  const assignedEl = document.getElementById('inc-triage-assigned');
+  const reasonEl = document.getElementById('inc-triage-reason');
+  const notesEl = document.getElementById('inc-triage-notes');
+
+  const status = statusEl ? statusEl.value : 'ACKNOWLEDGED';
+  const assignedTo = assignedEl ? assignedEl.value.trim() : null;
+  const reason = reasonEl ? reasonEl.value.trim() : null;
+  const notes = notesEl ? notesEl.value.trim() : null;
+
+  if (status === 'RESOLVED' && !reason) {
+    alert("Please provide a resolution reason when marking an incident as RESOLVED.");
+    return;
+  }
+
+  try {
+    await window.cognisec.triageSocAlert(incidentId, status, notes, assignedTo, reason);
+    showNotificationToast("Incident Triaged", `Incident #${incidentId} status transitioned to ${status}.`, "success");
+    await window.openIncidentInvestigation(incidentId);
+    await loadSocDashboardData();
+  } catch (e) {
+    alert(`Failed to save triage update: ${e.message}`);
+  }
+};
+
+window.triageQuickAlert = async function(alertId, newStatus) {
+  try {
+    await window.cognisec.triageSocAlert(alertId, newStatus, `Quick triage transition to ${newStatus}`);
+    showNotificationToast("Alert Updated", `Alert #${alertId} updated to ${newStatus}.`, "success");
+    await loadSocDashboardData();
+  } catch (e) {
+    alert(`Failed to update alert: ${e.message}`);
+  }
+};
+
+window.triageResolvePrompt = async function(alertId) {
+  const reason = prompt("Enter resolution reason for this incident (e.g., False positive, user verified, risk mitigated):");
+  if (!reason || !reason.trim()) return;
+  try {
+    await window.cognisec.triageSocAlert(alertId, 'RESOLVED', 'Resolved via SOC dashboard control', null, reason.trim());
+    showNotificationToast("Alert Resolved", `Alert #${alertId} marked as RESOLVED.`, "success");
+    await loadSocDashboardData();
+  } catch (e) {
+    alert(`Failed to resolve alert: ${e.message}`);
+  }
+};
+
+window.terminateSocSession = async function(sessionId) {
+  if (!confirm(`Are you sure you want to terminate session ${sessionId}? This will immediately invalidate the session token and record an administrative audit entry.`)) return;
+  try {
+    await window.cognisec.terminateSocSession(sessionId);
+    showNotificationToast("Session Terminated", `Session ${sessionId.substring(0, 12)}... terminated by SOC Administrator.`, "info");
+    await loadSocDashboardData();
+  } catch (e) {
+    alert(`Failed to terminate session: ${e.message}`);
+  }
+};
+
+window.revokeSocDevice = async function(deviceId) {
+  if (!confirm(`Revoke trust for device ${deviceId}? All active sessions on this device will be immediately revoked.`)) return;
+  try {
+    await window.cognisec.revokeSocDevice(deviceId);
+    showNotificationToast("Device Revoked", `Device ${deviceId} revoked by SOC Administrator.`, "warning");
+    await loadSocDashboardData();
+  } catch (e) {
+    alert(`Failed to revoke device: ${e.message}`);
+  }
+};
+
+window.confirmSocDevice = async function(deviceId) {
+  try {
+    await window.cognisec.updateDeviceTrust(deviceId, true);
+    showNotificationToast("Device Confirmed", `Device ${deviceId} confirmed as TRUSTED by SOC Administrator.`, "success");
+    await loadSocDashboardData();
+  } catch (e) {
+    alert(`Failed to confirm device: ${e.message}`);
+  }
+};
+
+window.inspectUserBehavior = async function(userId) {
+  if (!userId) return;
+  const container = document.getElementById('soc-behavior-display');
+  if (!container) return;
+
+  try {
+    const prof = await window.cognisec.fetchUserProfile(userId);
+    if (!prof) {
+      container.innerHTML = `<div class="p-6 text-center text-slate-500 font-mono text-xs">No behavioral profile found for user ID ${userId}.</div>`;
+      return;
+    }
+
+    const mlColor = prof.ml_status === 'ML_READY' ? 'text-emerald-400 border-emerald-800 bg-emerald-950' : 'text-amber-300 border-amber-800 bg-amber-950';
+    const means = prof.baseline_features?.means || {};
+    const stds = prof.baseline_features?.stds || {};
+
+    const featuresList = [
+      { key: "typing_speed_wpm", name: "Typing Speed", unit: "WPM" },
+      { key: "avg_flight_time_ms", name: "Keystroke Flight Time", unit: "ms" },
+      { key: "avg_dwell_time_ms", name: "Key Dwell Time", unit: "ms" },
+      { key: "mouse_velocity_avg", name: "Mouse Velocity", unit: "px/s" },
+      { key: "mouse_acceleration_avg", name: "Mouse Acceleration", unit: "px/s²" },
+      { key: "mouse_curvature_entropy", name: "Curvature Entropy", unit: "bits" },
+      { key: "click_frequency", name: "Click Frequency", unit: "clicks/s" },
+      { key: "scroll_speed_avg", name: "Scroll Speed", unit: "px/s" },
+      { key: "idle_duration_sec", name: "Idle Duration", unit: "s" },
+      { key: "navigation_entropy", name: "Navigation Entropy", unit: "bits" }
+    ];
+
+    container.innerHTML = `
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
+        <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-1">
+          <span class="text-slate-400 text-[10px]">Statistical Baseline</span>
+          <strong class="text-white block text-sm font-bold">${prof.baseline_status}</strong>
+          <span class="text-slate-500 text-[10px]">Confidence: ${Math.round(prof.maturity_confidence * 100)}%</span>
+        </div>
+        <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-1">
+          <span class="text-slate-400 text-[10px]">Trusted Telemetry Samples</span>
+          <strong class="text-white block text-sm font-bold">${prof.sample_count} Samples</strong>
+          <span class="text-slate-500 text-[10px]">Model Buffer: ${prof.model_sample_count || prof.sample_count}</span>
+        </div>
+        <div class="p-4 rounded-xl bg-black/80 border border-red-950 space-y-1">
+          <span class="text-slate-400 text-[10px]">Machine Learning Model</span>
+          <strong class="block text-sm font-bold ${mlColor}">${prof.ml_status}</strong>
+          <span class="text-slate-500 text-[10px]">${prof.ml_status === 'ML_READY' ? 'Isolation Forest Active (100 Trees)' : 'Heuristic Welford Calibration'}</span>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h5 class="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">Learned 10-Dimensional Vector Means &amp; Standard Deviations:</h5>
+          <span class="text-[10px] font-mono text-slate-500">${prof.sample_count > 0 ? 'Calibration Active' : 'Zero Baseline // Clean Cold-Start'}</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 font-mono text-[11px]">
+          ${featuresList.map(f => {
+            const hasData = prof.sample_count > 0 && means[f.key] !== undefined && means[f.key] !== null;
+            const meanVal = hasData ? Number(means[f.key]).toFixed(2) : null;
+            const stdVal = hasData && stds[f.key] !== undefined ? Number(stds[f.key]).toFixed(2) : null;
+            return `
+              <div class="p-3 rounded-xl bg-black/50 border border-red-950/60 space-y-1">
+                <span class="text-slate-400 block text-[10px] truncate" title="${f.name}">${f.name}</span>
+                <strong class="${hasData ? 'text-emerald-400' : 'text-slate-500'} block text-xs font-bold">
+                  ${hasData ? `${meanVal} ${f.unit}` : 'AWAITING DATA'}
+                </strong>
+                <span class="text-slate-500 text-[10px] block truncate">
+                  ${hasData && stdVal !== null ? `σ: ±${stdVal}` : 'No variance data'}
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+
+  } catch (e) {
+    container.innerHTML = `<div class="p-6 text-center text-red-400 font-mono text-xs">Error inspecting behavior: ${e.message}</div>`;
+  }
+};
+
 window.resolveSocAlert = async function(alertId, status) {
   if (window.cognisec) {
-    await window.cognisec.resolveAlert(alertId, status, `Alert marked as ${status} by SOC Analyst`);
+    await window.cognisec.resolveAlert(alertId, status, `Alert marked as ${status} by SOC Administrator`);
+    showNotificationToast("Alert Updated", `Alert #${alertId} updated to ${status}.`, "success");
     await loadSocDashboardData();
   }
 };
 
+window.filterSocEvents = async function(severity) {
+  const container = document.getElementById('soc-all-events-container');
+  if (!container || !window.cognisec) return;
+  try {
+    const events = await window.cognisec.fetchSocEvents(50, severity === 'ALL' ? null : severity);
+    const countEl = document.getElementById('soc-logs-events-count');
+    if (countEl) countEl.textContent = `${(events || []).length} Events Filtered (${severity})`;
+    window.renderSocEventsTable(events || []);
+  } catch (e) {
+    container.innerHTML = `<div class="p-6 text-center text-red-400 font-mono text-xs">Failed to filter events: ${e.message}</div>`;
+  }
+};
+
 window.switchDashboardTab = function(tabKey) {
-  ['overview', 'behavior', 'threatmap', 'logs'].forEach(k => {
+  const tabs = ['overview', 'users', 'devices', 'behavior', 'logs', 'audit', 'health'];
+  tabs.forEach(k => {
     const btn = document.getElementById(`dash-tab-${k}`);
     const content = document.getElementById(`dash-content-${k}`);
     if (btn) {
       if (k === tabKey) {
-        btn.className = 'px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)] cursor-pointer';
+        btn.className = 'px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)] cursor-pointer shrink-0';
       } else {
-        btn.className = 'px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer';
+        btn.className = 'px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-red-950/40 cursor-pointer shrink-0';
       }
     }
     if (content) {
@@ -862,10 +2043,106 @@ window.switchDashboardTab = function(tabKey) {
       else content.classList.add('hidden');
     }
   });
+
+  if (tabKey === 'audit') {
+    window.loadSocAuditLogs('ALL');
+  } else if (tabKey === 'health') {
+    window.loadSocAnalytics('24h');
+    window.loadSocSystemHealth();
+  }
 };
 
 window.triggerSocRescan = async function() {
-  await loadSocDashboardData();
+  const btn = document.getElementById('soc-rescan-btn');
+  const origText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.innerHTML = `<span>⚡ Analyzing...</span>`;
+    btn.disabled = true;
+  }
+
+  try {
+    const res = await window.cognisec.triggerSocRescan();
+    if (res) {
+      const sessEl = document.getElementById('rescan-eval-sessions');
+      const devEl = document.getElementById('rescan-eval-devices');
+      const alertEl = document.getElementById('rescan-eval-alerts');
+      const timeEl = document.getElementById('rescan-eval-time');
+      const findContainer = document.getElementById('rescan-findings-container');
+
+      if (sessEl) sessEl.textContent = res.evaluated_sessions || 0;
+      if (devEl) devEl.textContent = res.pending_devices || 0;
+      if (alertEl) alertEl.textContent = res.open_critical_alerts || 0;
+      if (timeEl) timeEl.textContent = new Date(res.executed_at).toLocaleString();
+
+      if (findContainer) {
+        if (res.findings && res.findings.length > 0) {
+          findContainer.innerHTML = res.findings.map(f => `
+            <div class="p-2.5 rounded-lg bg-black/60 border border-red-950/80 text-xs font-mono space-y-1">
+              <div class="flex items-center justify-between">
+                <span class="text-amber-400 font-bold">${escapeHtml(f.finding_type || 'FINDING')}</span>
+                <span class="text-[10px] text-slate-500">${escapeHtml(f.severity || 'INFO')}</span>
+              </div>
+              <p class="text-slate-300 text-[11px]">${escapeHtml(f.description)}</p>
+            </div>
+          `).join('');
+        } else {
+          findContainer.innerHTML = `<div class="p-3 rounded-xl bg-black/50 border border-slate-900 text-slate-400">All evaluated zero-trust sessions, device bindings, and behavioral profiles operating within parameters.</div>`;
+        }
+      }
+
+      openModal('soc-rescan-result');
+    }
+    await loadSocDashboardData();
+    showNotificationToast("AI Re-Scan Completed", "Evaluated active sessions, devices, and open threats.", "success");
+  } catch (e) {
+    alert(`AI Re-Scan failed: ${e.message}`);
+  } finally {
+    if (btn) {
+      btn.innerHTML = origText;
+      btn.disabled = false;
+    }
+  }
+};
+
+
+// Detect available device information using browser-supported APIs and derive an evidence-supported label
+window.getSuggestedDeviceLabel = function() {
+  const ua = navigator.userAgent || '';
+  const navPlatform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+  const isMobile = (navigator.userAgentData && navigator.userAgentData.mobile) ||
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+
+  // Evidence-supported browser detection
+  let browser = 'Browser';
+  if (/Edg\//i.test(ua)) browser = 'Edge';
+  else if (/Chrome\//i.test(ua) && !/Chromium|Edg\//i.test(ua)) browser = 'Chrome';
+  else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+  else if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) browser = 'Safari';
+  else if (/Opera|OPR\//i.test(ua)) browser = 'Opera';
+
+  // Evidence-supported OS/Platform detection
+  if (/iPad/i.test(ua) || (navPlatform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+    return `iPad · ${browser}`;
+  }
+  if (/iPhone/i.test(ua)) {
+    return `iPhone · ${browser}`;
+  }
+  if (/Android/i.test(ua)) {
+    return `Android · ${browser}`;
+  }
+  if (/Win/i.test(ua) || (/Win/i.test(navPlatform) && !/Macintosh/i.test(ua))) {
+    return `Windows · ${browser}`;
+  }
+  if (/Mac/i.test(navPlatform) || /Macintosh|Mac OS X/i.test(ua)) {
+    return `macOS · ${browser}`;
+  }
+  if (/CrOS/i.test(ua)) {
+    return `Chromebook · ${browser}`;
+  }
+  if (/Linux/i.test(navPlatform) || /Linux/i.test(ua)) {
+    return `Linux · ${browser}`;
+  }
+  return isMobile ? `Mobile · ${browser}` : `Desktop · ${browser}`;
 };
 
 // 2. LOGIN MODAL SCREEN SWITCHING & REAL FASTAPI SUBMISSION
@@ -956,6 +2233,13 @@ window.switchUserAuthTab = function(tab) {
 
     const emailInput = document.getElementById('login-user-email');
     if (emailInput) setTimeout(() => emailInput.focus(), 50);
+
+    const nicknameInput = document.getElementById('login-device-nickname');
+    if (nicknameInput && typeof window.getSuggestedDeviceLabel === 'function') {
+      const suggestedLabel = window.getSuggestedDeviceLabel();
+      nicknameInput.value = suggestedLabel;
+      nicknameInput.placeholder = `e.g. ${suggestedLabel}`;
+    }
   }
 };
 
@@ -1467,12 +2751,41 @@ window.submitLoginForm = async function(e, type) {
   try {
     let locData = null;
     const shareLocBox = document.getElementById('login-share-location');
-    if (shareLocBox && shareLocBox.checked) {
-      if (btn) btn.innerHTML = `<span>Requesting location permission...</span>`;
-      locData = await window.cognisec.requestDeviceLocation();
+    const locationEnabled = !shareLocBox || shareLocBox.checked;
+
+    if (locationEnabled && navigator.geolocation) {
+      if (btn) btn.innerHTML = `<span>Verifying device security & location...</span>`;
+
+      // Check current browser permission state if Permissions API is available
+      let permState = null;
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const permStatus = await navigator.permissions.query({ name: 'geolocation' });
+          permState = permStatus ? permStatus.state : null;
+        } catch (e) {
+          permState = null;
+        }
+      }
+
+      // If browser already permanently denied permission, don't stall; skip to fallback
+      if (permState !== 'denied') {
+        try {
+          // If permission is already granted, this retrieves position immediately without prompting.
+          // If undecided ('prompt'), this allows native browser permission dialog to appear.
+          // Timeout is capped (3500ms) to ensure login never waits indefinitely.
+          locData = await window.cognisec.requestDeviceLocation(3500);
+          if (!locData || locData.latitude == null) {
+            locData = null; // Ensure no fabricated coordinates
+          }
+        } catch (locErr) {
+          locData = null; // Continue with existing fallback on error/timeout
+        }
+      }
     }
+
     const nicknameInput = document.getElementById('login-device-nickname');
-    const nickname = (nicknameInput && nicknameInput.value.trim()) ? nicknameInput.value.trim() : null;
+    const rawNickname = nicknameInput ? nicknameInput.value.trim() : '';
+    const nickname = rawNickname || (typeof window.getSuggestedDeviceLabel === 'function' ? window.getSuggestedDeviceLabel() : null);
 
     if (btn) btn.innerHTML = `<span>Authenticating with FastAPI Backend...</span>`;
     const result = await window.cognisec.login(email, password, 'platform', null, locData, nickname);
@@ -1856,6 +3169,12 @@ window.addEventListener('cognisec:session_locked', () => {
 });
 document.addEventListener('DOMContentLoaded', () => {
   syncAuthStateUI();
+  const nicknameInput = document.getElementById('login-device-nickname');
+  if (nicknameInput && typeof window.getSuggestedDeviceLabel === 'function') {
+    const suggestedLabel = window.getSuggestedDeviceLabel();
+    nicknameInput.value = suggestedLabel;
+    nicknameInput.placeholder = `e.g. ${suggestedLabel}`;
+  }
 });
 setTimeout(() => {
   syncAuthStateUI();
@@ -1863,83 +3182,531 @@ setTimeout(() => {
 
 // 3. GENUINE BEHAVIORAL CALIBRATION & TELEMETRY STREAM
 let consoleStartTime = Date.now();
+let liveTelemetryMonitoringInterval = null;
+let isDemoTelemetryMode = false;
 
-window.handleConsoleTyping = function(e) {
-  const targetPrompt = "The zero trust security architecture verifies every continuous behavioral signal without storing private keystrokes.";
-  const val = e.target.value;
-  const chars = val.length;
-
-  // 1. Progress calculation against neutral calibration sentence
-  const progText = document.getElementById('calibration-progress-text');
-  if (progText) {
-    progText.textContent = `${chars} / ${targetPrompt.length} chars`;
-    if (chars >= targetPrompt.length) {
-      progText.className = 'text-emerald-400 font-bold';
+window.toggleDemoTelemetryMode = function() {
+  isDemoTelemetryMode = !isDemoTelemetryMode;
+  const pill = document.getElementById('bt-demo-mode-pill');
+  const btn = document.getElementById('bt-toggle-demo-btn');
+  if (pill) {
+    if (isDemoTelemetryMode) {
+      pill.classList.remove('hidden');
     } else {
-      progText.className = 'text-amber-400 font-bold';
+      pill.classList.add('hidden');
     }
   }
-
-  // 2. Extract genuine browser-measured physical timing dynamics
-  // (Zero storage of input text, raw characters or typed content)
-  if (window.cognisec) {
-    const snap = window.cognisec.computeTelemetrySnapshot();
-    const flightEl = document.getElementById('measured-flight-time');
-    const dwellEl = document.getElementById('measured-dwell-time');
-    const wpmEl = document.getElementById('wpm-count');
-
-    if (flightEl) {
-      flightEl.textContent = snap.avgFlight > 0 ? `${Math.round(snap.avgFlight)} ms` : '-- ms';
-    }
-    if (dwellEl) {
-      dwellEl.textContent = snap.avgDwell > 0 ? `${Math.round(snap.avgDwell)} ms` : '-- ms';
-    }
-    if (wpmEl) {
-      wpmEl.textContent = snap.wpm > 0 ? `${snap.wpm} WPM` : '-- WPM';
-    }
+  if (btn) {
+    btn.innerHTML = isDemoTelemetryMode
+      ? '<span>🧪 Exit Demo Mode</span>'
+      : '<span>🧪 Demo Mode</span>';
+    btn.className = isDemoTelemetryMode
+      ? 'px-2.5 py-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-900 border border-amber-600 text-amber-300 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
+      : 'px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-600 text-slate-300 hover:text-amber-300 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1';
   }
 
-  // 3. Dispatch genuine telemetry burst to FastAPI on 15-character cadence
-  if (chars % 15 === 0 && chars > 0) {
-    if (window.cognisec && window.cognisec.sessionToken) {
-      window.cognisec.sendBehaviorTelemetry().then(res => {
-        if (res && res.success && res.data) {
-          const d = res.data;
-          const riskDisplay = (d.risk_score !== undefined && d.risk_score !== null) ? d.risk_score.toFixed(3) : 'Protected';
-          addConsoleLog(`Behavioral Telemetry Transmitted (FastAPI POST /api/behavior/events | Decision: ${d.decision} | Risk: ${riskDisplay})`);
-          if (typeof refreshMaturityProgress === 'function') {
-            refreshMaturityProgress();
-          }
-        } else if (res && !res.success) {
-          addConsoleLog(`Telemetry Dispatch Notice: ${res.error}`);
+  if (typeof addConsoleLog === 'function') {
+    addConsoleLog(isDemoTelemetryMode 
+      ? 'DEMO MODE ACTIVATED: Demonstration session enabled. Demonstrates capture without altering genuine baseline.'
+      : 'DEMO MODE DEACTIVATED: Live user telemetry monitoring resumed.');
+  }
+
+  window.updateLiveBehavioralIndicators();
+};
+
+window.startLiveTelemetryMonitoring = function() {
+  if (liveTelemetryMonitoringInterval) clearInterval(liveTelemetryMonitoringInterval);
+  window.updateLiveBehavioralIndicators();
+  liveTelemetryMonitoringInterval = setInterval(() => {
+    window.updateLiveBehavioralIndicators();
+  }, 1000);
+};
+
+window.stopLiveTelemetryMonitoring = function() {
+  if (liveTelemetryMonitoringInterval) {
+    clearInterval(liveTelemetryMonitoringInterval);
+    liveTelemetryMonitoringInterval = null;
+  }
+};
+
+let cachedLatestStoredLog = null;
+let cachedBaselineProfile = null;
+
+window.updateBehavioralFactorCoverage = function() {
+  const panel = document.getElementById('section-factor-coverage');
+  if (!panel) return;
+
+  const liveMetrics = (window.cognisec && typeof window.cognisec.getLiveTelemetryMetrics === 'function')
+    ? window.cognisec.getLiveTelemetryMetrics()
+    : null;
+
+  const latestLog = cachedLatestStoredLog;
+  const profile = cachedBaselineProfile;
+
+  const means = (profile && profile.baseline_features && profile.baseline_features.means) || {};
+  const stds = (profile && profile.baseline_features && profile.baseline_features.stds) || {};
+  const sampleCount = (profile && profile.sample_count) || 0;
+
+  const factors = [
+    // Typing Dynamics
+    { key: 'typing_speed_wpm', unit: 'WPM', decimals: 1, minLive: 1.0 },
+    { key: 'avg_flight_time_ms', unit: 'ms', decimals: 1, minLive: 1.0 },
+    { key: 'avg_dwell_time_ms', unit: 'ms', decimals: 1, minLive: 1.0 },
+
+    // Mouse Dynamics
+    { key: 'mouse_velocity_avg', unit: 'px/s', decimals: 1, minLive: 1.0 },
+    { key: 'mouse_acceleration_avg', unit: 'px/s²', decimals: 1, minLive: 1.0 },
+    { key: 'mouse_curvature_entropy', unit: '', decimals: 2, minLive: 0.01 },
+    { key: 'click_frequency', unit: 'clicks/s', decimals: 2, minLive: 0.01 },
+
+    // Activity Dynamics
+    { key: 'scroll_speed_avg', unit: 'px/s', decimals: 1, minLive: 1.0 },
+    { key: 'idle_duration_sec', unit: 's', decimals: 1, minLive: 0.1 },
+
+    // Navigation Dynamics
+    { key: 'navigation_entropy', unit: '', decimals: 2, minLive: 0.01 }
+  ];
+
+  let activeCount = 0;
+
+  factors.forEach(feat => {
+    const statusEl = document.getElementById(`coverage-status-${feat.key}`);
+    const valEl = document.getElementById(`coverage-val-${feat.key}`);
+    const baseEl = document.getElementById(`coverage-base-${feat.key}`);
+
+    // Check Live Active Status
+    let isLive = false;
+    let liveVal = null;
+    if (liveMetrics && liveMetrics[feat.key] !== undefined && liveMetrics[feat.key] !== null) {
+      const v = Number(liveMetrics[feat.key]);
+      if (feat.key === 'idle_duration_sec') {
+        if (window.cognisec && window.cognisec.hasRealInteraction && window.cognisec.lastInteractionTime) {
+          isLive = true;
+          liveVal = v;
         }
-      }).catch(err => {
-        addConsoleLog(`Telemetry Network Error: ${err.message}`);
-      });
+      } else if (v >= feat.minLive) {
+        isLive = true;
+        liveVal = v;
+      }
+    }
+
+    // Check Stored Status (Backend persistence confirmed)
+    let isStored = false;
+    let storedVal = null;
+    if (latestLog && latestLog[feat.key] !== undefined && latestLog[feat.key] !== null) {
+      const sv = Number(latestLog[feat.key]);
+      if (feat.key === 'idle_duration_sec') {
+        if (latestLog.timestamp) {
+          isStored = true;
+          storedVal = sv;
+        }
+      } else if (sv >= feat.minLive) {
+        isStored = true;
+        storedVal = sv;
+      }
+    }
+
+    // Determine status & latest measured value
+    let statusText = 'AWAITING DATA';
+    let statusClass = 'text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-500 border border-slate-800 font-bold shrink-0';
+    let displayedVal = '--';
+    let valClass = 'font-extrabold text-slate-500 font-mono';
+
+    if (isLive) {
+      statusText = '● LIVE';
+      statusClass = 'text-[9px] px-1.5 py-0.2 rounded bg-emerald-950/90 text-emerald-400 border border-emerald-800 font-bold shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.25)]';
+      displayedVal = `${liveVal.toFixed(feat.decimals)}${feat.unit ? ' ' + feat.unit : ''}`;
+      valClass = 'font-extrabold text-white font-mono';
+      activeCount++;
+    } else if (isStored) {
+      statusText = 'STORED';
+      statusClass = 'text-[9px] px-1.5 py-0.2 rounded bg-cyan-950/90 text-cyan-300 border border-cyan-800 font-bold shrink-0';
+      displayedVal = `${storedVal.toFixed(feat.decimals)}${feat.unit ? ' ' + feat.unit : ''}`;
+      valClass = 'font-extrabold text-slate-200 font-mono';
+      activeCount++;
+    }
+
+    if (statusEl) {
+      statusEl.textContent = statusText;
+      statusEl.className = statusClass;
+    }
+
+    if (valEl) {
+      valEl.textContent = displayedVal;
+      valEl.className = valClass;
+    }
+
+    // Baseline Mean and Standard Deviation
+    if (baseEl) {
+      if (sampleCount > 0 && means[feat.key] !== undefined) {
+        const m = Number(means[feat.key]).toFixed(feat.decimals);
+        const s = stds[feat.key] !== undefined ? Number(stds[feat.key]).toFixed(feat.decimals) : '1.0';
+        baseEl.textContent = `${m} ± ${s}${feat.unit ? ' ' + feat.unit : ''}`;
+        baseEl.className = 'font-mono text-slate-300';
+      } else {
+        baseEl.textContent = '--';
+        baseEl.className = 'font-mono text-slate-500';
+      }
+    }
+  });
+
+  // Overall Coverage Count Badge
+  const countBadge = document.getElementById('factor-coverage-count-badge');
+  if (countBadge) {
+    countBadge.textContent = `${activeCount} / 10 Active`;
+    if (activeCount === 10) {
+      countBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800';
+    } else if (activeCount > 0) {
+      countBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800';
+    } else {
+      countBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-slate-400 border border-slate-800';
     }
   }
 };
 
-function addConsoleLog(text) {
-  const logContainer = document.getElementById('console-event-log');
-  if (!logContainer) return;
-  const timeStr = new Date().toLocaleTimeString();
-  const div = document.createElement('div');
-  div.className = 'p-2 rounded bg-black/60 border border-red-950 text-emerald-300 font-mono text-[11px]';
-  div.textContent = `> ${timeStr} - ${text}`;
-  logContainer.prepend(div);
+window.updateLiveBehavioralIndicators = function() {
+  if (!window.cognisec) return;
+  const metrics = window.cognisec.getLiveTelemetryMetrics ? window.cognisec.getLiveTelemetryMetrics() : null;
+  if (!metrics) return;
+
+  function updateMetricDisplay(metricKey, liveVal, unit, isLiveActive) {
+    const liveEl = document.getElementById(`metric-${metricKey}-live`);
+    const pillEl = document.getElementById(`pill-${metricKey}`);
+
+    if (liveEl) {
+      if (isLiveActive) {
+        liveEl.textContent = typeof liveVal === 'number' ? liveVal.toFixed(1) : liveVal;
+        liveEl.className = 'text-base font-extrabold text-white';
+      } else {
+        liveEl.textContent = '--';
+        liveEl.className = 'text-base font-extrabold text-slate-500';
+      }
+    }
+
+    if (pillEl) {
+      if (isLiveActive) {
+        pillEl.textContent = '● LIVE';
+        pillEl.className = 'text-[9px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold';
+      } else {
+        pillEl.textContent = 'AWAITING';
+        pillEl.className = 'text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-400 border border-slate-800';
+      }
+    }
+  }
+
+  updateMetricDisplay('typing-wpm', metrics.typing_speed_wpm, 'WPM', metrics.typing_speed_wpm > 0);
+  updateMetricDisplay('flight-time', metrics.avg_flight_time_ms, 'ms', metrics.avg_flight_time_ms > 0);
+  updateMetricDisplay('dwell-time', metrics.avg_dwell_time_ms, 'ms', metrics.avg_dwell_time_ms > 0);
+  updateMetricDisplay('mouse-vel', metrics.mouse_velocity_avg, 'px/s', metrics.mouse_velocity_avg > 0);
+  updateMetricDisplay('mouse-acc', metrics.mouse_acceleration_avg, 'px/s²', metrics.mouse_acceleration_avg > 0);
+  updateMetricDisplay('mouse-curv', metrics.mouse_curvature_entropy, 'entropy', metrics.mouse_curvature_entropy > 0);
+  updateMetricDisplay('click-freq', metrics.click_frequency, 'clicks/s', metrics.click_frequency > 0);
+  updateMetricDisplay('scroll-speed', metrics.scroll_speed_avg, 'px/s', metrics.scroll_speed_avg > 0);
+
+  // Idle duration is continuously monitored if real interaction occurred
+  const idleEl = document.getElementById('metric-idle-dur-live');
+  const idlePill = document.getElementById('pill-idle-dur');
+  const hasInteracted = window.cognisec && window.cognisec.hasRealInteraction;
+  if (idleEl) {
+    idleEl.textContent = hasInteracted && metrics.idle_duration_sec !== undefined ? metrics.idle_duration_sec.toFixed(1) : '--';
+    idleEl.className = hasInteracted ? 'text-base font-extrabold text-white' : 'text-base font-extrabold text-slate-500';
+  }
+  if (idlePill) {
+    if (hasInteracted) {
+      idlePill.textContent = '● LIVE';
+      idlePill.className = 'text-[9px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold';
+    } else {
+      idlePill.textContent = 'AWAITING';
+      idlePill.className = 'text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-400 border border-slate-800';
+    }
+  }
+
+  updateMetricDisplay('nav-entropy', metrics.navigation_entropy, 'entropy', metrics.navigation_entropy > 0);
+
+  // Update real collector stream status pill
+  const collectorPill = document.getElementById('bt-collector-status-pill');
+  if (collectorPill) {
+    const isStreamActive = window.cognisec && window.cognisec.isAuthenticated() && !!window.cognisec.telemetryInterval;
+    if (isStreamActive) {
+      collectorPill.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Live Monitoring Active';
+      collectorPill.className = 'px-2.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/70 text-[11px] font-medium flex items-center gap-1.5';
+    } else {
+      collectorPill.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>Monitoring Inactive';
+      collectorPill.className = 'px-2.5 py-0.5 rounded-full bg-slate-900 text-slate-400 border border-slate-700 text-[11px] font-medium flex items-center gap-1.5';
+    }
+  }
+
+  if (typeof window.updateBehavioralFactorCoverage === 'function') {
+    window.updateBehavioralFactorCoverage();
+  }
+};
+
+window.addEventListener('cognisec:telemetry_dispatched', () => {
+  const modal = document.getElementById('modal-liveDemo');
+  if (modal && !modal.classList.contains('hidden')) {
+    if (typeof refreshBehavioralDashboard === 'function') {
+      refreshBehavioralDashboard();
+    }
+  }
+});
+
+function formatDecisionLabel(decision) {
+  if (!decision || decision === 'AWAITING DATA') return 'Awaiting Data';
+  if (decision === 'STEP_UP_VERIFICATION' || decision === 'STEP_UP_REQUIRED') return 'Additional verification required';
+  if (decision === 'ALLOW') return 'Access Granted';
+  if (decision === 'RESTRICT') return 'Access Restricted';
+  if (decision === 'TERMINATE_SESSION' || decision === 'TERMINATE') return 'Session Terminated';
+  if (decision === 'OBSERVATION_PENDING') return 'Observation Pending';
+  if (decision === 'EVALUATED') return 'Recorded & Evaluated';
+  return decision;
 }
 
-window.refreshMaturityProgress = async function() {
-  if (!window.cognisec || !window.cognisec.sessionToken) return;
+window.refreshBehavioralDashboard = async function() {
+  if (!window.cognisec || !window.cognisec.isAuthenticated()) return;
+
+  // 1. Safe Masked Session Identifier
+  const rawSessionId = window.cognisec.sessionId || localStorage.getItem('cognisec_session_id') || 'sess_default';
+  const maskedSessionId = (rawSessionId && rawSessionId.length > 12)
+    ? `${rawSessionId.substring(0, 8)}••••${rawSessionId.substring(rawSessionId.length - 4)}`
+    : (rawSessionId || 'sess_unknown');
+
+  const sessEl = document.getElementById('bt-session-id');
+  if (sessEl) {
+    sessEl.textContent = maskedSessionId;
+    sessEl.title = `Active Session: ${rawSessionId}`;
+  }
+
+  // 2. Fetch User Behavioral Profile
   try {
-    const res = await window.cognisec.getBehaviorProfile();
-    if (res && res.success && res.data) {
-      const p = res.data;
+    const profileRes = await window.cognisec.getBehaviorProfile();
+    if (profileRes && profileRes.success && profileRes.data) {
+      const p = profileRes.data;
+      cachedBaselineProfile = p;
       const sampleCount = p.sample_count || 0;
       const modelSamples = p.model_sample_count !== undefined ? p.model_sample_count : sampleCount;
+      const totalObs = p.total_observations !== undefined ? p.total_observations : sampleCount;
+      const lastObsTs = p.last_observation_timestamp
+        ? new Date(p.last_observation_timestamp).toLocaleTimeString()
+        : (p.last_updated ? new Date(p.last_updated).toLocaleTimeString() : 'Awaiting collection');
+      const lastUpdateTs = p.last_updated ? new Date(p.last_updated).toLocaleTimeString() : 'Initial start';
 
-      // 1. Statistical Baseline (Welford 5 samples)
+      // Profile Status
+      const statusEl = document.getElementById('bt-profile-status');
+      if (statusEl) {
+        if (sampleCount === 0 || p.enrollment_status === 'NOT_ENROLLED') {
+          statusEl.textContent = 'Setup Required';
+          statusEl.className = 'text-amber-400 font-semibold block truncate text-xs mt-1';
+        } else if (sampleCount < 5 || p.enrollment_status === 'ENROLLMENT_IN_PROGRESS') {
+          statusEl.textContent = `In Progress (${sampleCount} of 5)`;
+          statusEl.className = 'text-amber-300 font-semibold block truncate text-xs mt-1';
+        } else {
+          statusEl.textContent = 'Profile Ready (Baseline)';
+          statusEl.className = 'text-emerald-400 font-semibold block truncate text-xs mt-1';
+        }
+      }
+
+      // Total Observations
+      const totalObsEl = document.getElementById('bt-total-obs');
+      if (totalObsEl) {
+        totalObsEl.textContent = `${totalObs} event${totalObs === 1 ? '' : 's'}`;
+      }
+
+      // Last Observation Timestamp
+      const lastObsEl = document.getElementById('bt-last-obs-time');
+      if (lastObsEl) {
+        lastObsEl.textContent = lastObsTs;
+      }
+
+      // Normal Behavior Profile Sample Count
+      const baselineSamplesEl = document.getElementById('bt-baseline-samples');
+      if (baselineSamplesEl) {
+        baselineSamplesEl.textContent = sampleCount === 0
+          ? '0 / 5 (Not Started)'
+          : `${sampleCount} / 5 (${sampleCount >= 5 ? 'Established' : 'Learning'})`;
+      }
+
+      // Last Baseline Update
+      const lastUpdateEl = document.getElementById('bt-baseline-updated');
+      if (lastUpdateEl) {
+        lastUpdateEl.textContent = lastUpdateTs;
+      }
+
+      // Authoritative HUD Elements
+      const hasObs = Boolean(p.total_observations && p.total_observations > 0);
+      const anomEl = document.getElementById('bt-hud-anomaly-score');
+      if (anomEl) {
+        anomEl.textContent = (hasObs && p.anomaly_score !== undefined && p.anomaly_score !== null) ? Number(p.anomaly_score).toFixed(3) : '--';
+        anomEl.className = hasObs ? 'text-base font-extrabold text-amber-300 font-mono' : 'text-base font-extrabold text-slate-500 font-mono';
+      }
+      const driftEl = document.getElementById('bt-hud-drift-status');
+      if (driftEl) {
+        if (!hasObs) {
+          driftEl.textContent = 'AWAITING DATA';
+          driftEl.className = 'text-[10px] font-semibold text-slate-400';
+        } else if (p.is_anomaly) {
+          driftEl.textContent = '⚠️ DRIFT DETECTED';
+          driftEl.className = 'text-[10px] font-bold text-red-400';
+        } else {
+          driftEl.textContent = 'NORMAL';
+          driftEl.className = 'text-[10px] font-semibold text-emerald-400';
+        }
+      }
+      const riskEl = document.getElementById('bt-hud-risk-score');
+      if (riskEl) {
+        riskEl.textContent = (hasObs && p.latest_risk_score !== undefined && p.latest_risk_score !== null) ? Number(p.latest_risk_score).toFixed(3) : '--';
+        riskEl.className = hasObs ? 'text-base font-extrabold text-emerald-400 font-mono' : 'text-base font-extrabold text-slate-500 font-mono';
+      }
+      const catEl = document.getElementById('bt-hud-risk-category');
+      if (catEl) {
+        if (!hasObs || !p.latest_risk_level) {
+          catEl.textContent = 'AWAITING DATA';
+          catEl.className = 'px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-900 text-slate-400 border border-slate-700';
+        } else {
+          const cat = p.latest_risk_level;
+          catEl.textContent = cat;
+          catEl.className = cat === 'LOW'
+            ? 'px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800'
+            : cat === 'MEDIUM'
+            ? 'px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-950 text-amber-300 border border-amber-800'
+            : 'px-1.5 py-0.2 rounded text-[10px] font-semibold bg-red-950 text-red-300 border border-red-800';
+        }
+      }
+      const decEl = document.getElementById('bt-hud-decision');
+      if (decEl) {
+        if (!hasObs || !p.latest_decision) {
+          decEl.textContent = 'Awaiting Data';
+          decEl.className = 'px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-700 text-xs font-semibold inline-block';
+        } else {
+          const dec = p.latest_decision;
+          decEl.textContent = formatDecisionLabel(dec);
+          decEl.className = dec === 'ALLOW'
+            ? 'px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs font-semibold inline-block'
+            : 'px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-xs font-semibold inline-block';
+        }
+      }
+      const trainGuardEl = document.getElementById('bt-hud-training-eligibility');
+      if (trainGuardEl) {
+        if (!hasObs) {
+          trainGuardEl.textContent = 'Awaiting Data';
+          trainGuardEl.className = 'text-xs font-semibold text-slate-400';
+        } else {
+          const isEligible = (p.latest_decision === 'ALLOW' && (p.latest_risk_score || 0) < 0.30);
+          trainGuardEl.textContent = isEligible ? 'Active (Protected)' : 'Paused (Review Required)';
+          trainGuardEl.className = isEligible ? 'text-xs font-semibold text-emerald-400' : 'text-xs font-semibold text-amber-300';
+        }
+      }
+
+      // Self-Explaining Risk Guidance Banner
+      const riskSummaryEl = document.getElementById('bt-risk-status-summary');
+      const riskDetailEl = document.getElementById('bt-risk-status-detail');
+      const riskActionEl = document.getElementById('bt-risk-action-required');
+      const riskIconEl = document.getElementById('bt-risk-status-icon');
+
+      if (riskSummaryEl && riskDetailEl && riskActionEl) {
+        if (!hasObs) {
+          if (riskIconEl) riskIconEl.textContent = 'ℹ️';
+          riskSummaryEl.textContent = 'Awaiting behavioral activity';
+          riskSummaryEl.className = 'font-bold text-slate-300';
+          riskDetailEl.textContent = 'No behavioral telemetry has been recorded yet. Set up your behavior profile below or continue using the portal normally.';
+          riskActionEl.textContent = 'Set up your behavior profile below to establish normal baseline';
+          riskActionEl.className = 'font-semibold text-amber-300';
+        } else {
+          const dec = p.latest_decision || 'ALLOW';
+          const isAnomaly = Boolean(p.is_anomaly);
+
+          if (dec === 'STEP_UP_VERIFICATION' || dec === 'STEP_UP_REQUIRED') {
+            if (riskIconEl) riskIconEl.textContent = '⚠️';
+            riskSummaryEl.textContent = 'Additional verification required';
+            riskSummaryEl.className = 'font-bold text-amber-400';
+            const reasonStr = p.step_up_reason || p.user_message || (isAnomaly ? 'Unusual typing patterns and interaction kinematics detected that deviate from your normal baseline.' : 'Current security risk level requires secondary verification.');
+            riskDetailEl.textContent = reasonStr;
+            riskActionEl.textContent = 'Action Required: Complete additional verification challenge to verify your identity';
+            riskActionEl.className = 'font-semibold text-amber-300';
+          } else if (dec === 'RESTRICT') {
+            if (riskIconEl) riskIconEl.textContent = '🚫';
+            riskSummaryEl.textContent = 'Access restricted';
+            riskSummaryEl.className = 'font-bold text-red-400';
+            riskDetailEl.textContent = p.user_message || 'Behavioral telemetry indicates significant deviation from normal patterns. Sensitive operations are locked.';
+            riskActionEl.textContent = 'Action Required: Re-verify identity or contact your administrator';
+            riskActionEl.className = 'font-semibold text-red-400';
+          } else if (dec === 'TERMINATE_SESSION' || dec === 'TERMINATE') {
+            if (riskIconEl) riskIconEl.textContent = '🛑';
+            riskSummaryEl.textContent = 'Session terminated';
+            riskSummaryEl.className = 'font-bold text-red-400';
+            riskDetailEl.textContent = p.user_message || 'Critical behavioral deviation detected. Session terminated to safeguard account integrity.';
+            riskActionEl.textContent = 'Action Required: Log in again with primary credentials';
+            riskActionEl.className = 'font-semibold text-red-400';
+          } else {
+            if (riskIconEl) riskIconEl.textContent = '✓';
+            riskSummaryEl.textContent = 'Normal activity — access secure';
+            riskSummaryEl.className = 'font-bold text-emerald-400';
+            riskDetailEl.textContent = isAnomaly
+              ? 'Minor variance detected, but overall risk score remains within acceptable normal thresholds.'
+              : 'Interaction patterns match your established behavior profile. Risk score is within normal parameters.';
+            riskActionEl.textContent = 'None — your session is active and protected';
+            riskActionEl.className = 'font-semibold text-emerald-400';
+          }
+        }
+      }
+
+      // Baseline Stored Features (Means & Stds)
+      const means = (p.baseline_features && p.baseline_features.means) || {};
+      const stds = (p.baseline_features && p.baseline_features.stds) || {};
+
+      function renderBaseVal(elementId, featureKey, unit) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        if (sampleCount > 0 && means[featureKey] !== undefined) {
+          const mVal = Number(means[featureKey]).toFixed(1);
+          const sVal = stds[featureKey] !== undefined ? Number(stds[featureKey]).toFixed(1) : '1.0';
+          el.textContent = `${mVal} ± ${sVal} ${unit}`;
+          el.className = 'text-slate-300 font-semibold';
+        } else {
+          el.textContent = 'Awaiting baseline';
+          el.className = 'text-slate-500 italic';
+        }
+      }
+
+      renderBaseVal('metric-typing-wpm-base', 'typing_speed_wpm', 'WPM');
+      renderBaseVal('metric-flight-time-base', 'avg_flight_time_ms', 'ms');
+      renderBaseVal('metric-dwell-time-base', 'avg_dwell_time_ms', 'ms');
+      renderBaseVal('metric-mouse-vel-base', 'mouse_velocity_avg', 'px/s');
+      renderBaseVal('metric-mouse-acc-base', 'mouse_acceleration_avg', 'px/s²');
+      renderBaseVal('metric-mouse-curv-base', 'mouse_curvature_entropy', '');
+      renderBaseVal('metric-click-freq-base', 'click_frequency', 'c/s');
+      renderBaseVal('metric-scroll-speed-base', 'scroll_speed_avg', 'px/s');
+      renderBaseVal('metric-idle-dur-base', 'idle_duration_sec', 's');
+      renderBaseVal('metric-nav-entropy-base', 'navigation_entropy', '');
+
+      // Calibration Studio Samples Progress & Readiness
+      const calibCount = document.getElementById('calibration-samples-count');
+      const calibBar = document.getElementById('calibration-samples-bar');
+      const calibReadiness = document.getElementById('calibration-profile-readiness');
+
+      if (calibCount) {
+        calibCount.textContent = `${Math.min(5, sampleCount)} of 5 required`;
+      }
+      if (calibBar) {
+        const pct = Math.min(100, Math.round((sampleCount / 5) * 100));
+        calibBar.style.width = `${pct}%`;
+        calibBar.className = pct >= 100
+          ? 'bg-emerald-500 h-2 rounded-full transition-all duration-300'
+          : 'bg-amber-500 h-2 rounded-full transition-all duration-300';
+      }
+      if (calibReadiness) {
+        if (sampleCount === 0) {
+          calibReadiness.textContent = 'Profile Setup Required';
+          calibReadiness.className = 'text-[11px] font-semibold text-amber-400';
+        } else if (sampleCount < 5) {
+          calibReadiness.textContent = `Profile Setup in Progress (${5 - sampleCount} more sample${5 - sampleCount === 1 ? '' : 's'} needed)`;
+          calibReadiness.className = 'text-[11px] font-semibold text-amber-300';
+        } else {
+          calibReadiness.textContent = '✓ Behavior Profile Ready';
+          calibReadiness.className = 'text-[11px] font-semibold text-emerald-400';
+        }
+      }
+
+      // Progress Bars (Expandable section)
       const welfordCount = document.getElementById('maturity-welford-count');
       const welfordBar = document.getElementById('maturity-welford-bar');
       if (welfordCount) {
@@ -1953,7 +3720,6 @@ window.refreshMaturityProgress = async function() {
           : 'bg-amber-500 h-1.5 rounded-full transition-all duration-300';
       }
 
-      // 2. Isolation Forest Model Readiness (25 samples)
       const ifCount = document.getElementById('maturity-if-count');
       const ifBar = document.getElementById('maturity-if-bar');
       if (ifCount) {
@@ -1967,80 +3733,236 @@ window.refreshMaturityProgress = async function() {
           : 'bg-emerald-600/60 h-1.5 rounded-full transition-all duration-300';
       }
 
-      // 3. Calibration Status Badge
       const badge = document.getElementById('calibration-maturity-badge');
       if (badge) {
         if (sampleCount === 0) {
-          badge.textContent = 'Calibration not started';
-          badge.className = 'px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 border border-slate-700 text-[11px] font-mono font-bold self-start sm:self-auto';
+          badge.textContent = 'Profile Setup Required';
+          badge.className = 'px-2.5 py-1 rounded-lg bg-amber-950/80 text-amber-300 border border-amber-800 text-xs font-semibold self-start sm:self-auto';
         } else if (sampleCount < 5) {
-          badge.textContent = `Collecting observations (${sampleCount}/5)`;
-          badge.className = 'px-2.5 py-1 rounded-lg bg-amber-950 text-amber-300 border border-amber-800 text-[11px] font-mono font-bold self-start sm:self-auto';
+          badge.textContent = `Profile in Progress (${sampleCount} of 5 samples)`;
+          badge.className = 'px-2.5 py-1 rounded-lg bg-amber-950/80 text-amber-300 border border-amber-800 text-xs font-semibold self-start sm:self-auto';
         } else if (modelSamples < 25) {
-          badge.textContent = 'Statistical baseline established (IF pending)';
-          badge.className = 'px-2.5 py-1 rounded-lg bg-blue-950 text-blue-300 border border-blue-800 text-[11px] font-mono font-bold self-start sm:self-auto';
+          badge.textContent = '✓ Behavior Profile Ready';
+          badge.className = 'px-2.5 py-1 rounded-lg bg-emerald-950/80 text-emerald-300 border border-emerald-700 text-xs font-semibold self-start sm:self-auto';
         } else {
-          badge.textContent = '✓ Isolation Forest trained & ready';
-          badge.className = 'px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-600 text-[11px] font-mono font-bold self-start sm:self-auto';
+          badge.textContent = '✓ Behavior Profile Ready (Model Trained)';
+          badge.className = 'px-2.5 py-1 rounded-lg bg-emerald-950/80 text-emerald-300 border border-emerald-600 text-xs font-semibold self-start sm:self-auto';
         }
       }
     }
   } catch (err) {
-    console.warn('[COGNISEC-AI] Failed to refresh maturity progress:', err);
+    console.warn('[COGNISEC-AI] Failed to fetch profile:', err);
+  }
+
+  // 3. Fetch Recent Behavior Logs for Timeline
+  try {
+    const logsRes = await window.cognisec.getBehaviorLogs(20);
+    const tbody = document.getElementById('bt-timeline-tbody');
+    const countBadge = document.getElementById('bt-timeline-count-badge');
+
+    if (logsRes && logsRes.success && Array.isArray(logsRes.data)) {
+      const logs = logsRes.data;
+      cachedLatestStoredLog = logs.length > 0 ? logs[0] : null;
+      if (countBadge) countBadge.textContent = `${logs.length} event${logs.length === 1 ? '' : 's'}`;
+
+      if (tbody) {
+        if (logs.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="5" class="py-6 text-center text-slate-500 italic font-sans">
+                No behavioral events recorded yet. Interact or complete calibration to establish profile.
+              </td>
+            </tr>
+          `;
+        } else {
+          tbody.innerHTML = logs.map(log => {
+            const timeStr = new Date(log.timestamp).toLocaleTimeString();
+            let parsed = {};
+            if (log.raw_feature_json) {
+              try { parsed = JSON.parse(log.raw_feature_json); } catch (_) {}
+            }
+
+            const decision = parsed.decision || 'EVALUATED';
+            const riskScore = parsed.risk_score !== undefined ? Number(parsed.risk_score).toFixed(3) : '--';
+            const isTrusted = parsed.is_trusted === true;
+
+            // Determine dominant signal in this observation
+            let eventIcon = '⌨️';
+            let eventLabel = 'Typing Patterns';
+            if (log.typing_speed_wpm > 0) {
+              eventIcon = '⌨️';
+              eventLabel = 'Typing Patterns';
+            } else if (log.mouse_velocity_avg > 0 || log.mouse_curvature_entropy > 0) {
+              eventIcon = '🖱️';
+              eventLabel = 'Mouse Movement';
+            } else if (log.scroll_speed_avg > 0) {
+              eventIcon = '📜';
+              eventLabel = 'Activity Patterns';
+            } else {
+              eventIcon = '⏱️';
+              eventLabel = 'Navigation Patterns';
+            }
+
+            const safeSummary = `WPM: ${log.typing_speed_wpm} | Flight: ${log.avg_flight_time_ms}ms | Mouse: ${log.mouse_velocity_avg}px/s | Idle: ${log.idle_duration_sec}s`;
+            const formattedDec = formatDecisionLabel(decision);
+
+            return `
+              <tr class="hover:bg-red-950/20 transition-colors">
+                <td class="py-2 px-3 text-slate-300 font-mono whitespace-nowrap">${timeStr}</td>
+                <td class="py-2 px-3 whitespace-nowrap">
+                  <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-black/60 border border-slate-800 text-slate-200 text-[10px] font-medium">
+                    <span>${eventIcon}</span>
+                    <span>${eventLabel}</span>
+                  </span>
+                </td>
+                <td class="py-2 px-3 text-slate-400 font-mono text-[10px] truncate max-w-xs" title="${safeSummary}">
+                  ${safeSummary}
+                </td>
+                <td class="py-2 px-3 whitespace-nowrap">
+                  <span class="text-xs font-semibold ${decision === 'ALLOW' ? 'text-emerald-400' : 'text-amber-400'}">${formattedDec}</span>
+                  <span class="text-[10px] text-slate-500 font-mono ml-1">(${riskScore})</span>
+                </td>
+                <td class="py-2 px-3 text-right whitespace-nowrap">
+                  <span class="text-[9px] px-1.5 py-0.5 rounded font-medium ${isTrusted ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-900 text-slate-400 border border-slate-800'}">
+                    ${isTrusted ? 'Profile Baseline' : 'Recorded'}
+                  </span>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[COGNISEC-AI] Failed to fetch behavior logs:', err);
+  }
+
+  if (typeof window.updateBehavioralFactorCoverage === 'function') {
+    window.updateBehavioralFactorCoverage();
   }
 };
+
+window.refreshMaturityProgress = window.refreshBehavioralDashboard;
+
+window.handleConsoleTyping = function(e) {
+  const targetPrompt = "The zero trust security architecture verifies every continuous behavioral signal without storing private keystrokes.";
+  const val = e.target.value;
+  const chars = val.length;
+
+  // 1. Progress calculation against neutral calibration sentence
+  const progText = document.getElementById('calibration-progress-text');
+  if (progText) {
+    progText.textContent = `${chars} / ${targetPrompt.length} characters`;
+    if (chars >= targetPrompt.length) {
+      progText.className = 'text-emerald-400 font-bold';
+    } else {
+      progText.className = 'text-amber-400 font-bold';
+    }
+  }
+
+  // 2. Extract genuine browser-measured physical timing dynamics
+  window.updateLiveBehavioralIndicators();
+
+  // 3. Dispatch genuine telemetry burst to FastAPI on 15-character cadence
+  if (chars % 15 === 0 && chars > 0) {
+    if (window.cognisec && window.cognisec.sessionToken) {
+      window.cognisec.sendBehaviorTelemetry().then(res => {
+        if (res && res.success && res.data) {
+          const d = res.data;
+          const riskDisplay = (d.risk_score !== undefined && d.risk_score !== null) ? d.risk_score.toFixed(3) : 'Protected';
+          addConsoleLog(`Telemetry Stream Sample Transmitted (Decision: ${formatDecisionLabel(d.decision)} | Risk: ${riskDisplay})`);
+          if (typeof refreshBehavioralDashboard === 'function') {
+            refreshBehavioralDashboard();
+          }
+        } else if (res && !res.success) {
+          addConsoleLog(`Telemetry Notice: ${res.error}`);
+        }
+      }).catch(err => {
+        addConsoleLog(`Telemetry Network Notice: ${err.message}`);
+      });
+    }
+  }
+};
+
+function addConsoleLog(text) {
+  const logContainer = document.getElementById('console-event-log');
+  if (!logContainer) return;
+  const timeStr = new Date().toLocaleTimeString();
+  const div = document.createElement('div');
+  div.className = 'p-2 rounded bg-black/60 border border-slate-900 text-emerald-300 font-mono text-[11px]';
+  div.textContent = `> ${timeStr} - ${text}`;
+  logContainer.prepend(div);
+}
 
 window.runConsoleVerification = async function() {
   const btn = document.getElementById('btn-console-verify');
   const authBadge = document.getElementById('badge-auth-state');
+  const feedbackEl = document.getElementById('calibration-user-feedback');
+
   if (btn) {
-    btn.textContent = 'Transmitting Behavioral Telemetry...';
+    btn.textContent = 'Submitting Calibration Sample...';
     btn.disabled = true;
   }
+  if (feedbackEl) {
+    feedbackEl.textContent = 'Transmitting timing patterns to security engine...';
+    feedbackEl.className = 'text-xs font-medium text-slate-400 block';
+  }
 
-  addConsoleLog('Initiating Behavioral Telemetry Transmission (POST /api/behavior/events)...');
+  addConsoleLog('Transmitting behavioral calibration sample to backend (POST /api/behavior/events)...');
 
   try {
     const res = window.cognisec ? await window.cognisec.sendBehaviorTelemetry() : null;
     if (res && res.success && res.data) {
       const d = res.data;
       const riskDisplay = (d.risk_score !== undefined && d.risk_score !== null) ? d.risk_score.toFixed(3) : 'Protected';
-      addConsoleLog(`FastAPI Ingestion Confirmed: Decision=${d.decision} | Session=${d.session_status} | Risk=${riskDisplay}`);
+      addConsoleLog(`Backend Ingestion Confirmed: Decision=${formatDecisionLabel(d.decision)} | Risk=${riskDisplay}`);
       if (authBadge) {
-        authBadge.textContent = d.decision === 'ALLOW' ? '✓ Telemetry Accepted' : '⚠️ ' + d.decision;
+        authBadge.textContent = d.decision === 'ALLOW' ? '✓ Sample Ingested' : '⚠️ ' + formatDecisionLabel(d.decision);
         authBadge.className = d.decision === 'ALLOW'
           ? 'px-2 py-0.5 text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 rounded font-bold'
           : 'px-2 py-0.5 text-[10px] bg-amber-950 text-amber-400 border border-amber-800 rounded font-bold';
       }
       if (btn) {
-        btn.textContent = 'Telemetry Ingested & Verified ✓';
+        btn.textContent = 'Sample Recorded Successfully ✓';
         setTimeout(() => {
           if (btn) {
-            btn.textContent = 'Send Behavioral Calibration Sample →';
+            btn.textContent = 'Submit Calibration Sample';
             btn.disabled = false;
           }
         }, 2000);
       }
-      if (typeof refreshMaturityProgress === 'function') {
-        await refreshMaturityProgress();
+      if (feedbackEl) {
+        feedbackEl.textContent = 'Sample recorded successfully and added to your behavior profile.';
+        feedbackEl.className = 'text-xs font-semibold text-emerald-400 block';
+      }
+      if (typeof refreshBehavioralDashboard === 'function') {
+        await refreshBehavioralDashboard();
       }
     } else {
-      const errMsg = (res && res.error) || 'Ingestion failed';
-      addConsoleLog(`Telemetry Dispatch Error: ${errMsg}`);
+      const errMsg = (res && res.error) || 'Sample submission failed';
+      addConsoleLog(`Submission Error: ${errMsg}`);
       if (authBadge) {
-        authBadge.textContent = 'Telemetry Failed';
+        authBadge.textContent = 'Submission Failed';
         authBadge.className = 'px-2 py-0.5 text-[10px] bg-red-950 text-red-400 border border-red-800 rounded font-bold';
       }
       if (btn) {
         btn.textContent = 'Submission Failed - Retry';
         btn.disabled = false;
       }
+      if (feedbackEl) {
+        feedbackEl.textContent = `Unable to record sample: ${errMsg}. Please try again.`;
+        feedbackEl.className = 'text-xs font-semibold text-red-400 block';
+      }
     }
   } catch (err) {
-    addConsoleLog(`Verification Network Error: ${err.message}`);
+    addConsoleLog(`Network Error: ${err.message}`);
     if (btn) {
       btn.textContent = 'Network Error - Retry';
       btn.disabled = false;
+    }
+    if (feedbackEl) {
+      feedbackEl.textContent = `Network error: ${err.message}. Please try again.`;
+      feedbackEl.className = 'text-xs font-semibold text-red-400 block';
     }
   }
 };
@@ -2814,6 +4736,24 @@ window.handleAgentMessageSubmit = function(e) {
 };
 
 // 8. REAL SECURITY NOTIFICATION CENTER & DEVICE INVENTORY HANDLERS
+let _guestDemoNotifRead = false;
+let _lastAuthUserId = null;
+
+window._resetNotificationGuestState = function() {
+  _guestDemoNotifRead = false;
+  _lastAuthUserId = null;
+};
+
+function _escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 window.toggleNotificationCenter = function() {
   const container = document.getElementById('notif-popup-container');
   if (container) {
@@ -2835,25 +4775,130 @@ window.closeNotificationPopup = function() {
 };
 
 window.refreshNotifications = async function() {
-  if (!window.cognisec || !window.cognisec.isAuthenticated()) {
-    const badge = document.getElementById('notif-badge');
+  const listEl = document.getElementById('notif-list-container');
+  const badge = document.getElementById('notif-badge');
+  const countBadge = document.getElementById('notif-count-badge');
+  const bellBtn = document.getElementById('notif-bell-btn');
+
+  // Keep bell icon visible always
+  if (bellBtn) {
+    bellBtn.classList.remove('hidden');
+  }
+
+  // CASE 1: UNLOGGED / GUEST MODE
+  const isAuth = Boolean(window.cognisec && window.cognisec.isAuthenticated());
+  if (!isAuth) {
+    _lastAuthUserId = null;
+
+    // Update bell badge for guest demo
     if (badge) {
-      badge.textContent = '0';
-      badge.classList.add('hidden');
+      if (!_guestDemoNotifRead) {
+        badge.textContent = '1';
+        badge.classList.remove('hidden');
+        badge.classList.add('bg-red-600', 'animate-pulse');
+      } else {
+        badge.textContent = '0';
+        badge.classList.add('hidden');
+        badge.classList.remove('animate-pulse');
+      }
+    }
+
+    // Update header count badge for guest demo
+    if (countBadge) {
+      if (!_guestDemoNotifRead) {
+        countBadge.textContent = '1 unread (Demo)';
+        countBadge.className = 'px-1.5 py-0.5 bg-amber-950 border border-amber-800 text-amber-300 text-[10px] rounded font-bold';
+      } else {
+        countBadge.textContent = '0 unread (Demo)';
+        countBadge.className = 'px-1.5 py-0.5 bg-slate-900 border border-slate-700 text-slate-400 text-[10px] rounded font-bold';
+      }
+    }
+
+    if (!listEl) return;
+
+    if (_guestDemoNotifRead) {
+      listEl.innerHTML = `
+        <div class="p-4 rounded-xl bg-black/60 border border-red-950 text-center text-xs text-slate-400 font-mono space-y-1">
+          <div class="text-xs font-semibold text-slate-300">✓ All demo notifications marked as read.</div>
+          <div class="text-[10px] text-slate-500">Sign in to view real-time security telemetry for your account.</div>
+        </div>
+      `;
+    } else {
+      listEl.innerHTML = `
+        <div class="p-3.5 rounded-xl bg-black/80 border border-amber-900/60 shadow-[0_0_15px_rgba(245,158,11,0.15)] space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5">
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-800 tracking-wider font-mono">DEMO PREVIEW</span>
+              <span class="text-xs font-bold text-white">New Login Detected</span>
+            </div>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 animate-pulse font-mono">PENDING CONFIRMATION</span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed font-sans">
+            An unrecognized device login attempt was registered for <strong>Boomika Ram</strong> from <span class="text-amber-300 font-mono font-bold">Bengaluru, IN (MacBook Pro M3 • IP 103.21.124.9)</span>.
+          </p>
+          <div class="text-[10px] font-mono text-slate-400 space-y-0.5">
+            <div><span class="text-slate-500">Location:</span> Bengaluru, IN (Simulated Network)</div>
+            <div><span class="text-slate-500">Timestamp:</span> Just Now (Demo Mode)</div>
+          </div>
+          <div class="flex items-center justify-between pt-1 border-t border-red-950/60">
+            <span class="text-[10px] text-amber-400 font-mono">📧 Demo Alert: Simulated Dispatch</span>
+            <button onclick="handleMarkNotificationRead()" class="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer">
+              Mark as read
+            </button>
+          </div>
+          <div id="notif-action-buttons" class="pt-2">
+            <div class="text-[11px] text-amber-300 font-bold pb-1.5 text-center font-mono">Was this login authorized by you?</div>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                onclick="handleNotificationResponse(null, 'yes')"
+                class="py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(52,211,153,0.3)] font-mono"
+              >
+                ✓ Yes, This Was Me
+              </button>
+              <button
+                onclick="handleNotificationResponse(null, 'no')"
+                class="py-2 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_15px_rgba(239,68,68,0.5)] font-mono"
+              >
+                ⛔ No, Secure Account
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
     }
     return;
   }
 
-  const listEl = document.getElementById('notif-list-container');
-  const badge = document.getElementById('notif-badge');
-  const countBadge = document.getElementById('notif-count-badge');
+  // CASE 2: AUTHENTICATED MODE
+  // 1. Enforce account isolation: check if user switched
+  const currentUserId = (window.cognisec.user && window.cognisec.user.id != null) ? window.cognisec.user.id : 'unknown';
+  if (_lastAuthUserId !== null && _lastAuthUserId !== currentUserId) {
+    if (listEl) listEl.innerHTML = '';
+  }
+  _lastAuthUserId = currentUserId;
+
+  // 2. Render loading state while fetching real notifications
+  if (listEl) {
+    listEl.innerHTML = `
+      <div id="notif-loading-indicator" class="p-6 rounded-xl bg-black/60 border border-red-950 text-center text-xs text-slate-400 font-mono flex flex-col items-center justify-center gap-2">
+        <div class="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+        <span>Loading security notifications...</span>
+      </div>
+    `;
+  }
 
   try {
     const data = await window.cognisec.getNotifications();
-    const notifications = (data && data.notifications) ? data.notifications : [];
+
+    // Guard against race conditions if user logged out or switched while fetch was inflight
+    if (!window.cognisec || !window.cognisec.isAuthenticated() || (window.cognisec.user && window.cognisec.user.id !== currentUserId)) {
+      return;
+    }
+
+    const notifications = (data && Array.isArray(data.notifications)) ? data.notifications : [];
     const unreadCount = (data && typeof data.unread_count === 'number') ? data.unread_count : 0;
 
-    // Update notification bell badge
+    // Update bell badge with real backend unread count
     if (badge) {
       badge.textContent = String(unreadCount);
       if (unreadCount > 0) {
@@ -2865,61 +4910,68 @@ window.refreshNotifications = async function() {
       }
     }
 
+    // Update header count badge
     if (countBadge) {
       countBadge.textContent = `${unreadCount} unread`;
+      countBadge.className = unreadCount > 0
+        ? 'px-1.5 py-0.5 bg-red-950 border border-red-800 text-red-300 text-[10px] rounded font-bold'
+        : 'px-1.5 py-0.5 bg-slate-900 border border-slate-700 text-slate-400 text-[10px] rounded font-bold';
     }
 
     if (!listEl) return;
 
+    // Empty state: account has zero notifications
     if (notifications.length === 0) {
       listEl.innerHTML = `
-        <div class="p-4 rounded-xl bg-black/60 border border-red-950 text-center text-xs text-slate-400 font-mono">
-          ✓ No security alerts recorded.<br><span class="text-[10px] text-slate-500">All registered devices are recognized.</span>
+        <div class="p-6 rounded-xl bg-black/60 border border-red-950 text-center text-xs text-slate-400 font-mono space-y-1">
+          <div class="text-sm font-semibold text-slate-300">No notifications yet</div>
+          <div class="text-[10px] text-slate-500">There are no security alerts or unrecognized sign-ins for your account.</div>
         </div>
       `;
       return;
     }
 
+    // Render genuine backend notifications ONLY
     listEl.innerHTML = notifications.map(n => {
       let statusBadge = '';
       if (n.status === 'PENDING_CONFIRMATION') {
-        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 animate-pulse">PENDING CONFIRMATION</span>';
+        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 animate-pulse font-mono">PENDING CONFIRMATION</span>';
       } else if (n.status === 'CONFIRMED_TRUSTED') {
-        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">TRUSTED</span>';
+        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono">TRUSTED</span>';
       } else if (n.status === 'CONFIRMED_DENIED') {
-        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-300 border border-red-800">DENIED &amp; REVOKED</span>';
+        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-300 border border-red-800 font-mono">DENIED &amp; REVOKED</span>';
       } else if (n.status === 'DEVICE_REVOKED') {
-        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-400 border border-red-800">REVOKED</span>';
+        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-400 border border-red-800 font-mono">REVOKED</span>';
       } else {
-        statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-slate-400 border border-slate-700">${n.status}</span>`;
+        statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-slate-400 border border-slate-700 font-mono">${_escapeHtml(n.status)}</span>`;
       }
 
       let emailStatusHtml = '';
       if (n.email_delivery_status === 'SENT') {
         emailStatusHtml = '<span class="text-[10px] text-emerald-400 font-mono">📧 Owner Alert: Email Sent</span>';
       } else if (n.email_delivery_status === 'FAILED') {
-        emailStatusHtml = `<span class="text-[10px] text-red-400 font-mono" title="${n.email_error || ''}">📧 Email Failed (Recorded in SOC)</span>`;
+        emailStatusHtml = `<span class="text-[10px] text-red-400 font-mono" title="${_escapeHtml(n.email_error || '')}">📧 Email Failed (Recorded in SOC)</span>`;
       } else if (n.email_delivery_status === 'SKIPPED_UNCONFIGURED') {
         emailStatusHtml = '<span class="text-[10px] text-slate-500 font-mono">📧 SMTP Server Unconfigured</span>';
       } else {
         emailStatusHtml = '<span class="text-[10px] text-amber-400 font-mono">📧 Email In Queue</span>';
       }
 
-      const timeStr = new Date(n.created_at).toLocaleString('en-US', { timeZone: 'UTC', hour12: false }) + ' UTC';
+      const timeStr = n.created_at ? (new Date(n.created_at).toLocaleString('en-US', { timeZone: 'UTC', hour12: false }) + ' UTC') : 'Unknown Time';
 
       const actionButtons = (n.status === 'PENDING_CONFIRMATION') ? `
         <div class="pt-2">
-          <div class="text-[11px] text-amber-300 font-bold pb-1.5 text-center">Was this login authorized by you?</div>
+          <div class="text-[11px] text-amber-300 font-bold pb-1.5 text-center font-mono">Was this login authorized by you?</div>
           <div class="grid grid-cols-2 gap-2">
             <button
-              onclick="handleNotificationResponse('${n.notification_id}', 'yes')"
-              class="py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(52,211,153,0.3)]"
+              onclick="handleNotificationResponse('${_escapeHtml(n.notification_id)}', 'yes')"
+              class="py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(52,211,153,0.3)] font-mono"
             >
               ✓ Yes, This Was Me
             </button>
             <button
-              onclick="handleNotificationResponse('${n.notification_id}', 'no')"
-              class="py-2 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_15px_rgba(239,68,68,0.5)]"
+              onclick="handleNotificationResponse('${_escapeHtml(n.notification_id)}', 'no')"
+              class="py-2 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_15px_rgba(239,68,68,0.5)] font-mono"
             >
               ⛔ No, Secure Account
             </button>
@@ -2928,7 +4980,7 @@ window.refreshNotifications = async function() {
       ` : '';
 
       const markReadBtn = !n.is_read ? `
-        <button onclick="handleMarkNotificationRead('${n.notification_id}')" class="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer">
+        <button onclick="handleMarkNotificationRead('${_escapeHtml(n.notification_id)}')" class="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer">
           Mark as read
         </button>
       ` : '<span class="text-[10px] text-slate-600">Read</span>';
@@ -2936,12 +4988,12 @@ window.refreshNotifications = async function() {
       return `
         <div class="p-3.5 rounded-xl bg-black/80 border ${n.is_read ? 'border-red-950/60' : 'border-red-800/80 shadow-[0_0_15px_rgba(220,38,38,0.2)]'} space-y-2">
           <div class="flex items-center justify-between gap-2">
-            <span class="text-xs font-bold text-white">${n.title}</span>
+            <span class="text-xs font-bold text-white">${_escapeHtml(n.title)}</span>
             ${statusBadge}
           </div>
-          <p class="text-xs text-slate-300 leading-relaxed font-sans">${n.message}</p>
+          <p class="text-xs text-slate-300 leading-relaxed font-sans">${_escapeHtml(n.message)}</p>
           <div class="text-[10px] font-mono text-slate-400 space-y-0.5">
-            <div><span class="text-slate-500">Location:</span> ${n.location_summary || 'Unknown Network'}</div>
+            <div><span class="text-slate-500">Location:</span> ${_escapeHtml(n.location_summary || 'Unknown Network')}</div>
             <div><span class="text-slate-500">Timestamp:</span> ${timeStr}</div>
           </div>
           <div class="flex items-center justify-between pt-1 border-t border-red-950/60">
@@ -2954,30 +5006,119 @@ window.refreshNotifications = async function() {
     }).join('');
 
   } catch (err) {
+    if (!window.cognisec || !window.cognisec.isAuthenticated() || (window.cognisec.user && window.cognisec.user.id !== currentUserId)) {
+      return;
+    }
     console.warn('[COGNISEC-AI] Failed to fetch notifications:', err.message);
+
+    if (badge) {
+      badge.textContent = '0';
+      badge.classList.add('hidden');
+      badge.classList.remove('animate-pulse');
+    }
+    if (countBadge) {
+      countBadge.textContent = 'Error';
+      countBadge.className = 'px-1.5 py-0.5 bg-red-950 border border-red-800 text-red-400 text-[10px] rounded font-bold';
+    }
+    if (!listEl) return;
+
+    const is401 = (err && err.status === 401) || (err && err.message && err.message.includes('401'));
+    if (is401) {
+      listEl.innerHTML = `
+        <div class="p-5 rounded-xl bg-red-950/40 border border-red-900 text-center text-xs text-red-300 font-mono space-y-2">
+          <div class="font-bold">⚠️ Session Expired</div>
+          <div class="text-[11px] text-slate-400">Your session has expired. Please sign in again to view your security notifications.</div>
+        </div>
+      `;
+    } else {
+      listEl.innerHTML = `
+        <div class="p-5 rounded-xl bg-red-950/40 border border-red-900 text-center text-xs text-red-300 font-mono space-y-2">
+          <div class="font-bold text-red-400">⚠️ Failed to Load Notifications</div>
+          <div class="text-[11px] text-slate-400">${_escapeHtml(err.message || 'Unable to retrieve real-time alerts.')}</div>
+          <button onclick="refreshNotifications()" class="mt-2 px-3 py-1 bg-red-900/60 hover:bg-red-800 text-white rounded text-[10px] cursor-pointer">Retry</button>
+        </div>
+      `;
+    }
   }
 };
 
 window.handleMarkNotificationRead = async function(notifId) {
-  if (!window.cognisec) return;
+  if (!window.cognisec || !window.cognisec.isAuthenticated()) {
+    // Guest demo mode: mark demo notification read locally
+    _guestDemoNotifRead = true;
+    window.refreshNotifications();
+    return;
+  }
+  if (!notifId) return;
   await window.cognisec.markNotificationRead(notifId);
   window.refreshNotifications();
 };
 
 window.markAllNotificationsAsRead = async function() {
-  if (!window.cognisec) return;
+  if (!window.cognisec || !window.cognisec.isAuthenticated()) {
+    // Guest demo mode: mark all demo notifications read locally
+    _guestDemoNotifRead = true;
+    window.refreshNotifications();
+    return;
+  }
   await window.cognisec.markAllNotificationsRead();
   window.refreshNotifications();
 };
 
 window.handleNotificationResponse = async function(notifId, answer) {
+  // Support legacy single-argument call: handleNotificationResponse('yes')
+  if (!answer && (notifId === 'yes' || notifId === 'no')) {
+    answer = notifId;
+    notifId = null;
+  }
+
+  const resultBanner = document.getElementById('notif-result-banner');
+
+  // CASE A: GUEST DEMO MODE
+  if (!window.cognisec || !window.cognisec.isAuthenticated() || !notifId) {
+    _guestDemoNotifRead = true;
+    if (resultBanner) {
+      resultBanner.classList.remove('hidden');
+      if (answer === 'yes') {
+        resultBanner.className = 'p-3 rounded-xl bg-emerald-950/80 border border-emerald-500 text-emerald-300 text-xs font-bold text-center animate-fade-in shadow-[0_0_15px_rgba(52,211,153,0.3)] font-mono';
+        resultBanner.innerHTML = '🟢 Device Confirmed as Trusted! (Demo Mode)<br><span class="text-[10px] text-slate-300">Added to Verified Hardware Inventory.</span>';
+      } else {
+        resultBanner.className = 'p-3 rounded-xl bg-red-950/90 border-2 border-red-500 text-red-300 text-xs font-bold text-center animate-fade-in shadow-[0_0_20px_#ef4444] font-mono';
+        resultBanner.innerHTML = '⛔ CRITICAL SECURITY INTERCEPT! (Demo Mode)<br><span class="text-[10px] text-white">Session Locked &amp; Unauthorized IP Blocked.</span>';
+
+        const logsEl = document.getElementById('soc-live-logs');
+        if (logsEl) {
+          const timeStr = new Date().toLocaleTimeString('en-US', { hour12: false });
+          const newLog = document.createElement('div');
+          newLog.className = 'p-3 rounded-xl bg-black/50 border border-red-950 flex items-center justify-between font-mono text-[11px] animate-fade-in';
+          newLog.innerHTML = `
+            <div class="flex items-center gap-3">
+              <span class="text-red-400 font-bold">🔴 [${timeStr}]</span>
+              <span class="text-white font-bold">DEMO: USER DENIED LOGIN (MacBook Pro M3)</span>
+              <span class="text-slate-400 text-[10px]">&bull; IP 103.21.124.9 &bull; Zero-Trust Kill Switch Executed</span>
+            </div>
+            <span class="px-2.5 py-0.5 bg-red-950 text-red-400 border border-red-800 rounded text-[10px] font-bold">SESSION KILLED</span>
+          `;
+          logsEl.prepend(newLog);
+        }
+      }
+
+      setTimeout(() => {
+        if (resultBanner) resultBanner.classList.add('hidden');
+      }, 4000);
+    }
+
+    window.refreshNotifications();
+    return;
+  }
+
+  // CASE B: AUTHENTICATED REAL NOTIFICATION RESPONSE
   if (window._isHandlingNotif) return;
   window._isHandlingNotif = true;
-  const resultBanner = document.getElementById('notif-result-banner');
 
   if (resultBanner) {
     resultBanner.classList.remove('hidden');
-    resultBanner.className = 'p-3 rounded-xl bg-black/80 border border-slate-700 text-slate-300 text-xs font-bold text-center';
+    resultBanner.className = 'p-3 rounded-xl bg-black/80 border border-slate-700 text-slate-300 text-xs font-bold text-center font-mono';
     resultBanner.innerHTML = 'Communicating with zero-trust security authority...';
   }
 
@@ -2986,16 +5127,16 @@ window.handleNotificationResponse = async function(notifId, answer) {
     if (res.status === 'success') {
       if (resultBanner) {
         if (answer === 'yes') {
-          resultBanner.className = 'p-3 rounded-xl bg-emerald-950/80 border border-emerald-500 text-emerald-300 text-xs font-bold text-center animate-fade-in shadow-[0_0_15px_rgba(52,211,153,0.3)]';
+          resultBanner.className = 'p-3 rounded-xl bg-emerald-950/80 border border-emerald-500 text-emerald-300 text-xs font-bold text-center animate-fade-in shadow-[0_0_15px_rgba(52,211,153,0.3)] font-mono';
           resultBanner.innerHTML = '🟢 Device Confirmed &amp; Trusted!<br><span class="text-[10px] text-slate-300">Updated in verified hardware inventory.</span>';
         } else {
-          resultBanner.className = 'p-3 rounded-xl bg-red-950/90 border-2 border-red-500 text-red-300 text-xs font-bold text-center animate-fade-in shadow-[0_0_20px_#ef4444]';
+          resultBanner.className = 'p-3 rounded-xl bg-red-950/90 border-2 border-red-500 text-red-300 text-xs font-bold text-center animate-fade-in shadow-[0_0_20px_#ef4444] font-mono';
           resultBanner.innerHTML = '⛔ UNAUTHORIZED ACCESS REJECTED!<br><span class="text-[10px] text-white">Device revoked &amp; all associated sessions terminated.</span>';
         }
       }
     } else {
       if (resultBanner) {
-        resultBanner.className = 'p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs font-bold text-center';
+        resultBanner.className = 'p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs font-bold text-center font-mono';
         resultBanner.textContent = res.message || 'Operation could not be completed.';
       }
     }
@@ -3005,11 +5146,13 @@ window.handleNotificationResponse = async function(notifId, answer) {
     }, 4000);
 
     window.refreshNotifications();
-    window.refreshUserDevices();
+    if (typeof window.refreshUserDevices === 'function') {
+      window.refreshUserDevices();
+    }
 
   } catch (err) {
     if (resultBanner) {
-      resultBanner.className = 'p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs font-bold text-center';
+      resultBanner.className = 'p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs font-bold text-center font-mono';
       resultBanner.textContent = `Error: ${err.message}`;
     }
   } finally {
@@ -3025,36 +5168,88 @@ window.refreshUserDevices = async function() {
     const devices = await window.cognisec.getDevices();
     if (!Array.isArray(devices) || devices.length === 0) {
       container.innerHTML = `
-        <div class="p-4 rounded-xl bg-black/60 border border-red-950 text-center text-xs text-slate-400">
-          No hardware devices registered yet.
+        <div class="p-4 rounded-xl bg-black/60 border border-red-950 text-center text-xs text-slate-400 font-sans">
+          No recognized hardware devices registered for this account yet.
         </div>
       `;
       return;
     }
 
+    const currentSessionId = window.cognisec.sessionId || localStorage.getItem('cognisec_session_id');
+
     container.innerHTML = devices.map(d => {
+      // 1. Trust & Verification State Badges
       let trustBadge = '';
       if (d.trust_state === 'TRUSTED') {
         trustBadge = '<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>TRUSTED</span>';
       } else if (d.trust_state === 'PENDING_CONFIRMATION') {
-        trustBadge = '<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 flex items-center gap-1 animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>PENDING CONFIRMATION</span>';
+        trustBadge = '<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>PENDING CONFIRMATION</span>';
       } else if (d.trust_state === 'REVOKED') {
         trustBadge = '<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-400 border border-red-800 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>REVOKED</span>';
       } else {
         trustBadge = `<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-slate-400 border border-slate-700">${d.trust_state}</span>`;
       }
 
-      let locationText = 'Location: ';
-      if (d.latitude != null && d.longitude != null) {
-        locationText += `GPS ${d.latitude.toFixed(4)}, ${d.longitude.toFixed(4)} (±${Math.round(d.location_accuracy || 0)}m, ${d.location_source})`;
-      } else if (d.city || d.country) {
-        locationText += `${d.city || ''}, ${d.region || ''}, ${d.country || ''} (${d.location_source || 'Approximate IP'})`;
+      // 2. Active Session Association
+      const isCurrentDevice = (currentSessionId && d.active_session_ids && Array.isArray(d.active_session_ids) && d.active_session_ids.includes(currentSessionId));
+      let sessionBadge = '';
+      if (isCurrentDevice) {
+        sessionBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/90 text-emerald-300 border border-emerald-600 flex items-center gap-1">★ Current Device (This Session)</span>';
+      } else if (d.active_session_count && d.active_session_count > 0) {
+        sessionBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-950 text-blue-300 border border-blue-800 flex items-center gap-1">● ${d.active_session_count} Active Session${d.active_session_count > 1 ? 's' : ''}</span>`;
       } else {
-        locationText += `IP ${d.last_ip || '127.0.0.1'} (${d.location_source || 'Network'})`;
+        sessionBadge = '<span class="px-2 py-0.5 rounded text-[10px] text-slate-500 bg-black/40 border border-slate-800">No active session</span>';
       }
 
+      // 3. Environment & Verification Status
+      const hasKnownEnv = d.browser_name && d.os_name && d.browser_name !== 'Unknown' && d.os_name !== 'Unknown';
+      const isIdentityUnverified = !hasKnownEnv || d.device_fingerprint === 'unknown' || (d.nickname && d.nickname === 'Identity not verified');
+      
+      let displayNickname = d.nickname;
+      if (!displayNickname || displayNickname.startsWith('Device #') || displayNickname === 'Unverified Device') {
+        displayNickname = hasKnownEnv ? `${d.os_name} · ${d.browser_name}` : 'Identity not verified';
+      }
+
+      const unverifiedBadge = isIdentityUnverified
+        ? '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-900 text-slate-400 border border-slate-700">Identity Not Verified</span>'
+        : '';
+
+      const envDetails = hasKnownEnv
+        ? `${d.browser_name} ${d.browser_version || ''} &bull; ${d.os_name} ${d.os_version || ''} (${d.device_type || 'Desktop'})`
+        : `Unverified browser environment &bull; Probabilistic client fingerprint`;
+
+      // 4. Location Context (Honest and Privacy-Preserving)
+      let locationText = '';
+      const ip = (d.last_ip || '127.0.0.1').trim();
+      const isPrivateNetwork = (
+        ip.startsWith('127.') || ip.startsWith('10.') || ip.startsWith('192.168.') ||
+        ip.startsWith('172.') || ip === '::1' || ip === 'localhost' || d.city === 'Local Network'
+      );
+
+      if (d.latitude != null && d.longitude != null) {
+        locationText = `GPS: ${d.latitude.toFixed(2)}, ${d.longitude.toFixed(2)} (User-permitted)`;
+      } else if (isPrivateNetwork) {
+        locationText = `Local network (${ip} · No external location lookup)`;
+      } else if (d.city || d.country) {
+        locationText = `Approximate location (${[d.city, d.region, d.country].filter(Boolean).join(', ')} · IP-derived)`;
+      } else {
+        locationText = `Network: IP ${ip} (Approximate)`;
+      }
+
+      // 5. Timestamps
       const firstSeen = new Date(d.first_seen).toLocaleString('en-US', { timeZone: 'UTC', hour12: false }) + ' UTC';
       const lastSeen = new Date(d.last_seen).toLocaleString('en-US', { timeZone: 'UTC', hour12: false }) + ' UTC';
+
+      // 6. Action Controls
+      const confirmBtn = (d.trust_state === 'PENDING_CONFIRMATION') ? `
+        <button
+          onclick="handleConfirmDevice('${d.device_id}')"
+          class="px-2.5 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700 text-emerald-300 hover:text-white text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
+          title="Confirm device as recognized and trusted"
+        >
+          ✓ Confirm Trust
+        </button>
+      ` : '';
 
       const revokeBtn = (d.trust_state !== 'REVOKED') ? `
         <button
@@ -3067,17 +5262,19 @@ window.refreshUserDevices = async function() {
 
       return `
         <div class="p-4 rounded-xl bg-black/70 border border-red-950 flex flex-col md:flex-row md:items-center justify-between gap-3 font-mono text-xs">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-white text-sm">${d.nickname || `${d.browser_name || 'Browser'} on ${d.os_name || 'OS'}`}</span>
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold text-white text-sm">${displayNickname}</span>
               <button onclick="handleUpdateNickname('${d.device_id}')" class="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer" title="Rename device">✎ Edit Name</button>
               ${trustBadge}
+              ${sessionBadge}
+              ${unverifiedBadge}
             </div>
             <div class="text-[11px] text-slate-400 font-sans">
-              ${d.browser_name || 'Browser'} ${d.browser_version || ''} &bull; ${d.os_name || 'OS'} ${d.os_version || ''} (${d.device_type || 'Desktop'})
+              ${envDetails}
             </div>
             <div class="text-[10px] text-slate-400">
-              ${locationText}
+              Location: ${locationText}
             </div>
             <div class="text-[10px] text-slate-500 flex items-center gap-3">
               <span>First: ${firstSeen}</span>
@@ -3085,7 +5282,8 @@ window.refreshUserDevices = async function() {
               <span>Last: ${lastSeen}</span>
             </div>
           </div>
-          <div class="shrink-0 pt-2 md:pt-0">
+          <div class="shrink-0 pt-2 md:pt-0 flex items-center gap-2 flex-wrap">
+            ${confirmBtn}
             ${revokeBtn}
           </div>
         </div>
@@ -3094,6 +5292,27 @@ window.refreshUserDevices = async function() {
 
   } catch (err) {
     console.warn('[COGNISEC-AI] Failed to fetch devices:', err.message);
+    container.innerHTML = `
+      <div class="p-4 rounded-xl bg-red-950/40 border border-red-800 text-center text-xs text-red-300 font-sans">
+        Unable to load device inventory: ${err.message}. Please refresh or verify authentication.
+      </div>
+    `;
+  }
+};
+
+window.handleConfirmDevice = async function(deviceId) {
+  if (!confirm('Confirm this device as recognized and trusted for your account?')) {
+    return;
+  }
+  const res = await window.cognisec.confirmDevice(deviceId);
+  if (res && res.status === 'success') {
+    alert(res.message);
+  } else {
+    alert((res && res.message) || 'Failed to confirm device trust.');
+  }
+  window.refreshUserDevices();
+  if (typeof window.refreshNotifications === 'function') {
+    window.refreshNotifications();
   }
 };
 
@@ -3102,26 +5321,29 @@ window.handleRevokeDevice = async function(deviceId) {
     return;
   }
   const res = await window.cognisec.revokeDevice(deviceId);
-  if (res.status === 'success') {
+  if (res && res.status === 'success') {
     alert(res.message);
   } else {
-    alert(res.message || 'Failed to revoke device.');
+    alert((res && res.message) || 'Failed to revoke device.');
   }
   window.refreshUserDevices();
-  window.refreshNotifications();
+  if (typeof window.refreshNotifications === 'function') {
+    window.refreshNotifications();
+  }
 };
 
 window.handleUpdateNickname = async function(deviceId) {
   const newName = prompt('Enter a recognizable nickname for this device (e.g., "My Work Laptop"):');
   if (newName && newName.trim()) {
-    await window.cognisec.updateDeviceNickname(deviceId, newName.trim());
+    const res = await window.cognisec.updateDeviceNickname(deviceId, newName.trim());
+    if (res && res.status === 'error') {
+      alert(res.message || 'Failed to update device nickname.');
+    }
     window.refreshUserDevices();
   }
 };
 
 // DASHBOARD SECTION REDIRECT & ADMIN ACCESS CONTROL
-window.isAdminUser = true; // Boomika Ram (Security Administrator - USR-9842-X9)
-
 window.scrollToSection = function(id) {
   let section = document.getElementById(id);
   if (!section && (id === 'plain-black-applications-section' || id === 'applications')) {
@@ -3133,7 +5355,7 @@ window.scrollToSection = function(id) {
 };
 
 window.openSocDashboard = function() {
-  if (window.isAdminUser) {
+  if (window.cognisec && window.cognisec.isAdmin()) {
     window.openModal('dashboard');
   } else {
     const resultBanner = document.getElementById('notif-result-banner');

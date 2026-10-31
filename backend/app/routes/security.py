@@ -1,7 +1,7 @@
 import datetime
 import logging
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 
 logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
@@ -29,6 +29,8 @@ from app.schemas.security import (
     NeuralTraceResetConfirmResponse,
     AccessDecisionRequest,
     AccessDecisionResponse,
+    VaultRelockRequest,
+    VaultRelockResponse,
 )
 from app.services.session_service import SessionService
 from app.services.risk_service import RiskService
@@ -821,6 +823,7 @@ def evaluate_resource_access_decision(
 def get_confidential_vault_data(
     resource: str,
     session_id: Optional[str] = None,
+    response: Response = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -832,7 +835,12 @@ def get_confidential_vault_data(
     - Verified, unexpired NeuralTrace (GESTURE_PATTERN) grant for this exact application and resource
     - Risk level must be LOW or MEDIUM
     Fails closed with HTTP 403 Forbidden on any violation.
+    Sets Cache-Control: no-store to prevent browser history or proxy caching.
     """
+    if response is not None:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0, private"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     target_session = None
     if session_id:
         target_session = SessionService.get_session(db, session_id)
@@ -841,6 +849,44 @@ def get_confidential_vault_data(
         active_sessions = SessionService.get_active_sessions(db, user_id=current_user.id)
         if active_sessions:
             target_session = active_sessions[0]
+
+    def _record_denial_and_raise(detail_msg: str, status_code: int = status.HTTP_403_FORBIDDEN):
+        if target_session:
+            from app.services.access_tracker import ConfidentialAccessTracker
+            denials = ConfidentialAccessTracker.record_denial(
+                user_id=current_user.id,
+                session_id=target_session.id,
+                resource=resource
+            )
+            if denials >= settings.CONFIDENTIAL_ACCESS_DENIAL_THRESHOLD:
+                import numpy as np
+                r_score, a_score, r_level, factors, _, _ = RiskService.calculate_risk(
+                    db=db,
+                    user_id=current_user.id,
+                    session_id=target_session.id,
+                    application=target_session.application,
+                    behavior_vector=np.zeros(10),
+                    context_signals={"denied_access_count": denials}
+                )
+                DecisionService.enforce_zero_trust_decision(
+                    db=db,
+                    user_id=current_user.id,
+                    session_id=target_session.id,
+                    application=target_session.application,
+                    risk_score=r_score,
+                    anomaly_score=a_score,
+                    risk_level=r_level,
+                    contributing_factors=factors
+                )
+        raise HTTPException(status_code=status_code, detail=detail_msg)
+
+    norm_res = SessionService.normalize_resource(resource)
+    target_app = SessionService.get_application_for_resource(norm_res)
+    if not norm_res or not target_app or norm_res not in ("academic_vault", "financial_vault", "ehr_vault"):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unknown or invalid confidential vault resource."
+        )
 
     if not target_session:
         raise HTTPException(
@@ -860,24 +906,10 @@ def get_confidential_vault_data(
         )
         db.add(sec_event)
         db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Confidential access blocked due to {target_session.current_risk_level or 'CRITICAL'} risk policy."
-        )
+        _record_denial_and_raise(f"Confidential access blocked due to {target_session.current_risk_level or 'CRITICAL'} risk policy.")
 
     if target_session.status != "ACTIVE":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Valid active session required to access confidential vault."
-        )
-
-    norm_res = SessionService.normalize_resource(resource)
-    target_app = SessionService.get_application_for_resource(norm_res)
-    if not norm_res or not target_app or norm_res not in ("academic_vault", "financial_vault", "ehr_vault"):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Unknown or invalid confidential vault resource."
-        )
+        _record_denial_and_raise("Valid active session required to access confidential vault.")
 
     grant = db.query(ApplicationGrant).filter(
         ApplicationGrant.session_id == target_session.id,
@@ -889,16 +921,10 @@ def get_confidential_vault_data(
 
     if not grant:
         factor_desc = "sequential cognitive" if target_session.current_risk_level == "HIGH" else "NeuralTrace"
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Zero Trust policy requires {factor_desc} verification to access {norm_res} in {target_app}."
-        )
+        _record_denial_and_raise(f"Zero Trust policy requires {factor_desc} verification to access {norm_res} in {target_app}.")
 
     if target_session.current_risk_level == "HIGH" and grant.factor != "HIGH_RISK_DUAL":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="High risk policy requires sequential cognitive verification (HIGH_RISK_DUAL)."
-        )
+        _record_denial_and_raise("High risk policy requires sequential cognitive verification (HIGH_RISK_DUAL).")
 
     req_factor = grant.factor or ("HIGH_RISK_DUAL" if target_session.step_up_factor == "HIGH_RISK_DUAL" else "GESTURE_PATTERN")
 
@@ -913,10 +939,11 @@ def get_confidential_vault_data(
 
     if not is_authorized:
         factor_desc = "sequential cognitive" if req_factor == "HIGH_RISK_DUAL" else "NeuralTrace"
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Zero Trust policy requires {factor_desc} verification to access {norm_res} in {target_app}."
-        )
+        _record_denial_and_raise(f"Zero Trust policy requires {factor_desc} verification to access {norm_res} in {target_app}.")
+
+    # Clear denial history upon successful authorized access
+    from app.services.access_tracker import ConfidentialAccessTracker
+    ConfidentialAccessTracker.clear_denials(user_id=current_user.id, session_id=target_session.id)
 
     res_norm = norm_res
     if res_norm == "financial_vault":
@@ -924,6 +951,7 @@ def get_confidential_vault_data(
             "resource": "financial_vault",
             "application": "shopping",
             "access_granted": True,
+            "success": True,
             "data": {
                 "saved_cards": [
                     {
@@ -980,6 +1008,7 @@ def get_confidential_vault_data(
             "resource": "academic_vault",
             "application": "college",
             "access_granted": True,
+            "success": True,
             "data": {
                 "student_id": "BITS-2022-CS-9841",
                 "program": "B.Tech Computer Science & Engineering",
@@ -1016,6 +1045,7 @@ def get_confidential_vault_data(
             "resource": "ehr_vault",
             "application": "healthcare",
             "access_granted": True,
+            "success": True,
             "data": {
                 "patient_id": "MED-2026-BLR-00418",
                 "clinical_diagnosis": "Post-Op Cardiac Surveillance & Hypertension Class I",
@@ -1079,6 +1109,69 @@ def get_confidential_vault_data(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Unknown confidential vault resource."
         )
+
+
+@router.post("/vault/relock", response_model=VaultRelockResponse)
+@router.post("/vault/revoke", response_model=VaultRelockResponse)
+def relock_confidential_vault(
+    request: VaultRelockRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Authoritative server-enforced revocation of confidential vault access grant.
+    Revokes the active ApplicationGrant for the given session and resource without
+    terminating the user's entire authenticated portal session.
+    Logs VAULT_GRANT_REVOKED in the security audit trail.
+    """
+    session = SessionService.get_session(db, request.session_id)
+    verify_session_access(session, current_user)
+
+    norm_res = SessionService.normalize_resource(request.resource)
+    if not norm_res or norm_res not in ("academic_vault", "financial_vault", "ehr_vault"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid or unknown confidential vault resource '{request.resource}'."
+        )
+
+    expected_app = SessionService.get_application_for_resource(norm_res)
+    norm_app = SessionService.normalize_application(request.application) if request.application else expected_app
+
+    if norm_app and norm_app != expected_app:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Resource '{norm_res}' does not belong to application '{norm_app}'."
+        )
+
+    count = SessionService.revoke_application_grants(
+        db=db,
+        session_id=session.id,
+        user_id=current_user.id,
+        application=expected_app,
+        resource=norm_res
+    )
+
+    # Record security audit event
+    sec_event = SecurityEvent(
+        user_id=current_user.id,
+        session_id=session.id,
+        application=expected_app,
+        event_type="VAULT_GRANT_REVOKED",
+        severity="INFO",
+        decision="ALLOW",
+        details=f"Confidential vault grant for resource '{norm_res}' in application '{expected_app}' authoritatively revoked on portal exit. Vault is LOCKED."
+    )
+    db.add(sec_event)
+    db.commit()
+
+    return VaultRelockResponse(
+        success=True,
+        message=f"Vault grant for '{norm_res}' successfully revoked. Vault is locked.",
+        resource=norm_res,
+        application=expected_app,
+        revoked_count=count,
+        vault_status="LOCKED"
+    )
 
 
 @router.post("/adaptive/neuraltrace/reset-request", response_model=NeuralTraceResetRequestResponse)

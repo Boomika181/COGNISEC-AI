@@ -1079,10 +1079,11 @@ class StepUpService:
         email: str,
         db: Session,
         ttl_seconds: int = DEFAULT_TTL_SECONDS
-    ) -> Tuple[bool, str, str]:
+    ) -> Tuple[bool, str, str, bool, str]:
         """
         Generates and delivers a secure 6-digit OTP for account password recovery.
         Resolves account strictly from verified database record.
+        Returns: (success, message, masked_email, email_delivered, delivery_status)
         """
         norm_email = email.lower().strip()
         from app.services.auth_service import AuthService
@@ -1090,7 +1091,13 @@ class StepUpService:
         if not user:
             # Anti-enumeration response
             masked = EmailService.mask_email(norm_email)
-            return (True, f"If this account is registered, a verification code has been sent to {masked}.", masked)
+            return (
+                True,
+                f"If this account is registered, a verification code has been sent to {masked}.",
+                masked,
+                False,
+                "UNREGISTERED_ACCOUNT"
+            )
 
         masked_email = EmailService.mask_email(user.email)
         otp = f"{secrets.randbelow(1000000):06d}"
@@ -1104,7 +1111,7 @@ class StepUpService:
                 logger.info(
                     f"[COGNISEC-AI] [PASSWORD_RESET_DEDUP] Duplicate reset request for {norm_email} deduplicated within 15s cooldown."
                 )
-                return (True, f"Verification code sent to {masked_email}.", masked_email)
+                return (True, f"Verification code sent to {masked_email}.", masked_email, True, "DELIVERED")
 
             cls._password_resets[norm_email] = {
                 "user_id": user.id,
@@ -1129,13 +1136,18 @@ class StepUpService:
             if "timed out" in email_msg.lower():
                 safe_err = "Email delivery failed: connection timed out."
             elif "rejected" in email_msg.lower():
-                safe_err = f"Email delivery failed: {email_msg}"
+                safe_err = "Email delivery failed: recipient address was rejected."
+            elif "auth" in email_msg.lower():
+                safe_err = "Email delivery failed: mail server authentication error."
+            elif "suppressed" in email_msg.lower():
+                safe_err = "Email delivery failed: recipient is not deliverable."
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=safe_err
             )
 
-        return (True, f"Verification code sent to {masked_email}.", masked_email)
+        delivery_status = "DELIVERED" if email_ok else ("EXHIBITION" if settings.EXHIBITION_MODE else "PENDING")
+        return (True, f"Verification code sent to {masked_email}.", masked_email, email_ok, delivery_status)
 
     @classmethod
     def resend_password_reset_challenge(
@@ -1144,11 +1156,11 @@ class StepUpService:
         db: Session,
         ttl_seconds: int = DEFAULT_TTL_SECONDS,
         cooldown_seconds: int = 30
-    ) -> Tuple[bool, str, str, int]:
+    ) -> Tuple[bool, str, str, int, bool, str]:
         """
         Resends password recovery OTP to registered email.
         Enforces cooldown, supersedes previous OTP, and returns delivery status.
-        Returns: (success, message, masked_email, retry_after)
+        Returns: (success, message, masked_email, retry_after, email_delivered, delivery_status)
         """
         norm_email = email.lower().strip()
         from app.services.auth_service import AuthService
@@ -1156,7 +1168,14 @@ class StepUpService:
         masked = EmailService.mask_email(norm_email)
         if not user:
             # Anti-enumeration response: preserve identical format
-            return (True, f"If this account is registered, a verification code has been sent to {masked}.", masked, cooldown_seconds)
+            return (
+                True,
+                f"If this account is registered, a verification code has been sent to {masked}.",
+                masked,
+                cooldown_seconds,
+                False,
+                "UNREGISTERED_ACCOUNT"
+            )
 
         masked_email = EmailService.mask_email(user.email)
         now = utc_now()
@@ -1171,7 +1190,14 @@ class StepUpService:
                     logger.info(
                         f"[COGNISEC-AI] [PASSWORD_RESET_RESEND_BLOCKED] Resend for {norm_email} blocked by cooldown ({remaining}s remaining)."
                     )
-                    return (False, f"Please wait {remaining} second{'s' if remaining != 1 else ''} before requesting a new code.", masked_email, remaining)
+                    return (
+                        False,
+                        f"Please wait {remaining} second{'s' if remaining != 1 else ''} before requesting a new code.",
+                        masked_email,
+                        remaining,
+                        False,
+                        "COOLDOWN_ACTIVE"
+                    )
 
             # Generate fresh 6-digit OTP and supersede any prior challenge
             otp = f"{secrets.randbelow(1000000):06d}"
@@ -1201,14 +1227,26 @@ class StepUpService:
             if "timed out" in email_msg.lower():
                 safe_err = "Email delivery failed: connection timed out."
             elif "rejected" in email_msg.lower():
-                safe_err = f"Email delivery failed: {email_msg}"
+                safe_err = "Email delivery failed: recipient address was rejected."
+            elif "auth" in email_msg.lower():
+                safe_err = "Email delivery failed: mail server authentication error."
+            elif "suppressed" in email_msg.lower():
+                safe_err = "Email delivery failed: recipient is not deliverable."
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=safe_err
             )
 
+        delivery_status = "DELIVERED" if email_ok else ("EXHIBITION" if settings.EXHIBITION_MODE else "PENDING")
         logger.info(f"[COGNISEC-AI] [PASSWORD_RESET_RESEND] Successfully dispatched fresh reset OTP to {masked_email}.")
-        return (True, f"A new verification code has been dispatched to {masked_email}.", masked_email, cooldown_seconds)
+        return (
+            True,
+            f"A new verification code has been dispatched to {masked_email}.",
+            masked_email,
+            cooldown_seconds,
+            email_ok,
+            delivery_status
+        )
 
     @classmethod
     def verify_password_reset_challenge(cls, email: str, otp_code: str) -> Tuple[bool, str]:

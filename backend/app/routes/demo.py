@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.database.connection import get_db
+from app.database.connection import get_db, get_simulator_db
 from app.schemas.admin import AttackSimulationRequest, AttackSimulationResponse
 from app.models.user import User
 from app.models.session import Session as DbSession
@@ -22,11 +22,11 @@ router = APIRouter(prefix="/demo", tags=["Demo Attack Simulator"])
 def simulate_attack_scenario(
     request: AttackSimulationRequest,
     current_user: User = Depends(require_admin),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_simulator_db)
 ):
 
     """
-    Executes controlled exhibition attack scenarios for final demonstration:
+    Executes controlled exhibition attack scenarios in an isolated simulation sandbox:
     - NEW_DEVICE
     - ABNORMAL_TYPING
     - ABNORMAL_MOUSE
@@ -34,12 +34,26 @@ def simulate_attack_scenario(
     - CREDENTIAL_MISUSE
     - REQUEST_FLOOD
     - SESSION_HIJACKING
+    Ensures zero contamination of genuine development SOC inventory, baselines, or metrics.
     """
     target_user_id = request.target_user_id or current_user.id
     target_user = db.query(User).filter(User.id == target_user_id).first()
     if not target_user:
-        target_user = current_user
-        target_user_id = current_user.id
+        target_user = User(
+            id=target_user_id,
+            name=current_user.name or "Simulation Operator",
+            email=current_user.email or "sim.operator@cognisec.ai",
+            password_hash=getattr(current_user, "password_hash", "sim_hash"),
+            role="ADMIN",
+            account_status="ACTIVE"
+        )
+        db.add(target_user)
+        try:
+            db.commit()
+            db.refresh(target_user)
+        except Exception:
+            db.rollback()
+            target_user = db.query(User).filter(User.id == target_user_id).first()
 
     app_name = (request.application or "ecommerce").lower()
     sim_session_id = f"sim_{uuid.uuid4().hex[:12]}"
@@ -135,8 +149,35 @@ def simulate_attack_scenario(
         contributing_factors=factors or [desc]
     )
 
-    # Check created alert
+    # Immediately terminate the temporary simulation session to ensure zero contamination of live active sessions
+    now_utc = datetime.now(timezone.utc)
+    sim_session = db.query(DbSession).filter(DbSession.id == sim_session_id).first()
+    if sim_session:
+        sim_session.status = "TERMINATED"
+        sim_session.logout_time = now_utc
+        sim_session.login_outcome = "simulation_completed"
+
+    # Stamp explicit simulation provenance onto the SecurityEvent
+    if event_id:
+        sec_event = db.query(SecurityEvent).filter(SecurityEvent.id == event_id).first()
+        if sec_event:
+            try:
+                det = json.loads(sec_event.details or "{}")
+            except Exception:
+                det = {}
+            det["is_simulated"] = True
+            det["provenance"] = "ATTACK_SIMULATOR"
+            det["scenario"] = request.scenario
+            sec_event.details = json.dumps(det)
+
+    # Stamp explicit simulation provenance onto the Alert
     alert = db.query(Alert).filter(Alert.security_event_id == event_id).first() if event_id else None
+    if alert:
+        if not alert.message.startswith("[SIMULATED SCENARIO]"):
+            alert.message = f"[SIMULATED SCENARIO] {alert.message}"
+        alert.notes = f"Exhibition Attack Simulation: {request.scenario}"
+
+    db.commit()
 
     return AttackSimulationResponse(
         scenario=request.scenario,
