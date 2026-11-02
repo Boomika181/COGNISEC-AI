@@ -105,6 +105,7 @@ class LoginOtpResponse(BaseModel):
     expires_in_seconds: int = 300
     message: str
     otp: str = ""
+    risk_level: str = "LOW"
 
 
 class LoginOtpVerifyRequest(BaseModel):
@@ -136,6 +137,7 @@ class PasswordResetResponse(BaseModel):
     message: str
     email_delivered: bool = False
     delivery_status: str = "UNKNOWN"
+    otp: Optional[str] = None
 
 
 class PasswordResetResendRequest(BaseModel):
@@ -173,3 +175,7 @@ class RecoverAccountRequest(BaseModel):
     @classmethod
     def check_password_strength(cls, v: str) -> str:
         return validate_password_strength(v)
+
+
+class UnlockAccountRequest(BaseModel):
+    email: EmailStr

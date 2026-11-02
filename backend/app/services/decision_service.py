@@ -69,7 +69,11 @@ class DecisionService:
                 decision = "STEP_UP_VERIFICATION"
                 user_message = "Additional security verification required to proceed."
                 session_status = "STEP_UP_REQUIRED"
-                SessionService.update_session_status(db, session_id, status=session_status, risk_level=risk_level)
+                if db_session and db_session.status in ("PENDING_OBSERVATION", "PENDING_OTP"):
+                    db_session.current_risk_level = risk_level
+                    db.commit()
+                else:
+                    SessionService.update_session_status(db, session_id, status=session_status, risk_level=risk_level)
 
                 # Cooldown check: avoid duplicate event emission on every rapid telemetry packet
                 recent_step_event = db.query(SecurityEvent).filter(
@@ -124,7 +128,11 @@ class DecisionService:
             decision = "RESTRICT"
             user_message = "Access temporarily restricted. Sensitive operations are locked."
             session_status = "RESTRICTED"
-            SessionService.update_session_status(db, session_id, status=session_status, risk_level=risk_level)
+            if db_session and db_session.status in ("PENDING_OBSERVATION", "PENDING_OTP"):
+                db_session.current_risk_level = risk_level
+                db.commit()
+            else:
+                SessionService.update_session_status(db, session_id, status=session_status, risk_level=risk_level)
 
             # Cooldown check: avoid logging identical restriction events every 2 seconds
             recent_restricted_event = db.query(SecurityEvent).filter(

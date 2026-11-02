@@ -16,6 +16,7 @@ from app.models.behavior import BehaviorLog, BehaviorProfile
 from app.models.security_event import SecurityEvent
 from app.models.alert import Alert
 from app.core.security import get_password_hash
+from app.services.profile_service import ProfileService
 
 
 def seed_database():

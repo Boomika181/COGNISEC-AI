@@ -339,7 +339,7 @@
         <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2 portal-card">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Current Courses</span>
-            <span class="p-1.5 rounded-lg bg-purple-50 text-purple-600 text-sm">📚</span>
+            <span class="p-1.5 rounded-lg bg-blue-50 text-blue-700 text-sm">📚</span>
           </div>
           <div class="flex items-baseline gap-2">
             <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">4 Core + 2 Elec</span>
@@ -380,7 +380,7 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
         <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
           <span class="text-slate-400 text-[10px] uppercase tracking-wider block font-semibold">Behavioral Observation</span>
-          <strong id="cv-observation-state" class="text-sky-400 font-bold block truncate">Calibrating Baseline (30s)</strong>
+          <strong id="cv-observation-state" class="text-sky-400 font-bold block truncate">Calibrating Baseline (20s)</strong>
         </div>
         <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
           <span class="text-slate-400 text-[10px] uppercase tracking-wider block font-semibold">Telemetry Stream</span>
@@ -690,7 +690,7 @@
         <!-- Resource 2 -->
         <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4 portal-card flex flex-col justify-between">
           <div class="space-y-2">
-            <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl font-bold">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-xl font-bold">
               📓
             </div>
             <h4 class="font-bold text-slate-900 text-base">Lecture Slides &amp; Code Archives</h4>
@@ -698,7 +698,7 @@
               Synchronized professor slide decks, Jupyter notebooks, and algorithm implementations from lab sessions.
             </p>
           </div>
-          <button onclick="downloadDemoResource('Lecture Slides & PyTorch Notebooks Archive (ZIP)')" class="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-purple-50 text-purple-700 border border-slate-200 font-mono text-xs font-bold transition-all text-center cursor-pointer">
+          <button onclick="downloadDemoResource('Lecture Slides & PyTorch Notebooks Archive (ZIP)')" class="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-blue-50 text-blue-700 border border-slate-200 font-mono text-xs font-bold transition-all text-center cursor-pointer">
             Access Drive Archive
           </button>
         </div>
@@ -772,7 +772,7 @@
         <!-- Service 2: Faculty Directory -->
         <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3 portal-card">
           <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center text-lg">
+            <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-lg">
               👨‍🏫
             </div>
             <div>
@@ -783,7 +783,7 @@
           <p class="text-xs text-slate-600 leading-relaxed">
             Find instructor consultation schedules, office locations, and request mentorship appointments.
           </p>
-          <button onclick="openServiceModal('faculty')" class="text-purple-700 hover:text-purple-800 font-bold text-xs inline-flex items-center gap-1 cursor-pointer">
+          <button onclick="openServiceModal('faculty')" class="text-blue-700 hover:text-blue-800 font-bold text-xs inline-flex items-center gap-1 cursor-pointer">
             View Office Hours Directory →
           </button>
         </div>
@@ -1005,6 +1005,37 @@
     </div>
   </div>
 
+  <!-- CONFIDENTIAL ACADEMIC CERTIFICATE & DIGILOCKER MODAL -->
+  <div id="modal-academic-doc" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-4 text-slate-900 relative animate-fade-in max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center font-bold text-lg">📜</div>
+          <div>
+            <h4 class="font-extrabold text-base text-slate-900 font-sans">Official Academic Credential</h4>
+            <p id="doc-modal-ref" class="text-[11px] text-slate-500 font-mono">DigiLocker / NAD Verified Credential</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeAcademicDocModal()" class="text-slate-400 hover:text-slate-900 text-lg p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer">✕</button>
+      </div>
+
+      <div id="doc-modal-content" class="space-y-4 text-xs font-mono">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="pt-3 flex items-center justify-between gap-3 border-t border-slate-200">
+        <button type="button" onclick="window.print()"
+          class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 font-bold text-xs flex items-center gap-1.5 cursor-pointer">
+          <span>🖨️</span> Print / Save PDF
+        </button>
+        <button type="button" onclick="closeAcademicDocModal()"
+          class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase cursor-pointer">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- INTERACTIVE STUDENT SIGN IN MODAL (PRESERVED) -->
   <div id="student-signin-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-mono">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-slate-900 relative animate-fade-in">
@@ -1145,7 +1176,7 @@
           closeStudentSignInModal();
           btn.innerHTML = `<span>Sign In &amp; Authorize Academic Portal →</span>`;
           syncPortalAuthState();
-          showToast("Academic Identity Active", "Session established. Observation running silently in background (30s).", "🎓");
+          showToast("Academic Identity Active", "Session established. Observation running silently in background (20s).", "🎓");
           window.cognisec.startObservationFlow(loginRes.data);
           return;
         } else {
@@ -1190,12 +1221,15 @@
       }
 
       if (isObs) {
-        if (obsEl) obsEl.textContent = 'Calibrating Baseline (30s)';
+        const rem = (window.cognisec && typeof window.cognisec.observationSecondsRemaining === 'number')
+          ? window.cognisec.observationSecondsRemaining
+          : 20;
+        if (obsEl) obsEl.textContent = `Calibrating Baseline (${rem}s)`;
         if (telemEl) telemEl.textContent = 'Connected (Buffering)';
         if (resEl) resEl.textContent = '🔒 Locked (Masked)';
         if (decEl) decEl.textContent = serverOutcome?.decision || 'OBSERVATION_PENDING';
         if (badgeEl) {
-          badgeEl.textContent = 'CALIBRATING';
+          badgeEl.textContent = `CALIBRATING (${rem}s)`;
           badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 animate-pulse';
         }
         if (vaultBadge) {
@@ -1224,10 +1258,20 @@
         if (resEl) resEl.textContent = '🔒 Locked (Masked)';
         if (decEl) decEl.textContent = serverOutcome?.decision || (isVerified ? 'READY (Awaiting Request)' : 'VERIFY_REQUIRED');
         if (badgeEl) {
-          badgeEl.textContent = isVerified ? 'GUARD ACTIVE' : 'STEP-UP REQUIRED';
-          badgeEl.className = isVerified
-            ? 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800'
-            : 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800';
+          const status = window.cognisec ? (window.cognisec.sessionStatus || localStorage.getItem('cognisec_session_status')) : '';
+          if (isVerified) {
+            badgeEl.textContent = 'GUARD ACTIVE';
+            badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800';
+          } else if (status === 'PENDING_OBSERVATION') {
+            badgeEl.textContent = 'OBSERVING BEHAVIOR';
+            badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-sky-950 text-sky-300 border border-sky-800 animate-pulse';
+          } else if (status === 'PENDING_OTP') {
+            badgeEl.textContent = 'OTP PENDING';
+            badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 animate-pulse';
+          } else {
+            badgeEl.textContent = 'STEP-UP REQUIRED';
+            badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800';
+          }
         }
         if (vaultBadge) {
           vaultBadge.className = 'px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-mono font-bold flex items-center gap-1.5';
@@ -1240,6 +1284,19 @@
         lastAuthEl.textContent = isVerified ? new Date().toLocaleTimeString() : 'None';
       }
     }
+
+    // Live observation countdown listener
+    window.addEventListener('cognisec:observation_tick', (e) => {
+      const rem = e.detail?.remaining;
+      const obsEl = document.getElementById('cv-observation-state');
+      if (obsEl && rem !== undefined && rem > 0) {
+        obsEl.textContent = `Calibrating Baseline (${rem}s)`;
+      }
+      const badgeEl = document.getElementById('cv-status-badge');
+      if (badgeEl && (!window.cognisec || !window.cognisec.isFullyVerified())) {
+        badgeEl.textContent = `CALIBRATING (${rem}s)`;
+      }
+    });
 
     async function loadAndDisplayAcademicVault() {
       const cs = window.cognisec;
@@ -1283,14 +1340,222 @@
       }
     }
 
+    let currentAcademicVaultData = null;
+    let activeAcademicVaultTab = 'all';
+    let academicTranscriptSearchQuery = '';
+    let academicTranscriptSemesterFilter = 'all';
+
+    function switchAcademicVaultTab(tab) {
+      activeAcademicVaultTab = tab;
+      if (currentAcademicVaultData) {
+        renderAcademicVaultContent(currentAcademicVaultData);
+      }
+    }
+
+    function filterAcademicTranscripts(query) {
+      academicTranscriptSearchQuery = (query || '').toLowerCase().trim();
+      renderAcademicTranscriptsTable();
+    }
+
+    function filterAcademicTranscriptsBySemester(sem) {
+      academicTranscriptSemesterFilter = sem;
+      const allBtn = document.getElementById('sem-filter-all');
+      const sem7Btn = document.getElementById('sem-filter-7');
+      const sem6Btn = document.getElementById('sem-filter-6');
+      if (allBtn) allBtn.className = sem === 'all' ? 'px-3 py-1 rounded-lg bg-blue-700 text-white font-bold cursor-pointer transition-all' : 'px-3 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer transition-all';
+      if (sem7Btn) sem7Btn.className = sem === 'Sem 7' ? 'px-3 py-1 rounded-lg bg-blue-700 text-white font-bold cursor-pointer transition-all' : 'px-3 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer transition-all';
+      if (sem6Btn) sem6Btn.className = sem === 'Sem 6' ? 'px-3 py-1 rounded-lg bg-blue-700 text-white font-bold cursor-pointer transition-all' : 'px-3 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold cursor-pointer transition-all';
+      renderAcademicTranscriptsTable();
+    }
+
+    function renderAcademicTranscriptsTable() {
+      const tbody = document.getElementById('vault-transcripts-tbody');
+      if (!tbody || !currentAcademicVaultData) return;
+      const transcripts = currentAcademicVaultData.transcripts || [];
+
+      const filtered = transcripts.filter(t => {
+        const matchesQuery = !academicTranscriptSearchQuery ||
+          (t.code && t.code.toLowerCase().includes(academicTranscriptSearchQuery)) ||
+          (t.name && t.name.toLowerCase().includes(academicTranscriptSearchQuery)) ||
+          (t.grade && t.grade.toLowerCase().includes(academicTranscriptSearchQuery));
+
+        const matchesSemester = academicTranscriptSemesterFilter === 'all' ||
+          (t.semester && t.semester === academicTranscriptSemesterFilter);
+
+        return matchesQuery && matchesSemester;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="p-8 text-center text-slate-500 font-mono text-xs">
+              <span class="text-2xl block mb-1.5">🔍</span>
+              No course transcript records match your search criteria.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(t => `
+        <tr class="hover:bg-slate-50 border-b border-slate-200 transition-colors">
+          <td class="p-3 font-mono font-bold text-blue-700 whitespace-nowrap">
+            <div class="flex items-center gap-1.5">
+              <span>${t.code}</span>
+              <button type="button" onclick="copyAcademicIdentifier('${t.code}', this)" title="Copy Course Code"
+                class="text-[10px] text-slate-400 hover:text-slate-800 p-0.5 rounded cursor-pointer">📋</button>
+            </div>
+          </td>
+          <td class="p-3 font-sans font-semibold text-slate-900">${t.name}</td>
+          <td class="p-3 font-mono text-slate-600 text-center">${t.credits} Credits</td>
+          <td class="p-3 font-mono text-slate-600 whitespace-nowrap text-center">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-slate-100 font-bold">${t.semester}</span>
+          </td>
+          <td class="p-3 text-right whitespace-nowrap">
+            <span class="px-2.5 py-1 rounded-lg text-xs font-bold font-mono ${t.grade && t.grade.startsWith('A') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-blue-50 text-blue-800 border border-blue-200'}">
+              ${t.grade}
+            </span>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openAcademicDocModal(docId) {
+      if (!currentAcademicVaultData) return;
+      const docs = currentAcademicVaultData.documents || [];
+      const profile = currentAcademicVaultData.student_profile || {};
+      const doc = docs.find(d => d.doc_id === docId) || docs[0] || {
+        title: 'Official Cumulative Transcript (Sem 1-7)',
+        doc_id: docId || '#BITS-DIGI-84920',
+        status: 'Signed & Cryptographically Sealed',
+        authority: 'NAD / DigiLocker National Registry'
+      };
+
+      const user = (window.cognisec && typeof window.cognisec.getUser === 'function') ? window.cognisec.getUser() : null;
+      const studentName = profile.full_name || user?.name || 'Alexander Morgan';
+      const studentRoll = profile.student_id || 'BITS-2022-CS-9841';
+      const enrollmentNo = profile.enrollment_number || '2022A7PS0841P';
+      const program = profile.program || 'B.Tech (Hons) Computer Science & Engineering';
+      const cgpa = currentAcademicVaultData.cgpa || '9.42 / 10.00';
+
+      const modalEl = document.getElementById('modal-academic-doc');
+      const refEl = document.getElementById('doc-modal-ref');
+      const contentEl = document.getElementById('doc-modal-content');
+
+      if (refEl) {
+        refEl.textContent = `Doc Reference: ${doc.doc_id} • ${doc.authority}`;
+      }
+
+      if (contentEl) {
+        contentEl.innerHTML = `
+          <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white space-y-2 border border-slate-700 shadow-md">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🏛️</span>
+                  <strong class="text-sm font-sans block font-extrabold tracking-wide">BIRLA INSTITUTE OF TECHNOLOGY &amp; SCIENCE, PILANI</strong>
+                </div>
+                <p class="text-[10px] text-slate-300 font-mono">Deemed University under Sec 3 of UGC Act &bull; Pilani &bull; Goa &bull; Hyderabad &bull; Dubai</p>
+              </div>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/30 text-blue-300 border border-blue-400/30 font-mono">NIRF RANK #1</span>
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-1">
+            <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">OFFICIAL ELECTRONIC CREDENTIAL</span>
+            <h4 class="text-sm sm:text-base font-extrabold text-slate-900 font-sans">${doc.title}</h4>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+              <span>✓</span> ${doc.status}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Certified Student</span>
+              <strong class="text-slate-900 block font-sans">${studentName}</strong>
+              <p class="text-[11px] text-slate-600 font-mono">ID: ${studentRoll}</p>
+              <p class="text-[10px] text-slate-500 font-mono">Enrollment: ${enrollmentNo}</p>
+            </div>
+            <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Academic Distinction</span>
+              <strong class="text-blue-700 block font-sans">${program}</strong>
+              <p class="text-[11px] text-slate-700 font-mono">Cumulative CGPA: <strong class="text-emerald-700">${cgpa}</strong></p>
+              <p class="text-[10px] text-slate-500">Academic Standing: Dean's Honor Roll</p>
+            </div>
+          </div>
+
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
+            <div class="flex justify-between items-center text-[11px]">
+              <span class="text-slate-500">National Depository:</span>
+              <strong class="text-slate-800 font-mono">${doc.authority}</strong>
+            </div>
+            <div class="flex justify-between items-center text-[11px]">
+              <span class="text-slate-500">Cryptographic Seal:</span>
+              <span class="text-emerald-700 font-mono font-bold">RSA-4096 / SHA-256 Validated</span>
+            </div>
+            <div class="flex justify-between items-center text-[10px] text-slate-500 font-mono">
+              <span>Certificate Hash:</span>
+              <span class="text-slate-700 truncate max-w-[200px]">SHA-256: 7f8b9e...092a (Active)</span>
+            </div>
+          </div>
+
+          <div class="text-[10px] text-slate-400 font-mono leading-relaxed border-t border-slate-200 pt-2">
+            This credential was cryptographically decrypted and verified in browser memory under an active Cognisec AI ApplicationGrant.
+            National Academic Depository (NAD) DigiLocker interoperability standard certified.
+          </div>
+        `;
+      }
+
+      if (modalEl) modalEl.classList.remove('hidden');
+    }
+
+    function closeAcademicDocModal() {
+      const modalEl = document.getElementById('modal-academic-doc');
+      if (modalEl) modalEl.classList.add('hidden');
+    }
+
+    function copyAcademicIdentifier(text, btnEl) {
+      if (!text) return;
+      const doFeedback = () => {
+        if (!btnEl) return;
+        const prev = btnEl.innerHTML;
+        btnEl.innerHTML = '<span class="text-emerald-600 font-bold text-[10px]">Copied ✓</span>';
+        setTimeout(() => { btnEl.innerHTML = prev; }, 1600);
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(doFeedback).catch(() => {
+          fallbackAcademicCopy(text);
+          doFeedback();
+        });
+      } else {
+        fallbackAcademicCopy(text);
+        doFeedback();
+      }
+    }
+
+    function fallbackAcademicCopy(text) {
+      const el = document.createElement('textarea');
+      el.value = text;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      document.body.appendChild(el);
+      el.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      document.body.removeChild(el);
+    }
+
     function renderAcademicVaultContent(data) {
+      currentAcademicVaultData = data;
       const container = document.getElementById('academic-vault-dynamic-content');
       if (!container) return;
 
-      const cgpa = data.cgpa || '';
-      const standing = data.academic_standing || '';
-      const credits = data.credits_completed || '';
-      const major = data.major || '';
+      const profile = data.student_profile || {};
+      const cgpa = data.cgpa || profile.cgpa || '9.42 / 10.00';
+      const standing = data.academic_standing || profile.academic_standing || "Dean's Honor Roll";
+      const credits = data.credits_completed || '142 / 148 Completed';
+      const major = data.major || profile.program || 'B.Tech (Hons) Computer Science & Engineering';
+      const provisionalCert = data.provisional_certificate || 'PC-2026-CS-00412';
 
       // Update metric 1 card if present
       const metricCgpa = document.getElementById('metric-cgpa-val');
@@ -1298,115 +1563,459 @@
       const metricRank = document.getElementById('metric-cgpa-rank');
       if (metricRank && standing) metricRank.textContent = standing;
 
-      const transcripts = data.transcripts || [];
-      const transcriptRows = transcripts.map(t => `
-        <div class="flex justify-between p-1.5 rounded bg-white border border-sky-100">
-          <span class="text-slate-700">${t.code || ''} ${t.name || ''}</span>
-          <strong class="text-sky-700">${t.grade || ''}</strong>
-        </div>
-      `).join('');
-
-      const docs = data.documents || [];
-      const docRows = docs.map(d => `
-        <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-1">
-          <div class="flex justify-between items-center">
-            <strong class="text-slate-900 font-bold">${d.title || ''}</strong>
-            <span class="text-[10px] text-emerald-600 font-bold">✓ ${d.status || ''}</span>
-          </div>
-          <p class="text-[10px] text-slate-500 font-mono">Doc ID: ${d.doc_id || ''} &bull; ${d.authority || ''}</p>
-        </div>
-      `).join('');
-
+      const integrity = data.academic_integrity || {};
       const fin = data.financial_ledger || {};
+      const transcripts = data.transcripts || [];
+      const docs = data.documents || [];
+
+      // Normalize examination records (can be list or dict)
+      let exams = [];
+      if (Array.isArray(data.examination_records)) {
+        exams = data.examination_records;
+      } else if (data.examination_records && Array.isArray(data.examination_records.exams)) {
+        exams = data.examination_records.exams;
+      }
+
+      const currentUser = (window.cognisec && typeof window.cognisec.getUser === 'function') ? window.cognisec.getUser() : null;
+      const isAlex = !!(currentUser?.name && currentUser.name.toLowerCase().includes('alex'));
+      const studentName = currentUser?.name || profile.full_name || (isAlex ? 'Alex Mercer' : 'Authenticated Student');
+      const studentEmail = currentUser?.email || 'boomikaram35@gmail.com';
+      const maskedEmail = studentEmail.replace(/^(.)(.*)(.@.*)$/, (_, a, b, c) => a + '***' + c);
+      const studentRoll = profile.student_id || data.student_id || (isAlex ? 'BITS-2022-CS-9841' : `BITS-2022-CS-${currentUser?.id ? String(currentUser.id).padStart(4, '0') : '2020'}`);
+      const enrollmentNo = profile.enrollment_number || (isAlex ? '2022A7PS0841P' : `2022A7PS${currentUser?.id ? String(currentUser.id).padStart(4, '0') : '2020'}P`);
+      const maskedEnrollment = enrollmentNo.length > 8 ? (enrollmentNo.substring(0, 8) + '••••' + enrollmentNo.slice(-1)) : enrollmentNo;
+      const lastAuthTimestamp = (document.getElementById('cv-last-auth-time')?.textContent && document.getElementById('cv-last-auth-time')?.textContent !== 'None')
+        ? document.getElementById('cv-last-auth-time').textContent
+        : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      // Tab visibility filters
+      const showAll = activeAcademicVaultTab === 'all';
+      const showIdentity = showAll || activeAcademicVaultTab === 'identity';
+      const showPerformance = showAll || activeAcademicVaultTab === 'performance';
+      const showCourses = showAll || activeAcademicVaultTab === 'courses';
+      const showDocs = showAll || activeAcademicVaultTab === 'docs';
+      const showFinance = showAll || activeAcademicVaultTab === 'finance';
+      const showSecurity = showAll || activeAcademicVaultTab === 'security';
 
       container.innerHTML = `
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <!-- Card 1: Official Academic Transcript & Grade History -->
-          <div class="p-5 rounded-2xl bg-sky-50/50 border border-sky-200 space-y-4">
-            <div class="flex items-center justify-between pb-2 border-b border-sky-100">
-              <span class="text-xs font-bold text-sky-900 flex items-center gap-1.5">
-                <span>📊</span> Academic Performance Ledger
-              </span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">VERIFIED</span>
+        <!-- Top Status Bar: Zero Trust Grant Verification -->
+        <div class="p-3.5 sm:p-4 rounded-2xl bg-white border border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-3 text-xs font-mono shadow-xs">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+              DIGILOCKER / NAD COMPLIANT
+            </span>
+            <span class="text-slate-600 font-sans">Clearance: <strong class="text-slate-900">ApplicationGrant #AG-ACAD-2026-9481 (Active)</strong></span>
+          </div>
+          <div class="flex items-center gap-3 sm:gap-5 flex-wrap text-slate-600">
+            <span>Verified At: <strong class="text-blue-700 font-bold">${lastAuthTimestamp}</strong></span>
+            <span>Honor Standing: <strong class="text-emerald-700 font-semibold">${integrity.honor_code_status || 'Affirmed & Validated'}</strong></span>
+            <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">Zero-Trust Authorized</span>
+          </div>
+        </div>
+
+        <!-- Interactive Academic Vault Navigation Tabs -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-mono scrollbar-none border-b border-slate-200">
+          <button type="button" onclick="switchAcademicVaultTab('all')" id="atab-all"
+            class="px-3.5 py-2 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${activeAcademicVaultTab === 'all' ? 'bg-blue-700 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+            📑 Complete Academic Dossier
+          </button>
+          <button type="button" onclick="switchAcademicVaultTab('identity')" id="atab-identity"
+            class="px-3.5 py-2 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${activeAcademicVaultTab === 'identity' ? 'bg-blue-700 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+            👤 Identity &amp; Enrollment
+          </button>
+          <button type="button" onclick="switchAcademicVaultTab('performance')" id="atab-performance"
+            class="px-3.5 py-2 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${activeAcademicVaultTab === 'performance' ? 'bg-blue-700 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+            📊 Performance Intelligence
+          </button>
+          <button type="button" onclick="switchAcademicVaultTab('courses')" id="atab-courses"
+            class="px-3.5 py-2 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${activeAcademicVaultTab === 'courses' ? 'bg-blue-700 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+            📚 Courses &amp; Examinations
+          </button>
+          <button type="button" onclick="switchAcademicVaultTab('docs')" id="atab-docs"
+            class="px-3.5 py-2 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${activeAcademicVaultTab === 'docs' ? 'bg-blue-700 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+            📜 Document Vault &amp; DigiLocker
+          </button>
+          <button type="button" onclick="switchAcademicVaultTab('finance')" id="atab-finance"
+            class="px-3.5 py-2 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${activeAcademicVaultTab === 'finance' ? 'bg-blue-700 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+            💰 Scholarship &amp; Fees
+          </button>
+          <button type="button" onclick="switchAcademicVaultTab('security')" id="atab-security"
+            class="px-3.5 py-2 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${activeAcademicVaultTab === 'security' ? 'bg-blue-700 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+            🛡️ Security &amp; Audit Trail
+          </button>
+        </div>
+
+        <!-- SECTION A: ACADEMIC IDENTITY & ENROLLMENT -->
+        ${showIdentity ? `
+        <div class="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+            <div>
+              <h3 class="font-extrabold text-slate-900 text-xs uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <span>👤</span> Academic Identity &amp; Institutional Enrollment
+              </h3>
+              <p class="text-[11px] text-slate-500 font-sans">Official BITS Pilani Verified Regular Student Records &bull; Biometric &amp; Neural Verified</p>
             </div>
-            <div class="space-y-2 text-xs">
-              <div class="flex justify-between items-center">
-                <span class="text-slate-500">Cumulative GPA:</span>
-                <strong class="text-slate-900 font-bold text-sm">${cgpa}</strong>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-slate-500">Academic Standing:</span>
-                <strong class="text-emerald-700 font-bold">${standing}</strong>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-slate-500">Graduation Credits:</span>
-                <strong class="text-slate-900 font-bold">${credits}</strong>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-slate-500">Major:</span>
-                <strong class="text-slate-900 font-bold">${major}</strong>
-              </div>
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 self-start sm:self-auto font-mono">
+              ✓ Regular Enrollment Confirmed
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Student Name &amp; Degree</span>
+              <strong class="text-slate-900 text-sm block font-sans">${studentName}</strong>
+              <p class="text-[11px] text-blue-700 font-sans font-semibold">${profile.program || major}</p>
             </div>
 
-            <!-- Sem 7 Transcript Table -->
-            <div class="pt-2 border-t border-sky-100 space-y-1.5">
-              <span class="text-[10px] text-slate-500 uppercase tracking-wider font-bold block">Semester 7 Grade Breakdown</span>
-              <div class="space-y-1 text-[11px]">
-                ${transcriptRows}
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Student Roll ID</span>
+              <div class="flex items-center justify-between gap-1">
+                <strong class="text-slate-900 text-xs block">${studentRoll}</strong>
+                <button type="button" onclick="copyAcademicIdentifier('${studentRoll}', this)" title="Copy Roll ID"
+                  class="text-slate-400 hover:text-slate-900 p-0.5 rounded cursor-pointer">📋</button>
+              </div>
+              <span class="text-[10px] text-slate-500 block">Batch: ${profile.batch || '2022–2026'}</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">National Enrollment No</span>
+              <div class="flex items-center justify-between gap-1">
+                <strong class="text-slate-900 text-xs block font-mono">${maskedEnrollment}</strong>
+                <button type="button" onclick="copyAcademicIdentifier('${enrollmentNo}', this)" title="Copy Full Enrollment No"
+                  class="text-slate-400 hover:text-slate-900 p-0.5 rounded cursor-pointer">📋</button>
+              </div>
+              <span class="text-[10px] text-emerald-700 font-bold block">NAD DigiLocker Linked</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Campus &amp; Residence</span>
+              <strong class="text-slate-900 text-xs block">${profile.campus || 'Pilani Campus • Hall 4'}</strong>
+              <span class="text-[10px] text-slate-500 block">Advisor: ${profile.academic_advisor || 'Prof. K. R. Sharma'}</span>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- SECTION B: ACADEMIC PERFORMANCE INTELLIGENCE -->
+        ${showPerformance ? `
+        <div class="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+            <div>
+              <h3 class="font-extrabold text-slate-900 text-xs uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <span>📊</span> Academic Performance Intelligence
+              </h3>
+              <p class="text-[11px] text-slate-500 font-sans">Comprehensive Cumulative Performance Metrics &bull; Automated Clearance Validation</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 self-start sm:self-auto font-mono">
+              Top 2% Tier Standing
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase block font-semibold">Cumulative GPA</span>
+              <strong class="text-xl sm:text-2xl font-extrabold text-slate-900 block font-mono">${cgpa}</strong>
+              <span class="text-[10px] text-emerald-700 font-bold block">Dean's Honor Roll</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase block font-semibold">Graduation Credits</span>
+              <strong class="text-xl sm:text-2xl font-extrabold text-blue-700 block font-mono">${credits}</strong>
+              <span class="text-[10px] text-slate-600 block">96% Degree Complete</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase block font-semibold">Disciplinary Status</span>
+              <strong class="text-xl sm:text-2xl font-extrabold text-emerald-700 block font-mono">0 Infractions</strong>
+              <span class="text-[10px] text-emerald-700 font-bold block">100% Clean Conduct</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase block font-semibold">Proctoring Integrity</span>
+              <strong class="text-xl sm:text-2xl font-extrabold text-slate-900 block font-mono">100% Score</strong>
+              <span class="text-[10px] text-emerald-700 font-bold block">Zero Irregularities</span>
+            </div>
+          </div>
+
+          <!-- Credit Progress Bar -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs font-mono">
+            <div class="flex justify-between items-center text-[11px]">
+              <span class="text-slate-600">B.Tech (Hons) CSE Degree Completion Progress:</span>
+              <strong class="text-blue-700 font-bold">142 of 148 Credits Completed (6 Remaining in Sem 8)</strong>
+            </div>
+            <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+              <div class="bg-gradient-to-r from-blue-600 to-emerald-500 h-full rounded-full" style="width: 96%;"></div>
+            </div>
+            <div class="flex justify-between items-center text-[10px] text-slate-500 pt-0.5">
+              <span>Expected Degree Conferred: <strong class="text-slate-800">${profile.degree_expected || 'July 2026'}</strong></span>
+              <span>Provisional Certificate ID: <strong class="text-blue-700">${provisionalCert}</strong></span>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- SECTION C: COURSE TRANSCRIPTS & EXAMINATION RECORDS -->
+        ${showCourses ? `
+        <div class="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+            <div>
+              <h3 class="font-extrabold text-slate-900 text-xs uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <span>📚</span> Enrolled Course Transcripts &amp; Grade History
+              </h3>
+              <p class="text-[11px] text-slate-500 font-sans">Official Registrar Gradebook &bull; End-Term &amp; Continuous Internal Evaluation</p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap text-xs font-mono">
+              <div class="relative">
+                <input type="text" oninput="filterAcademicTranscripts(this.value)" placeholder="Search courses or codes..."
+                  class="px-3 py-1.5 pl-8 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-mono focus:outline-none focus:border-blue-500 w-44 sm:w-56" />
+                <span class="absolute left-2.5 top-2 text-slate-400 text-xs">🔍</span>
+              </div>
+              <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button type="button" id="sem-filter-all" onclick="filterAcademicTranscriptsBySemester('all')"
+                  class="px-2.5 py-1 rounded-lg bg-blue-700 text-white text-[10px] font-bold cursor-pointer transition-all">All (${transcripts.length})</button>
+                <button type="button" id="sem-filter-7" onclick="filterAcademicTranscriptsBySemester('Sem 7')"
+                  class="px-2.5 py-1 rounded-lg bg-transparent text-slate-700 hover:bg-slate-200 text-[10px] font-bold cursor-pointer transition-all">Sem 7</button>
+                <button type="button" id="sem-filter-6" onclick="filterAcademicTranscriptsBySemester('Sem 6')"
+                  class="px-2.5 py-1 rounded-lg bg-transparent text-slate-700 hover:bg-slate-200 text-[10px] font-bold cursor-pointer transition-all">Sem 6</button>
               </div>
             </div>
           </div>
 
-          <!-- Card 2: DigiLocker Student Document Vault -->
-          <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-200">
-              <span class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                <span>📜</span> DigiLocker Document Vault
-              </span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200">SHA-256</span>
-            </div>
-            <div class="space-y-2.5 text-xs">
-              ${docRows}
-            </div>
+          <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-left text-xs font-mono">
+              <thead class="bg-slate-50 text-slate-600 text-[10px] uppercase border-b border-slate-200">
+                <tr>
+                  <th class="p-3">Course Code</th>
+                  <th class="p-3">Course Title</th>
+                  <th class="p-3 text-center">Credits</th>
+                  <th class="p-3 text-center">Semester</th>
+                  <th class="p-3 text-right">Final Grade</th>
+                </tr>
+              </thead>
+              <tbody id="vault-transcripts-tbody" class="divide-y divide-slate-200 bg-white">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
           </div>
 
-          <!-- Card 3: Scholarship & Fee-Account Summary -->
-          <div class="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-200 space-y-4">
-            <div class="flex items-center justify-between pb-2 border-b border-emerald-100">
-              <span class="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                <span>💰</span> Scholarship &amp; Fee Ledger
-              </span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">NIL DUES</span>
+          <!-- Formal Examination Records -->
+          <div class="pt-2 space-y-2.5">
+            <h4 class="font-bold text-xs uppercase tracking-wider text-slate-700 font-mono flex items-center gap-1.5">
+              <span>✍️</span> Official Proctored Examination Records
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-mono">
+              ${exams.map(e => `
+                <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <div class="flex justify-between items-start">
+                    <strong class="text-slate-900 font-sans block text-xs font-bold">${e.exam || e.name || 'End-Term Comprehensive'}</strong>
+                    <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800">${e.score || e.grade || 'Verified'}</span>
+                  </div>
+                  <p class="text-[10px] text-slate-500">${e.session || 'Autumn 2026'} &bull; ${e.status || 'CONFIDENTIAL RECORD'}</p>
+                  <div class="pt-1 border-t border-slate-200 text-[9px] text-emerald-700 font-mono">
+                    ✓ ${e.seal || 'Faculty Proctor Seal Affirmed'}
+                  </div>
+                </div>
+              `).join('')}
             </div>
-            <div class="space-y-2 text-xs">
-              <div class="flex justify-between items-center">
-                <span class="text-slate-600">Scholarship Award:</span>
-                <strong class="text-emerald-800 font-bold">${fin.scholarship}</strong>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- SECTION D: OFFICIAL DIGITAL DOCUMENT VAULT (DIGILOCKER) -->
+        ${showDocs ? `
+        <div class="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+            <div>
+              <h3 class="font-extrabold text-slate-900 text-xs uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <span>📜</span> Official Digital Document Vault (DigiLocker / NAD Interoperable)
+              </h3>
+              <p class="text-[11px] text-slate-500 font-sans">Cryptographically Sealed Academic Certificates &bull; SHA-256 Verified Institutional Records</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 self-start sm:self-auto font-mono">
+              ✓ PKI RSA-4096 Certified
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs font-mono">
+            ${docs.map(d => `
+              <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 shadow-2xs">
+                <div class="flex justify-between items-start">
+                  <div class="space-y-0.5">
+                    <strong class="text-slate-900 font-bold block text-sm font-sans">${d.title}</strong>
+                    <span class="text-[10px] text-slate-500 font-mono">Authority: ${d.authority}</span>
+                  </div>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 shrink-0">
+                    ✓ Sealed
+                  </span>
+                </div>
+
+                <div class="flex items-center justify-between text-[11px] text-slate-600 pt-1 border-t border-slate-200">
+                  <div class="flex items-center gap-1.5">
+                    <span>Doc ID:</span>
+                    <strong class="text-blue-700">${d.doc_id}</strong>
+                    <button type="button" onclick="copyAcademicIdentifier('${d.doc_id}', this)" title="Copy Doc ID"
+                      class="text-slate-400 hover:text-slate-800 p-0.5 rounded cursor-pointer">📋</button>
+                  </div>
+                  <button type="button" onclick="openAcademicDocModal('${d.doc_id}')"
+                    class="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-[10px] font-bold font-mono transition-all cursor-pointer inline-flex items-center gap-1">
+                    <span>📄</span> Verify &amp; View
+                  </button>
+                </div>
               </div>
-              <div class="flex justify-between items-center">
-                <span class="text-slate-600">Tuition Fee Due:</span>
-                <strong class="text-emerald-700 font-bold">${fin.tuition_due}</strong>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-slate-600">Semester Status:</span>
-                <strong class="text-emerald-700 font-bold">${fin.status}</strong>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-slate-600">Bank Mandate:</span>
-                <strong class="text-slate-900 font-bold">${fin.bank_mandate}</strong>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- SECTION E: SCHOLARSHIP & FINANCIAL ASSISTANCE LEDGER -->
+        ${showFinance ? `
+        <div class="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+            <div>
+              <h3 class="font-extrabold text-slate-900 text-xs uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <span>💰</span> Scholarship, Fellowship &amp; Fee Ledger
+              </h3>
+              <p class="text-[11px] text-slate-500 font-sans">Official University Bursar Records &bull; Full Tuition Clearance &bull; Direct Benefit Transfer</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 self-start sm:self-auto font-mono">
+              100% Tuition Waiver
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs font-mono">
+            <!-- Card 1: Scheme -->
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Sanctioned Fellowship Scheme</span>
+              <strong class="text-slate-900 block font-sans text-xs">${fin.scholarship || 'Merit-cum-Need National Fellowship'}</strong>
+              <div class="pt-1 text-[11px] text-emerald-700 font-bold">
+                ✓ 100% Tuition Waiver Cleared
               </div>
             </div>
 
-            <div class="pt-2 border-t border-emerald-100 space-y-1.5">
-              <span class="text-[10px] text-slate-500 uppercase tracking-wider font-bold block">Official Receipt Archive</span>
-              <div class="p-2 rounded-xl bg-white border border-emerald-100 text-[11px] flex items-center justify-between">
-                <span>Receipt ${fin.receipt_ref}</span>
-                <span class="text-emerald-700 font-bold">${fin.receipt_status}</span>
+            <!-- Card 2: Disbursement & Stipend -->
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Direct Disbursement</span>
+              <strong class="text-blue-700 block text-xs font-bold">${fin.stipend_disbursement || '₹25,000 / month (Research Assistantship)'}</strong>
+              <div class="pt-1 text-[11px] text-slate-600">
+                Tuition Due: <strong class="text-emerald-700 font-bold">${fin.tuition_due || '₹0.00 (Fully Settled)'}</strong>
+              </div>
+            </div>
+
+            <!-- Card 3: Mandate & Receipt -->
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Bank Mandate &amp; Receipt</span>
+              <strong class="text-slate-900 block text-xs truncate">${fin.bank_mandate || 'State Bank of India (•••3921)'}</strong>
+              <div class="pt-1 flex justify-between items-center text-[10px]">
+                <span class="text-slate-600">Receipt: <strong class="text-blue-700">${fin.receipt_ref || '#REC-2026-7810'}</strong></span>
+                <span class="text-emerald-700 font-bold">${fin.receipt_status || 'Settled'}</span>
               </div>
             </div>
           </div>
         </div>
+        ` : ''}
+
+        <!-- SECTION F: ACADEMIC SECURITY & ACCESS AUDIT -->
+        ${showSecurity ? `
+        <div class="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+            <div>
+              <h3 class="font-extrabold text-slate-900 text-xs uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <span>🛡️</span> Academic Security &amp; Access Audit Trail
+              </h3>
+              <p class="text-[11px] text-slate-500 font-sans">Cognisec AI Zero-Trust Verification Logs &bull; Volatile In-Memory Clearance</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 self-start sm:self-auto font-mono">
+              Audit Trail Active
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs font-mono">
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Authorization Timestamp</span>
+              <strong class="text-slate-900 text-xs block">${lastAuthTimestamp}</strong>
+              <span class="text-[10px] text-emerald-700 font-bold block">Active Browser Session</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Security Decision &amp; Risk</span>
+              <strong class="text-emerald-700 text-xs block font-bold">ALLOW (Zero-Trust Verified)</strong>
+              <span class="text-[10px] text-slate-500 block">Risk Score: 0.002 (VERY LOW)</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Verification Factor</span>
+              <strong class="text-blue-700 text-xs block font-bold">NeuralTrace Gesture Dynamic</strong>
+              <span class="text-[10px] text-slate-600 block">Signal Route Confirmed</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Client Hardware Token</span>
+              <strong class="text-slate-900 text-xs block truncate">TLS 1.3 Certified Hardware Client</strong>
+              <span class="text-[10px] text-emerald-700 font-bold block">Anti-Proxy Shield Active</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Passive Telemetry Stream</span>
+              <strong class="text-emerald-700 text-xs block font-bold">Connected (TLS 1.3)</strong>
+              <span class="text-[10px] text-slate-500 block">Passive Behavioral Vector</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">ApplicationGrant Reference</span>
+              <strong class="text-blue-700 text-xs block font-mono">#AG-ACAD-2026-9481</strong>
+              <span class="text-[10px] text-slate-500 block">Auto-Revokes on Tab Exit</span>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- SECTION G: ACADEMIC CALENDAR & IMPORTANT DEADLINES -->
+        ${showIdentity || showAll ? `
+        <div class="p-5 sm:p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+            <div>
+              <h3 class="font-extrabold text-slate-900 text-xs uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <span>📅</span> Academic Calendar &amp; Important Semester Milestones
+              </h3>
+              <p class="text-[11px] text-slate-500 font-sans">Official BITS Pilani Senate Approved Academic Schedule &bull; Semester VII (2026–2027)</p>
+            </div>
+            <span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 font-mono">Official University Schedule</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+            <div class="p-3.5 rounded-xl bg-white border border-slate-200 space-y-1">
+              <span class="text-blue-700 text-[10px] font-bold block">12 NOV 2026</span>
+              <strong class="text-slate-900 block font-sans text-xs">Mid-Semester Exams</strong>
+              <p class="text-[10px] text-slate-500">Hall ticket issuance &bull; Closed-book examination</p>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-white border border-slate-200 space-y-1">
+              <span class="text-amber-700 text-[10px] font-bold block">28 NOV 2026</span>
+              <strong class="text-slate-900 block font-sans text-xs">Major Project Expo 2026</strong>
+              <p class="text-[10px] text-slate-500">Department jury demo &bull; Anti-proxy live presentation</p>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-white border border-slate-200 space-y-1">
+              <span class="text-blue-700 text-[10px] font-bold block">15 DEC 2026</span>
+              <strong class="text-slate-900 block font-sans text-xs">Comprehensive End-Terms</strong>
+              <p class="text-[10px] text-slate-500">Semester 7 End-Semester exams conclude</p>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-white border border-slate-200 space-y-1">
+              <span class="text-emerald-700 text-[10px] font-bold block">15 JUL 2027</span>
+              <strong class="text-slate-900 block font-sans text-xs">Degree Convocation</strong>
+              <p class="text-[10px] text-slate-500">71st Annual Convocation &bull; Degree conferral</p>
+            </div>
+          </div>
+        </div>
+        ` : ''}
       `;
+
+      // Render the transcripts table if on visible tab
+      if (showCourses) {
+        renderAcademicTranscriptsTable();
+      }
     }
 
     async function requestAcademicVaultAccess() {
@@ -1470,14 +2079,29 @@
           return;
         }
 
-        // Step-up required
-        showToast("NeuralTrace Verification Required", "Reconstruct your enrolled neural route to authorize confidential access.", "🛡️");
+        // Step-up required for confidential vault: strictly NeuralTrace (or cognitive if HIGH risk), never OTP
+        const reqFactor = (accessCheck.required_factor && accessCheck.required_factor !== 'OTP')
+          ? accessCheck.required_factor
+          : (accessCheck.risk_level === 'HIGH' ? 'HIGH_RISK_DUAL' : 'GESTURE_PATTERN');
+        let factorTitle = 'NEURALTRACE — CONFIDENTIAL ACCESS VERIFICATION';
+        let factorSubtitle = 'Zero Trust policy requires NeuralTrace signal verification to unlock confidential academic records.';
+        let factorReason = 'Zero Trust verification: Reconstruct your enrolled neural route to authorize access to your confidential academic dossier.';
+        let toastLabel = 'NeuralTrace Verification Required';
+
+        if (reqFactor === 'HIGH_RISK_DUAL') {
+          factorTitle = 'SEQUENTIAL COGNITIVE VERIFICATION — HIGH RISK ACCESS';
+          factorSubtitle = 'High risk detected. Complete sequential cognitive verification (Image Sequence & Private Response) to unlock confidential academic records.';
+          factorReason = 'Zero Trust policy: Complete sequential cognitive verification to access your confidential academic records under elevated risk.';
+          toastLabel = 'Sequential Cognitive Verification Required';
+        }
+
+        showToast(toastLabel, factorSubtitle, "🛡️");
         cs.openStepUpModal({
-          preferredFactor: 'GESTURE_PATTERN',
+          preferredFactor: reqFactor,
           targetResource: 'academic_vault',
-          title: 'NEURALTRACE — CONFIDENTIAL ACCESS VERIFICATION',
-          subtitle: 'Additional identity verification is required to access confidential academic records.',
-          reason: 'Zero Trust verification: Reconstruct your enrolled neural route to authorize access to your confidential academic dossier.',
+          title: factorTitle,
+          subtitle: factorSubtitle,
+          reason: factorReason,
           forceNew: true,
           onSuccess: async (data) => {
             const verifyCheck = await cs.checkResourceAccess('academic_vault');
@@ -1503,6 +2127,8 @@
 
     function lockAcademicVault() {
       isAcademicVaultUnlocked = false;
+      currentAcademicVaultData = null;
+      if (typeof closeAcademicDocModal === 'function') closeAcademicDocModal();
       if (window.cognisec) {
         window.cognisec.revokeResourceClearance('academic_vault');
         if (typeof window.cognisec.relockVault === 'function') {
@@ -1964,7 +2590,7 @@
 
       container.innerHTML = slots.map(slot => {
         const typeBadge = slot.type === 'Practical Lab' 
-          ? 'bg-purple-50 text-purple-700 border-purple-200'
+          ? 'bg-blue-50 text-blue-700 border-blue-200'
           : (slot.type === 'Tutorial' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-sky-50 text-sky-700 border-sky-200');
 
         return `
@@ -2282,7 +2908,7 @@
             <div class="flex items-center gap-2 flex-wrap">
               <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-50 text-sky-700 border border-sky-200">${e.code}</span>
               <strong class="text-sm font-extrabold text-slate-900">${e.name}</strong>
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${e.type === 'practical' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-slate-100 text-slate-700'}">${e.type}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${e.type === 'practical' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-700'}">${e.type}</span>
             </div>
             <div class="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-600 pt-1">
               <span>📅 <strong>${e.date}</strong></span>
@@ -2395,7 +3021,7 @@
         const isExpanded = (expandedNoticeId === n.id);
         const catBadge = n.category === 'exam' 
           ? 'bg-amber-50 text-amber-800 border-amber-200' 
-          : (n.category === 'placement' ? 'bg-purple-50 text-purple-800 border-purple-200' : 'bg-sky-50 text-sky-800 border-sky-200');
+          : (n.category === 'placement' ? 'bg-blue-50 text-blue-800 border-blue-200' : 'bg-sky-50 text-sky-800 border-sky-200');
 
         return `
           <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3 portal-card cursor-pointer" onclick="toggleAnnouncement(${n.id})">
@@ -2513,22 +3139,60 @@
       document.getElementById('service-contact-modal').classList.add('hidden');
     }
 
-    // ================= EXAM MODAL LAUNCH (PRESERVED) =================
-    function launchExam(courseName) {
-      if (!isStudentLoggedIn) {
+    // ================= EXAM MODAL LAUNCH WITH PROTECTED-ACTION OTP =================
+    let _authorizedExamSession = null;
+
+    async function launchExam(courseName) {
+      if (!isStudentLoggedIn || !window.cognisec || !window.cognisec.isAuthenticated()) {
         showToast("Student Authentication Required", "Please sign in to launch online exams.", "🔒");
         openStudentSignInModal();
         return;
       }
-      if (window.cognisec && !window.cognisec.isFullyVerified()) {
-        showToast("Verification Required", "Academic exam terminal locked until mandatory identity OTP is verified.", "🔒");
+      if (!window.cognisec.isFullyVerified()) {
+        showToast("Verification Required", "Academic exam terminal locked until 20-second post-login verification is completed.", "🔒");
         if (window.cognisec.triggerLoginOtpModal) window.cognisec.triggerLoginOtpModal();
         return;
       }
-      document.getElementById('exam-course-name').textContent = courseName;
-      document.getElementById('exam-step-init').classList.remove('hidden');
-      document.getElementById('exam-step-active').classList.add('hidden');
-      document.getElementById('exam-modal').classList.remove('hidden');
+      if (window._isLaunchingExam) {
+        return;
+      }
+      window._isLaunchingExam = true;
+      const targetCourse = courseName || 'CS F301 • End-Semester Proctored Assessment';
+
+      showToast(
+        "Dispatching Examination OTP...",
+        `Requesting proctored exam verification code for ${targetCourse} via Gmail SMTP...`,
+        "📧"
+      );
+
+      try {
+        const challenge = await window.cognisec.requestCollegeExamOtp({ courseName: targetCourse });
+        window.cognisec.openExamOtpModal(challenge, {
+          courseName: targetCourse,
+          onSuccess: (examSession) => {
+            _authorizedExamSession = examSession;
+            const courseEl = document.getElementById('exam-course-name');
+            if (courseEl) courseEl.textContent = examSession.course_name || targetCourse;
+            const tokenEl = document.getElementById('token-id');
+            if (tokenEl && examSession.exam_token) tokenEl.textContent = examSession.exam_token;
+            document.getElementById('exam-step-init').classList.remove('hidden');
+            document.getElementById('exam-step-active').classList.add('hidden');
+            document.getElementById('exam-modal').classList.remove('hidden');
+            showToast(
+              "Examination Unlocked",
+              `OTP verified on backend. Proctored terminal authorized (${examSession.exam_token || '#BITS-EXM'}).`,
+              "✅"
+            );
+          },
+          onCancel: () => {
+            showToast("Exam Launch Cancelled", "Online examination remains locked.", "🔒");
+          }
+        });
+      } catch (err) {
+        showToast("Exam Verification Error", err.message || "Unable to dispatch examination OTP.", "⚠️");
+      } finally {
+        window._isLaunchingExam = false;
+      }
     }
 
     function openStudentModal() {
@@ -2549,19 +3213,21 @@
       document.getElementById('exam-modal').classList.add('hidden');
     }
 
-    function startExamSession() {
-      const initStep = document.getElementById('exam-step-init');
-      initStep.innerHTML = `
-        <div class="text-center py-8 space-y-3">
-          <div class="w-10 h-10 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p class="text-xs font-bold text-slate-800">Verifying Aadhaar Biometrics &amp; Launching Test Terminal...</p>
-        </div>
-      `;
-      setTimeout(() => {
-        document.getElementById('token-id').textContent = '#BITS-2026-' + Math.floor(1000 + Math.random() * 9000);
-        initStep.classList.add('hidden');
+    async function startExamSession() {
+      const courseName = document.getElementById('exam-course-name')?.textContent || 'CS F301 • End-Semester Proctored Assessment';
+      try {
+        const authCheck = await window.cognisec.fetchAuthorizedExamSession(courseName);
+        if (!authCheck || !authCheck.authorized) {
+          throw new Error('Examination OTP verification required.');
+        }
+        const tokenEl = document.getElementById('token-id');
+        if (tokenEl) tokenEl.textContent = authCheck.exam_token || '#BITS-2026-' + Math.floor(1000 + Math.random() * 9000);
+        document.getElementById('exam-step-init').classList.add('hidden');
         document.getElementById('exam-step-active').classList.remove('hidden');
-      }, 1400);
+      } catch (err) {
+        closeExamModal();
+        showToast("Access Denied", err.message || "Online examination requires valid OTP authorization.", "🚫");
+      }
     }
 
     // ================= INITIALIZE ALL SECTIONS =================

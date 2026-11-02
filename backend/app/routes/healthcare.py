@@ -12,17 +12,23 @@ from app.services.session_service import SessionService
 from app.core.security import create_access_token
 from app.core.rate_limit import rate_limiter
 import json
-from app.routes.deps import get_current_user, require_admin
+from app.routes.deps import get_current_user, require_admin, get_optional_current_user
 from app.models.security_event import SecurityEvent
 from app.schemas.admin import DevResetLockoutRequest, DevResetLockoutResponse
 from app.core.config import settings
+from app.services.step_up_service import StepUpService
 from app.schemas.healthcare import (
     DoctorResponse,
     DepartmentResponse,
     AppointmentCreateRequest,
     AppointmentResponse,
     DoctorLoginRequest,
-    DoctorProfileResponse
+    DoctorProfileResponse,
+    AppointmentOtpRequest,
+    AppointmentOtpResponse,
+    AppointmentOtpVerifyRequest,
+    AppointmentOtpVerifyResponse,
+    AppointmentOtpResendRequest
 )
 from app.schemas.auth import TokenResponse
 
@@ -71,9 +77,153 @@ def check_availability(
     }
 
 
+@router.post("/appointment-otp/request", response_model=AppointmentOtpResponse)
+def request_appointment_otp(
+    request: AppointmentOtpRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Initiates outpatient appointment verification OTP for AyuSync MedCare.
+    Dispatches a single-use 6-digit code via Gmail SMTP to user's registered address (boomikaram35@gmail.com).
+    Binds challenge to patient details, doctor, date, time slot, session, and user.
+    """
+    if not request.session_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Session ID is required."
+        )
+
+    session = SessionService.get_session(db, request.session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found."
+        )
+
+    if session.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Session does not belong to the authenticated user."
+        )
+
+    if session.status in ("TERMINATED", "REVOKED") or session.current_risk_level == "CRITICAL":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Session is terminated or restricted by security policy."
+        )
+
+    if session.status in ("PENDING_OBSERVATION", "PENDING_OTP"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Baseline behavioral observation or initial login verification is incomplete."
+        )
+
+    appointment_data = {
+        "doctor_id": request.doctor_id,
+        "appointment_date": request.appointment_date,
+        "time_slot": request.time_slot,
+        "patient_name": request.patient_name,
+        "patient_phone": request.patient_phone,
+        "patient_email": request.patient_email,
+        "department": request.department,
+        "consultation_mode": request.consultation_mode,
+        "room": request.room
+    }
+
+    challenge_data = StepUpService.create_appointment_otp_challenge(
+        session_id=session.id,
+        user_id=current_user.id,
+        appointment_data=appointment_data,
+        db=db
+    )
+
+    return AppointmentOtpResponse(**challenge_data)
+
+
+@router.post("/appointment-otp/verify", response_model=AppointmentOtpVerifyResponse)
+def verify_appointment_otp(
+    request: AppointmentOtpVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Atomically verifies the single-use appointment OTP code.
+    Upon success: re-checks slot availability, persists HealthcareAppointment, and logs security event.
+    Upon failure: rejects booking, decrements remaining attempts.
+    """
+    session = SessionService.get_session(db, request.session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found."
+        )
+
+    if session.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Session does not belong to the authenticated user."
+        )
+
+    success, message, appointment = StepUpService.verify_appointment_otp(
+        session_id=request.session_id,
+        user_id=current_user.id,
+        challenge_id=request.challenge_id,
+        otp_code=request.otp_code,
+        db=db
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message
+        )
+
+    return AppointmentOtpVerifyResponse(
+        success=True,
+        reference_id=appointment.reference_id,
+        status="CONFIRMED",
+        message="Appointment confirmed successfully.",
+        appointment=AppointmentResponse.model_validate(appointment)
+    )
+
+
+@router.post("/appointment-otp/resend", response_model=AppointmentOtpResponse)
+def resend_appointment_otp(
+    request: AppointmentOtpResendRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Resends appointment verification OTP subject to 15s cooldown.
+    """
+    session = SessionService.get_session(db, request.session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found."
+        )
+
+    if session.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Session does not belong to the authenticated user."
+        )
+
+    challenge_data = StepUpService.resend_appointment_otp_challenge(
+        session_id=request.session_id,
+        user_id=current_user.id,
+        challenge_id=request.challenge_id,
+        db=db
+    )
+
+    return AppointmentOtpResponse(**challenge_data)
+
+
 @router.post("/appointments", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
 def book_appointment(
     request: AppointmentCreateRequest,
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -90,7 +240,7 @@ def book_appointment(
     appointment = HealthcareService.create_appointment(
         db=db,
         req=request,
-        user_id=None
+        user_id=current_user.id if current_user else None
     )
     return appointment
 
@@ -98,12 +248,38 @@ def book_appointment(
 @router.get("/appointments", response_model=List[AppointmentResponse])
 def list_appointments(
     email: Optional[str] = Query(None, description="Patient email address to retrieve appointments"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
     """Retrieves persisted appointments for patient view."""
-    if not email:
-        return []
-    return HealthcareService.get_appointments(db=db, email=email)
+    if current_user and current_user.role.upper() not in ("DOCTOR", "ADMIN"):
+        # Regular patients can only view their own appointments
+        target_email = current_user.email
+        return HealthcareService.get_appointments(db=db, user_id=current_user.id, email=target_email)
+
+    if email:
+        return HealthcareService.get_appointments(db=db, email=email)
+    elif current_user and current_user.role.upper() in ("DOCTOR", "ADMIN"):
+        return HealthcareService.get_appointments(db=db, limit=100)
+    return []
+
+
+@router.post("/appointments/{reference_id}/cancel", response_model=AppointmentResponse)
+def cancel_appointment(
+    reference_id: str,
+    patient_email: Optional[str] = Query(None, description="Patient email address for verification"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Cancels an appointment subject to patient ownership or doctor authorization rules.
+    """
+    return HealthcareService.cancel_appointment(
+        db=db,
+        reference_id=reference_id,
+        current_user=current_user,
+        patient_email=patient_email
+    )
 
 
 @router.post("/doctor/login", response_model=TokenResponse)
@@ -190,15 +366,15 @@ def doctor_login(
         nickname="Hospital Workstation"
     )
 
-    # Provision active clinical workstation session
+    # Provision clinical workstation session entering 20-second mandatory behavioral observation window
     active_session = SessionService.create_session(
         db,
         user_id=user.id,
         application="healthcare",
         device_id=device.id,
         ip_address=client_ip,
-        status="ACTIVE",
-        is_pending_observation=False
+        status="PENDING_OBSERVATION",
+        is_pending_observation=True
     )
 
     access_token = create_access_token(
@@ -216,7 +392,7 @@ def doctor_login(
         email=user.email,
         session_id=active_session.id,
         session_status=active_session.status,
-        observation_seconds_remaining=0,
+        observation_seconds_remaining=settings.OBSERVATION_WINDOW_SECONDS,
         is_new_device=is_new,
         device_id=device.device_id,
         trust_state=device.trust_state

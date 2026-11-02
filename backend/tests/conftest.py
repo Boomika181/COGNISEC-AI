@@ -41,9 +41,11 @@ def mock_smtp_in_tests(monkeypatch):
     original_send_otp = getattr(EmailService, "_original_send_otp", EmailService.send_otp_email)
     original_send_alert = getattr(EmailService, "_original_send_alert", EmailService.send_new_device_login_alert)
     original_send_reset = getattr(EmailService, "_original_send_reset", EmailService.send_password_reset_email)
+    original_send_pay = getattr(EmailService, "_original_send_pay", EmailService.send_payment_otp_email)
     EmailService._original_send_otp = original_send_otp
     EmailService._original_send_alert = original_send_alert
     EmailService._original_send_reset = original_send_reset
+    EmailService._original_send_pay = original_send_pay
 
     def mocked_send_otp(recipient_email, otp_code, expires_in_minutes=5, *args, **kwargs):
         if not EmailService.is_configured():
@@ -54,6 +56,16 @@ def mock_smtp_in_tests(monkeypatch):
         if os.getenv("TEST_USE_REAL_SMTP", "false").lower() == "true":
             return original_send_otp(recipient_email, otp_code, expires_in_minutes, *args, **kwargs)
         return (True, f"Mocked email dispatched to {EmailService.mask_email(recipient_email)}")
+
+    def mocked_send_pay(recipient_email, otp_code, order_id, amount, item_summary, expires_in_minutes=5, *args, **kwargs):
+        if not EmailService.is_configured():
+            return original_send_pay(recipient_email, otp_code, order_id, amount, item_summary, expires_in_minutes, *args, **kwargs)
+        is_deliv, reason = EmailService.is_deliverable_recipient(recipient_email)
+        if not is_deliv:
+            return (False, f"Delivery rejected: {reason}")
+        if os.getenv("TEST_USE_REAL_SMTP", "false").lower() == "true":
+            return original_send_pay(recipient_email, otp_code, order_id, amount, item_summary, expires_in_minutes, *args, **kwargs)
+        return (True, f"Mocked payment email dispatched to {EmailService.mask_email(recipient_email)}")
 
     def mocked_send_reset(recipient_email, otp_code, expires_in_minutes=5, *args, **kwargs):
         if not EmailService.is_configured():
@@ -77,6 +89,7 @@ def mock_smtp_in_tests(monkeypatch):
         return (True, "Mocked new device alert dispatched")
 
     monkeypatch.setattr("app.services.email_service.EmailService.send_otp_email", mocked_send_otp)
+    monkeypatch.setattr("app.services.email_service.EmailService.send_payment_otp_email", mocked_send_pay)
     monkeypatch.setattr("app.services.email_service.EmailService.send_new_device_login_alert", mocked_send_alert)
     monkeypatch.setattr("app.services.email_service.EmailService.send_password_reset_email", mocked_send_reset)
 
@@ -122,9 +135,33 @@ def setup_test_db():
         role="DOCTOR",
         account_status="ACTIVE"
     )
+    customer = User(
+        name="Jane Doe",
+        email="customer.jane@auraluxe.com",
+        password_hash=get_password_hash("Customer@123"),
+        role="USER",
+        account_status="ACTIVE"
+    )
+    student = User(
+        name="Alex Mercer",
+        email="student.alex@veritas.edu",
+        password_hash=get_password_hash("Student@123"),
+        role="USER",
+        account_status="ACTIVE"
+    )
+    doctor_sarah = User(
+        name="Dr. Sarah Lin",
+        email="dr.sarah@aetheriahealth.org",
+        password_hash=get_password_hash("Doctor@123"),
+        role="DOCTOR",
+        account_status="ACTIVE"
+    )
     db.add(admin)
     db.add(user)
     db.add(doctor)
+    db.add(customer)
+    db.add(student)
+    db.add(doctor_sarah)
     db.commit()
     db.close()
 

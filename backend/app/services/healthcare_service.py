@@ -293,6 +293,51 @@ class HealthcareService:
         return query.order_by(HealthcareAppointment.created_at.desc()).limit(limit).all()
 
     @staticmethod
+    def cancel_appointment(
+        db: Session,
+        reference_id: str,
+        current_user: Optional[User] = None,
+        patient_email: Optional[str] = None
+    ) -> HealthcareAppointment:
+        """
+        Cancels an appointment subject to patient ownership or doctor authorization rules.
+        """
+        apt = db.query(HealthcareAppointment).filter(
+            HealthcareAppointment.reference_id == reference_id
+        ).first()
+        if not apt:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Appointment '{reference_id}' not found in hospital registry."
+            )
+
+        if current_user:
+            if current_user.role.upper() not in ("DOCTOR", "ADMIN"):
+                # Patient can only cancel their own appointment
+                is_owner = (apt.user_id and apt.user_id == current_user.id) or (
+                    apt.patient_email and apt.patient_email.strip().lower() == current_user.email.strip().lower()
+                )
+                if not is_owner:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Unauthorized: You can only cancel your own appointments."
+                    )
+        elif patient_email:
+            if not apt.patient_email or apt.patient_email.strip().lower() != patient_email.strip().lower():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Unauthorized: Email address does not match appointment record."
+                )
+
+        if apt.status == "CANCELLED":
+            return apt
+
+        apt.status = "CANCELLED"
+        db.commit()
+        db.refresh(apt)
+        return apt
+
+    @staticmethod
     def get_doctor_details_for_user(user: User) -> Optional[Dict[str, Any]]:
         """Maps authenticated user account to registered hospital doctor profile."""
         user_email = (user.email or "").strip().lower()

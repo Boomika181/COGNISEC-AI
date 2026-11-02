@@ -73,7 +73,9 @@ def submit_behavior_event(
         )
 
     # 3. Enforce Application Context Matching
-    if event_data.application.lower() != session.application.lower():
+    req_norm_app = SessionService.normalize_application(event_data.application) or event_data.application.lower()
+    sess_norm_app = SessionService.normalize_application(session.application) or session.application.lower()
+    if req_norm_app != sess_norm_app:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Application mismatch: session registered for '{session.application}', received '{event_data.application}'."

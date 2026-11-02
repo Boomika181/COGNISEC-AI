@@ -99,3 +99,50 @@ class DoctorProfileResponse(BaseModel):
     opd_room: str
     session_id: Optional[str] = None
     session_status: Optional[str] = None
+
+
+class AppointmentOtpRequest(BaseModel):
+    session_id: str = Field(..., description="Active session ID")
+    patient_name: str = Field(..., min_length=2, max_length=100)
+    patient_phone: str = Field(..., min_length=7, max_length=20)
+    patient_email: EmailStr
+    department: str = Field(..., min_length=2, max_length=100)
+    doctor_id: str = Field(..., min_length=2, max_length=50)
+    doctor_name: Optional[str] = None
+    appointment_date: str = Field(..., min_length=10, max_length=10)
+    time_slot: str = Field(..., min_length=2, max_length=30)
+    consultation_mode: str = Field(default="In-Person Hospital Visit")
+    room: Optional[str] = None
+
+
+class AppointmentOtpResponse(BaseModel):
+    challenge_id: str
+    challenge_type: str = "HEALTHCARE_APPOINTMENT"
+    masked_email: str
+    expires_in_seconds: int = 300
+    resend_cooldown_seconds: int = 15
+    message: str
+    doctor_name: Optional[str] = None
+    appointment_date: Optional[str] = None
+    time_slot: Optional[str] = None
+    otp: Optional[str] = ""
+    is_demo_otp: bool = False
+
+
+class AppointmentOtpVerifyRequest(BaseModel):
+    session_id: str = Field(..., description="Active session ID")
+    challenge_id: str = Field(..., description="Challenge identifier")
+    otp_code: str = Field(..., min_length=6, max_length=6, description="6-digit verification code")
+
+
+class AppointmentOtpVerifyResponse(BaseModel):
+    success: bool = True
+    reference_id: str
+    status: str = "CONFIRMED"
+    message: str
+    appointment: AppointmentResponse
+
+
+class AppointmentOtpResendRequest(BaseModel):
+    session_id: str = Field(..., description="Active session ID")
+    challenge_id: str = Field(..., description="Challenge identifier to resend")

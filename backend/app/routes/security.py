@@ -338,6 +338,28 @@ def verify_step_up_challenge(
 
     if not success:
         if is_locked:
+            # Check if repeated vault denials combined with failed verification elevate to CRITICAL
+            from app.services.access_tracker import ConfidentialAccessTracker
+            recent_denials = ConfidentialAccessTracker.get_recent_denials_count(current_user.id, session.id)
+            if recent_denials >= 2 or session.current_risk_level in ("HIGH", "CRITICAL"):
+                session.status = "TERMINATED"
+                session.current_risk_level = "CRITICAL"
+                sec_event = SecurityEvent(
+                    user_id=current_user.id,
+                    session_id=session.id,
+                    application=norm_app or session.application,
+                    event_type="SESSION_TERMINATED",
+                    severity="CRITICAL",
+                    decision="TERMINATE_SESSION",
+                    details="Session terminated due to repeated confidential vault access denials combined with failed verification attempts."
+                )
+                db.add(sec_event)
+                db.commit()
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Session terminated due to critical security risk. Access denied."
+                )
+
             # Session locked due to brute-force attempts
             SessionService.update_session_status(db, request.session_id, status="RESTRICTED", risk_level="HIGH")
             sec_event = SecurityEvent(
@@ -659,21 +681,51 @@ def evaluate_resource_access_decision(
             application=norm_app
         )
 
-    if session.current_risk_level == "HIGH":
-        if is_app_authorized:
-            return AccessDecisionResponse(
-                decision="ALLOW",
-                access_granted=True,
-                session_status="ACTIVE",
-                risk_level="HIGH",
-                step_up_fresh=True,
-                step_up_factor="HIGH_RISK_DUAL",
-                message=f"Confidential access authorized via high-risk sequential cognitive verification for {norm_app}.",
-                verification_required=False,
-                resource=norm_res or request.resource,
-                application=norm_app
-            )
+    # Server-side tracking: Repeated unauthorized clicks to confidential vaults elevate risk
+    if not is_app_authorized:
+        from app.services.access_tracker import ConfidentialAccessTracker
+        denials = ConfidentialAccessTracker.record_denial(
+            user_id=current_user.id,
+            session_id=session.id,
+            resource=norm_res or request.resource
+        )
+        if denials >= settings.CONFIDENTIAL_ACCESS_DENIAL_THRESHOLD:
+            if session.current_risk_level not in ("CRITICAL", "TERMINATED"):
+                session.current_risk_level = "HIGH"
+                db.commit()
 
+    if session.status == "PENDING_OBSERVATION":
+        return AccessDecisionResponse(
+            decision="OBSERVATION_PENDING",
+            access_granted=False,
+            session_status="PENDING_OBSERVATION",
+            risk_level=session.current_risk_level,
+            step_up_fresh=False,
+            step_up_factor=None,
+            message="Behavioral baseline observation active. Confidential access locked.",
+            verification_required=False,
+            resource=norm_res or request.resource,
+            application=norm_app
+        )
+
+    # Server-authoritative check: If application grant is already valid and unexpired
+    if is_app_authorized:
+        active_factor = "HIGH_RISK_DUAL" if session.step_up_factor == "HIGH_RISK_DUAL" else "GESTURE_PATTERN"
+        return AccessDecisionResponse(
+            decision="ALLOW",
+            access_granted=True,
+            session_status=session.status if session.status == "ACTIVE" else "ACTIVE",
+            risk_level=session.current_risk_level,
+            step_up_fresh=True,
+            step_up_factor=active_factor,
+            message=f"Confidential access authorized via server-authoritative {active_factor} verification for {norm_app}.",
+            verification_required=False,
+            resource=norm_res or request.resource,
+            application=norm_app
+        )
+
+    # Step-up verification required to access confidential vault
+    if session.current_risk_level == "HIGH":
         # Check enrollment of both cognitive factors
         enrollment = AdaptiveAuthService.get_enrollment_status(db, current_user.id)
         has_img = enrollment.get("has_cognitive_image_sequence", False)
@@ -703,7 +755,7 @@ def evaluate_resource_access_decision(
         return AccessDecisionResponse(
             decision="STEP_UP_VERIFICATION",
             access_granted=False,
-            session_status="RESTRICTED",
+            session_status=session.status if session.status in ("ACTIVE", "RESTRICTED") else "RESTRICTED",
             risk_level="HIGH",
             step_up_fresh=False,
             step_up_factor=None,
@@ -714,96 +766,20 @@ def evaluate_resource_access_decision(
             application=norm_app
         )
 
-    if session.current_risk_level == "MEDIUM":
-        return AccessDecisionResponse(
-            decision="STEP_UP_VERIFICATION",
-            access_granted=False,
-            session_status=session.status,
-            risk_level="MEDIUM",
-            step_up_fresh=False,
-            step_up_factor=None,
-            message=f"Moderate risk detected. Reconstruct your NeuralTrace signal route to verify identity for {norm_app}.",
-            verification_required=True,
-            required_factor="GESTURE_PATTERN",
-            resource=norm_res or request.resource,
-            application=norm_app
-        )
-
-    if session.status == "RESTRICTED":
-        return AccessDecisionResponse(
-            decision="STEP_UP_VERIFICATION",
-            access_granted=False,
-            session_status="RESTRICTED",
-            risk_level=session.current_risk_level or "MEDIUM",
-            step_up_fresh=False,
-            step_up_factor=None,
-            message=f"Zero Trust policy requires NeuralTrace verification to access {norm_res} in {norm_app}.",
-            verification_required=True,
-            required_factor="GESTURE_PATTERN",
-            resource=norm_res or request.resource,
-            application=norm_app
-        )
-
-    if session.status == "PENDING_OBSERVATION":
-        return AccessDecisionResponse(
-            decision="OBSERVATION_PENDING",
-            access_granted=False,
-            session_status="PENDING_OBSERVATION",
-            risk_level=session.current_risk_level,
-            step_up_fresh=False,
-            step_up_factor=None,
-            message="Behavioral baseline observation active. Confidential access locked.",
-            verification_required=False,
-            resource=norm_res or request.resource,
-            application=norm_app
-        )
-
-    if session.status in ("PENDING_OTP", "STEP_UP_REQUIRED"):
-        return AccessDecisionResponse(
-            decision="STEP_UP_VERIFICATION",
-            access_granted=False,
-            session_status=session.status,
-            risk_level=session.current_risk_level,
-            step_up_fresh=False,
-            step_up_factor=None,
-            message=f"Identity verification required to access confidential records in {norm_app}.",
-            verification_required=True,
-            required_factor="GESTURE_PATTERN",
-            resource=norm_res or request.resource,
-            application=norm_app
-        )
-
-    if session.status == "ACTIVE":
-        active_factor = "HIGH_RISK_DUAL" if session.step_up_factor == "HIGH_RISK_DUAL" else "GESTURE_PATTERN"
-        if is_app_authorized:
-            return AccessDecisionResponse(
-                decision="ALLOW",
-                access_granted=True,
-                session_status="ACTIVE",
-                risk_level=session.current_risk_level,
-                step_up_fresh=True,
-                step_up_factor=active_factor,
-                message=f"Confidential access authorized via server-authoritative {active_factor} verification for {norm_app}.",
-                verification_required=False,
-                resource=norm_res or request.resource,
-                application=norm_app
-            )
-        else:
-            req_factor = "HIGH_RISK_DUAL" if session.current_risk_level == "HIGH" else "GESTURE_PATTERN"
-            factor_label = "sequential cognitive" if req_factor == "HIGH_RISK_DUAL" else "NeuralTrace"
-            return AccessDecisionResponse(
-                decision="STEP_UP_VERIFICATION",
-                access_granted=False,
-                session_status="ACTIVE",
-                risk_level=session.current_risk_level,
-                step_up_fresh=False,
-                step_up_factor=None,
-                message=f"Zero Trust policy requires independent {factor_label} verification to access {norm_res or 'confidential records'} in {norm_app or 'this portal'}.",
-                verification_required=True,
-                required_factor=req_factor,
-                resource=norm_res or request.resource,
-                application=norm_app
-            )
+    # For LOW and MEDIUM risk, confidential vault access strictly requires NeuralTrace (GESTURE_PATTERN), never OTP
+    return AccessDecisionResponse(
+        decision="STEP_UP_VERIFICATION",
+        access_granted=False,
+        session_status=session.status,
+        risk_level=session.current_risk_level or "LOW",
+        step_up_fresh=False,
+        step_up_factor=None,
+        message=f"Zero Trust policy requires NeuralTrace verification to access {norm_res or 'confidential records'} in {norm_app or 'this portal'}.",
+        verification_required=True,
+        required_factor="GESTURE_PATTERN",
+        resource=norm_res or request.resource,
+        application=norm_app
+    )
 
     return AccessDecisionResponse(
         decision="TERMINATE_SESSION",
@@ -947,96 +923,250 @@ def get_confidential_vault_data(
 
     res_norm = norm_res
     if res_norm == "financial_vault":
+        is_jane = bool(
+            current_user.email and ("customer.jane" in current_user.email.lower() or "jane" in current_user.name.lower())
+        )
+        if is_jane:
+            return {
+                "resource": "financial_vault",
+                "application": "shopping",
+                "access_granted": True,
+                "success": True,
+                "data": {
+                    "account_holder": current_user.name,
+                    "account_email": current_user.email,
+                    "saved_cards": [
+                        {
+                            "bank": "HDFC Regalia Gold Visa",
+                            "number": "•••• •••• •••• 4821",
+                            "last4": "4821",
+                            "network": "VISA Platinum",
+                            "expiry": "08/28",
+                            "type": "Primary Corporate Card",
+                            "limit_available": "₹3,42,500 / ₹5,00,000",
+                            "token_status": "Zero-Trust Token Active (EMVCo 3DS)"
+                        },
+                        {
+                            "bank": "ICICI Sapphiro Mastercard",
+                            "number": "•••• •••• •••• 9104",
+                            "last4": "9104",
+                            "network": "Mastercard World",
+                            "expiry": "11/27",
+                            "type": "Secondary Retail Card",
+                            "limit_available": "₹4,18,000 / ₹5,00,000",
+                            "token_status": "Verified Hardware Cryptogram"
+                        }
+                    ],
+                    "upi_vpa": {
+                        "primary": "customer.jane@okhdfcbank",
+                        "secondary": "jane.doe99@axisbank",
+                        "linked_account": "State Bank of India (••3921)",
+                        "mandate_id": "#MAND-UPI-2026-8810",
+                        "mandate_limit": "₹25,000 / transaction",
+                        "status": "AutoPay Active"
+                    },
+                    "billing_info": {
+                        "name": "Jane Doe",
+                        "address_line": "Flat 402, Prestige Palms, 12th Main Indiranagar",
+                        "city_state_pin": "Bengaluru, Karnataka - 560038",
+                        "tax_gstin": "29AAACN8491M1Z5 (Verified)",
+                        "phone": "+91 98450 •••••"
+                    },
+                    "bank_account": {
+                        "bank": "State Bank of India",
+                        "branch": "Indiranagar Branch, Bengaluru",
+                        "account_number": "••••••••••3921",
+                        "ifsc": "SBIN0004012",
+                        "type": "Salary Account (Verified Mandate)"
+                    },
+                    "bank_mandates": [
+                        {
+                            "bank": "State Bank of India (Savings)",
+                            "account": "••••••••••3921",
+                            "ifsc": "SBIN0004012",
+                            "branch": "MG Road, Bengaluru",
+                            "mandate_type": "Retail Auto-Pay Mandate",
+                            "status": "ACTIVE",
+                            "mandate_cap": "₹25,000 / transaction",
+                            "ref": "#MAND-2026-NYRAA-88419"
+                        }
+                    ],
+                    "recent_confidential_orders": [
+                        {
+                            "order_id": "#NYR-98421",
+                            "date": "28 Oct 2026",
+                            "item": "Nyraa Titan Chronograph",
+                            "amount": "₹14,999",
+                            "payment_method": "UPI AutoPay (HDFC)",
+                            "status": "Settled & Delivered",
+                            "delivery": "Indiranagar, Bengaluru"
+                        },
+                        {
+                            "order_id": "#NYR-97105",
+                            "date": "15 Oct 2026",
+                            "item": "Artisanal Leather Duffle",
+                            "amount": "₹5,999",
+                            "payment_method": "HDFC Regalia Token",
+                            "status": "Settled & Delivered",
+                            "delivery": "Koramangala, Bengaluru"
+                        },
+                        {
+                            "order_id": "#NYR-96540",
+                            "date": "04 Oct 2026",
+                            "item": "Premium Wireless ANC Headphones",
+                            "amount": "₹3,499",
+                            "payment_method": "ICICI Sapphiro ••9104",
+                            "status": "Settled & Delivered",
+                            "delivery": "Indiranagar, Bengaluru"
+                        }
+                    ],
+                    "recent_orders": [
+                        {
+                            "order_id": "#NYR-98421",
+                            "item": "Nyraa Titan Chronograph",
+                            "amount": "₹14,999",
+                            "method": "Paid via UPI 1-Tap",
+                            "status": "Settled",
+                            "delivery": "Delivered: Indiranagar, Bengaluru"
+                        }
+                    ],
+                    "refund_records": [
+                        {
+                            "refund_id": "#REF-2026-0814",
+                            "order_ref": "#NYR-94812",
+                            "amount": "₹1,299.00",
+                            "method": "Original Payment (HDFC Visa ••4821)",
+                            "status": "PROCESSED (ARN: 489201948210)",
+                            "date": "18 Oct 2026",
+                            "reason": "Return processed at warehouse"
+                        }
+                    ],
+                    "fraud_review": {
+                        "risk_assessment": "VERY_LOW (0.002)",
+                        "3ds_history": "3DS 2.2 Frictionless Auth (Auth Ref #AUTH-3DS-884192)",
+                        "device_trust": "Trusted Client Hardware Token",
+                        "behavioral_velocity": "Within Normal Baseline (0.012)"
+                    },
+                    "invoice_ref": "#INV-2026-0419"
+                }
+            }
+
+        # Authenticated account data isolation: Query genuine user orders
+        from app.models.shopping_order import ShoppingOrder
+        genuine_orders = db.query(ShoppingOrder).filter(ShoppingOrder.user_id == current_user.id).order_by(ShoppingOrder.created_at.desc()).all()
+        orders_list = []
+        for ord in genuine_orders:
+            orders_list.append({
+                "order_id": ord.order_id,
+                "date": ord.created_at.strftime("%d %b %Y") if ord.created_at else "Recent",
+                "item": ord.item_summary,
+                "amount": f"₹{ord.amount:,.2f}",
+                "payment_method": ord.payment_method,
+                "status": "Settled & Delivered" if ord.payment_status == "PAID" else ord.payment_status,
+                "delivery": ord.shipping_address or "Registered Address"
+            })
+
         return {
             "resource": "financial_vault",
             "application": "shopping",
             "access_granted": True,
             "success": True,
             "data": {
-                "saved_cards": [
-                    {
-                        "bank": "HDFC Regalia Gold Visa",
-                        "number": "•••• •••• •••• 4821",
-                        "expiry": "08/28",
-                        "type": "Primary",
-                        "token_status": "Zero-Trust Token Active"
-                    },
-                    {
-                        "bank": "ICICI Sapphiro Mastercard",
-                        "number": "•••• •••• •••• 9104",
-                        "expiry": "11/27",
-                        "type": "Secondary",
-                        "token_status": "Verified"
-                    }
-                ],
-                "upi_vpa": "customer.jane@okhdfcbank",
-                "bank_mandates": [
-                    {
-                        "bank": "State Bank of India (Savings)",
-                        "account": "••••••••••3921",
-                        "ifsc": "SBIN0004012",
-                        "branch": "MG Road, Bengaluru",
-                        "mandate_type": "Retail Auto-Pay Mandate",
-                        "status": "ACTIVE",
-                        "mandate_cap": "₹25,000 / transaction",
-                        "ref": "#MAND-2026-NYRAA-88419"
-                    }
-                ],
-                "recent_orders": [
-                    {
-                        "order_id": "#NYR-98421",
-                        "item": "Nyraa Titan Chronograph",
-                        "amount": "₹14,999",
-                        "method": "Paid via UPI 1-Tap",
-                        "status": "Settled",
-                        "delivery": "Delivered: Indiranagar, Bengaluru"
-                    },
-                    {
-                        "order_id": "#NYR-97105",
-                        "item": "Artisanal Leather Duffle",
-                        "amount": "₹5,999",
-                        "method": "HDFC Regalia Token",
-                        "status": "Settled",
-                        "delivery": "Delivered: Koramangala, Bengaluru"
-                    }
-                ],
-                "invoice_ref": "#INV-2026-0419"
+                "account_holder": current_user.name,
+                "account_email": current_user.email,
+                "saved_cards": [],
+                "upi_vpa": None,
+                "billing_info": {
+                    "name": current_user.name,
+                    "email": current_user.email,
+                    "phone": getattr(current_user, "phone", "+91 98450 •••••"),
+                    "address_line": "No saved address on file",
+                    "city_state_pin": "",
+                    "tax_gstin": ""
+                },
+                "bank_account": None,
+                "bank_mandates": [],
+                "recent_confidential_orders": orders_list,
+                "recent_orders": orders_list,
+                "refund_records": [],
+                "fraud_review": {
+                    "risk_assessment": "VERY_LOW (0.002)",
+                    "3ds_history": "3DS 2.2 Frictionless Auth",
+                    "device_trust": "Trusted Client Hardware Token",
+                    "behavioral_velocity": "Within Normal Baseline (0.000)"
+                },
+                "invoice_ref": f"#INV-2026-{current_user.id:04d}" if orders_list else None
             }
         }
     elif res_norm == "academic_vault":
+        is_alex = bool(
+            current_user.email and ("student.alex" in current_user.email.lower() or "alex" in current_user.name.lower())
+        )
+        student_id = "BITS-2022-CS-9841" if is_alex else f"BITS-2022-CS-20{current_user.id:02d}"
+        enrollment_no = "2022A7PS0841P" if is_alex else f"2022A7PS{current_user.id:04d}P"
+        full_name = "Alex Mercer" if is_alex else current_user.name
+        campus_desc = "Pilani Campus • Hall of Residence 4" if is_alex else "Pilani Campus"
+
         return {
             "resource": "academic_vault",
             "application": "college",
             "access_granted": True,
             "success": True,
             "data": {
-                "student_id": "BITS-2022-CS-9841",
+                "student_profile": {
+                    "student_id": student_id,
+                    "enrollment_number": enrollment_no,
+                    "full_name": full_name,
+                    "program": "B.Tech (Hons) Computer Science & Engineering",
+                    "batch": "2022 – 2026 (Semester 7)",
+                    "campus": campus_desc,
+                    "academic_advisor": "Prof. K. R. Sharma (Dept of CS)",
+                    "enrollment_status": "Active / Verified Regular Student",
+                    "degree_expected": "July 2026"
+                },
+                "student_id": student_id,
                 "program": "B.Tech Computer Science & Engineering",
                 "cgpa": "9.42 / 10.00",
                 "academic_standing": "Dean's Honor Roll",
                 "credits_completed": "142 / 148 Completed",
                 "major": "B.Tech (Hons) CSE",
-                "provisional_certificate": "PC-2026-CS-00412",
+                "provisional_certificate": f"PC-2026-CS-{current_user.id:05d}",
                 "scholarship": "Merit Excellence Fellowship (100% Tuition Waiver)",
                 "fee_balance": "₹0.00 (Cleared)",
                 "transcripts": [
-                    {"code": "CS F301", "name": "Principles of Programming Languages", "grade": "A (10/10)", "credits": 4},
-                    {"code": "CS F402", "name": "AI Security", "grade": "A (10/10)", "credits": 4},
-                    {"code": "CS F360", "name": "Distributed Systems", "grade": "A- (9/10)", "credits": 4},
-                    {"code": "AI F420", "name": "Deep RL", "grade": "A (10/10)", "credits": 4}
+                    {"code": "CS F301", "name": "Principles of Programming Languages", "grade": "A (10/10)", "credits": 4, "semester": "Sem 7"},
+                    {"code": "CS F402", "name": "AI Security & Adversarial ML", "grade": "A (10/10)", "credits": 4, "semester": "Sem 7"},
+                    {"code": "CS F360", "name": "Distributed Operating Systems", "grade": "A- (9/10)", "credits": 4, "semester": "Sem 7"},
+                    {"code": "AI F420", "name": "Deep Reinforcement Learning", "grade": "A (10/10)", "credits": 4, "semester": "Sem 7"},
+                    {"code": "CS F303", "name": "Computer Networks & Protocols", "grade": "A (10/10)", "credits": 4, "semester": "Sem 6"},
+                    {"code": "CS F342", "name": "Computer Architecture", "grade": "A- (9/10)", "credits": 4, "semester": "Sem 6"}
                 ],
+                "examination_records": [
+                    {"exam": "Comprehensive Semester 7 End-Term", "session": "Autumn 2026", "score": "94.5%", "status": "CONFIDENTIAL GRADE RECORDED", "seal": "Registrar Exam Division #EXAM-2026-9481"},
+                    {"exam": "Mid-Semester Evaluation", "session": "Autumn 2026", "score": "92.0%", "status": "VERIFIED", "seal": "Faculty Proctor Seal #PROC-8814"},
+                    {"exam": "Hardware Security Lab Practical Viva", "session": "Autumn 2026", "score": "98.0%", "status": "DISTINCTION", "seal": "External Examiner Affirmed"}
+                ],
+                "academic_integrity": {
+                    "standing": "EXEMPLARY RECORD",
+                    "infractions": "0 Violations Recorded",
+                    "honor_code_status": "Affirmed & Validated",
+                    "proctor_endorsement": "Dean of Students Affairs Clearance Granted",
+                    "last_audit": "2026-10-15 (Automated Clearance Archive)"
+                },
                 "documents": [
-                    {"title": "Official Transcript (Sem 1-7)", "doc_id": "#BITS-DIGI-84920", "status": "Signed", "authority": "NAD Registry Verified"},
-                    {"title": "Provisional Degree Certificate", "doc_id": "#PDC-2026-CS-092", "status": "Sealed", "authority": "Registrar Cryptographic Seal"},
-                    {"title": "Institutional Clearance Certificate", "doc_id": "#ICC-2026-NIL", "status": "Cleared", "authority": "All dues zero: Central Library, CS Lab, Hostel 11"}
+                    {"title": "Official Cumulative Transcript (Sem 1-7)", "doc_id": "#BITS-DIGI-84920", "status": "Signed & Cryptographically Sealed", "authority": "NAD / DigiLocker National Registry"},
+                    {"title": "Provisional Degree Certificate", "doc_id": "#PDC-2026-CS-092", "status": "Sealed & Issued", "authority": "Registrar Cryptographic PKI Seal"},
+                    {"title": "Institutional Clearance & Dues Certificate", "doc_id": "#ICC-2026-NIL", "status": "Nil Dues Cleared", "authority": "Central Library, Hostel 4, Accounts Division"},
+                    {"title": "Merit Fellowship Sanction Letter", "doc_id": "#FELL-2025-0814", "status": "Active & Disbursed", "authority": "Dean Academic Research"}
                 ],
                 "financial_ledger": {
-                    "scholarship": "Merit-cum-Need (80%)",
+                    "scholarship": "Merit-cum-Need National Fellowship (100% Tuition Waiver)",
                     "tuition_due": "₹0.00 (Fully Settled)",
-                    "status": "Clearance Active",
-                    "bank_mandate": "SBI Pilani Campus (••3921)",
+                    "status": "Clearance Active — Nil Dues",
+                    "bank_mandate": "State Bank of India, Pilani Campus (•••3921)",
                     "receipt_ref": "#REC-2026-7810",
-                    "receipt_status": "₹0 Due • Confirmed"
+                    "receipt_status": "₹0 Due • Confirmed Settled",
+                    "stipend_disbursement": "₹25,000 / month (Research Assistantship • Active)"
                 }
             }
         }
@@ -1048,16 +1178,17 @@ def get_confidential_vault_data(
             "success": True,
             "data": {
                 "patient_id": "MED-2026-BLR-00418",
-                "clinical_diagnosis": "Post-Op Cardiac Surveillance & Hypertension Class I",
+                "clinical_diagnosis": "Post-Op Coronary Angioplasty (CAD - LAD Stent) & Essential Hypertension",
                 "patient_profile": {
                     "name": "Rajesh Kumar",
                     "age": 52,
                     "gender": "Male",
-                    "blood_group": "B+",
+                    "blood_group": "B+ (Rh Positive)",
                     "abha_id": "91-0982-1249-92",
                     "unit": "Cardiology ICU",
                     "bay": "Bay 4 • Bengaluru Facility",
-                    "attending_physician": "Dr. B. Ram"
+                    "attending_physician": "Dr. Boomika Ram (KMC #84920)",
+                    "emergency_contact": "Priya Kumar (Spouse) — +91 98450 ••••• (Verified)"
                 },
                 "vitals": {
                     "heart_rate": "72 bpm (Resting)",
@@ -1069,21 +1200,40 @@ def get_confidential_vault_data(
                     "hba1c": "5.6% (Normal)"
                 },
                 "medical_history": {
-                    "primary_diagnosis": "Post-Op Coronary Angioplasty (CAD - LAD Stent)",
+                    "primary_diagnosis": "Post-Op Coronary Angioplasty (CAD - Proximal LAD Stent)",
                     "surgical_details": "Drug-eluting stent (DES) placed in proximal LAD. Post-procedure Day 3 recovery course uncomplicated.",
-                    "comorbidities": "Essential Hypertension (Stage II)",
+                    "comorbidities": "Essential Hypertension (Stage II) - Well Controlled; Mild Dyslipidemia",
                     "allergies": "No known drug allergies (NKDA). Penicillin skin test negative.",
                     "progress_note": "Patient is awake, alert, and ambulatory with minimal assistance. Chest discomfort has fully resolved. Femoral access site clean and dry with intact distal pulses. Dual antiplatelet therapy and high-intensity Statin well tolerated. Cardiac troponin-I has trended down from peak 2.4 ng/mL to 0.04 ng/mL. Scheduled for safe ward step-down in 24 hours.",
                     "signed_by": "Dr. Boomika Ram (KMC #84920)"
                 },
+                "clinical_notes": {
+                    "diagnosis": "Post-Op Coronary Angioplasty (CAD - LAD Stent)",
+                    "comorbidities": "Essential Hypertension (Stage II) • NKDA",
+                    "note": "Patient is awake, alert, and ambulatory. Chest discomfort has fully resolved. Dual antiplatelet therapy and high-intensity Statin well tolerated. Troponin-I resolved to 0.04 ng/mL baseline. Scheduled for step-down.",
+                    "signed_by": "Dr. Boomika Ram (Cardiology Consultant)"
+                },
                 "prescriptions": [
-                    {"medicine": "Telmisartan 40mg", "dosage": "1-0-0 Daily", "refills_left": 3},
-                    {"medicine": "Atorvastatin 10mg", "dosage": "0-0-1 Night", "refills_left": 2}
+                    {"medicine": "Telmisartan 40mg", "medication": "Telmisartan 40mg", "category": "Antihypertensive (ARB)", "dosage": "1-0-0 Daily", "frequency": "Morning with breakfast", "refills_left": 3},
+                    {"medicine": "Atorvastatin 40mg", "medication": "Atorvastatin 40mg", "category": "Lipid Lowering (Statin)", "dosage": "0-0-1 Night", "frequency": "Bedtime", "refills_left": 2},
+                    {"medicine": "Ticagrelor 90mg", "medication": "Ticagrelor 90mg", "category": "Antiplatelet (P2Y12)", "dosage": "1-0-1 Twice Daily", "frequency": "Every 12 hours", "refills_left": 4},
+                    {"medicine": "Aspirin 75mg", "medication": "Aspirin 75mg", "category": "Antiplatelet (Enteric-coated)", "dosage": "1-0-0 Daily", "frequency": "Post-lunch", "refills_left": 4}
                 ],
                 "lab_reports": [
-                    {"test": "Comprehensive Metabolic Panel", "date": "2026-09-28", "status": "Normal"},
-                    {"test": "Echocardiogram (Echo)", "date": "2026-08-15", "status": "LVEF 60% Normal"}
+                    {"test": "Cardiac Biomarkers (Troponin-I)", "date": "2026-10-28", "status": "NORMAL (0.04 ng/mL)", "result": "0.04 ng/mL (Ref: < 0.05 ng/mL - Baseline Resolved)", "hash": "SHA-256: 7f8b9e...092a"},
+                    {"test": "Comprehensive Metabolic Panel (CMP)", "date": "2026-10-28", "status": "NORMAL", "result": "Serum Creatinine: 0.9 mg/dL; eGFR > 90 mL/min; K+: 4.2 mEq/L", "hash": "SHA-256: 3c1a2f...881b"},
+                    {"test": "Lipid Profile & HbA1c", "date": "2026-10-26", "status": "STABLE", "result": "Total Chol: 164 mg/dL; LDL: 68 mg/dL; Triglycerides: 122 mg/dL; HbA1c: 5.6%", "hash": "SHA-256: e8d40a...941c"},
+                    {"test": "12-Lead Electrocardiogram (ECG)", "date": "2026-10-29", "status": "NORMAL SINUS", "result": "Normal Sinus Rhythm (72 bpm), PR: 142ms, QRS: 88ms, ST Elevation Resolved", "hash": "SHA-256: a19f2c...4401"},
+                    {"test": "2D Echocardiogram with Doppler", "date": "2026-10-25", "status": "OPTIMAL (LVEF 60%)", "result": "Preserved Left Ventricular Function (LVEF 60%), No regional wall motion abnormality", "hash": "SHA-256: d58b3e...771a"}
                 ],
+                "consultations": [
+                    {"date": "2026-10-29", "physician": "Dr. Boomika Ram (KMC #84920)", "specialty": "Interventional Cardiology", "summary": "Post-intervention Day 3 round: Hemodynamically stable, access site intact, telemetry monitoring shows uninterrupted normal sinus rhythm. Cleared for transfer to ward.", "recommendation": "Step-down to step-down ward; continue dual antiplatelet therapy for 12 months."}
+                ],
+                "allergies": {
+                    "drug_allergies": "No Known Drug Allergies (NKDA)",
+                    "skin_tests": "Penicillin skin prick test: Negative",
+                    "food_latex": "No environmental or latex sensitivities documented"
+                },
                 "diagnostics": {
                     "ecg": {
                         "title": "12-Lead Electrocardiogram (ECG)",
@@ -1249,4 +1399,141 @@ def confirm_neuraltrace_reset(
         confirm_pattern=request.confirm_pattern
     )
     return NeuralTraceResetConfirmResponse(**result)
+
+
+# ==========================================
+# COLLEGE ONLINE EXAMINATION OTP ENDPOINTS
+# ==========================================
+from pydantic import BaseModel
+
+class ExamOtpRequestPayload(BaseModel):
+    session_id: str
+    course_name: Optional[str] = "CS F301 • End-Semester Proctored Assessment"
+
+
+class ExamOtpVerifyPayload(BaseModel):
+    session_id: str
+    challenge_id: Optional[str] = None
+    otp: str
+    course_name: Optional[str] = None
+
+
+@router.post("/exam-otp/request")
+def request_college_exam_otp(
+    request: ExamOtpRequestPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Requests a protected-action OTP challenge before launching an online examination
+    in the College Portal. Dispatches the 6-digit OTP to the student's registered email
+    via Gmail SMTP and deduplicates concurrent/rapid requests.
+    """
+    session = SessionService.get_session(db, request.session_id)
+    verify_session_access(session, current_user)
+    return StepUpService.create_exam_otp_challenge(
+        session_id=session.id,
+        user_id=current_user.id,
+        course_name=request.course_name or "CS F301 • End-Semester Proctored Assessment",
+        db=db
+    )
+
+
+@router.post("/exam-otp/resend")
+def resend_college_exam_otp(
+    request: ExamOtpRequestPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Resends the online examination OTP subject to a 15-second cooldown.
+    Invalidates any previous unconsumed examination OTP challenge.
+    """
+    session = SessionService.get_session(db, request.session_id)
+    verify_session_access(session, current_user)
+    return StepUpService.resend_exam_otp_challenge(
+        session_id=session.id,
+        user_id=current_user.id,
+        course_name=request.course_name,
+        db=db
+    )
+
+
+@router.post("/exam-otp/verify")
+def verify_college_exam_otp(
+    request: ExamOtpVerifyPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Verifies the submitted 6-digit examination OTP on the backend.
+    On success, issues a scoped ApplicationGrant for (application='college', resource='online_exam').
+    """
+    session = SessionService.get_session(db, request.session_id)
+    verify_session_access(session, current_user)
+    ok, msg, data = StepUpService.verify_exam_otp_challenge(
+        session_id=session.id,
+        user_id=current_user.id,
+        challenge_id=request.challenge_id,
+        otp_code=request.otp,
+        course_name=request.course_name,
+        db=db
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=msg
+        )
+    return {
+        "verified": True,
+        "message": msg,
+        **(data or {})
+    }
+
+
+@router.get("/exam-session")
+def get_authorized_exam_session(
+    session_id: str,
+    course_name: Optional[str] = "CS F301 • End-Semester Proctored Assessment",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Protected examination launch endpoint.
+    Rejects direct API calls or URL access unless the session holds an active,
+    unexpired ApplicationGrant for (application='college', resource='online_exam', factor='EXAM_OTP').
+    """
+    session = SessionService.get_session(db, session_id)
+    verify_session_access(session, current_user)
+
+    if session.status != "ACTIVE" or session.current_risk_level in ("CRITICAL", "HIGH", "RESTRICTED"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Session is not in an active, low-risk state required for online examination."
+        )
+
+    is_authorized = SessionService.is_application_authorized(
+        db=db,
+        db_session=session,
+        user_id=current_user.id,
+        application="college",
+        resource="online_exam",
+        required_factor="EXAM_OTP"
+    )
+    if not is_authorized:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Online examination access denied: Valid examination OTP verification is required before launching the exam."
+        )
+
+    return {
+        "authorized": True,
+        "session_id": session.id,
+        "student_name": current_user.name,
+        "student_email": current_user.email,
+        "course_name": course_name or "CS F301 • End-Semester Proctored Assessment",
+        "exam_token": f"#BITS-EXM-{session.id[-4:].upper()}",
+        "proctoring_status": "ACTIVE_BEHAVIORAL_SHIELD"
+    }
+
 

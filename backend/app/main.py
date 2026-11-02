@@ -16,6 +16,7 @@ from app.routes import (
     devices_router,
     notifications_router,
     healthcare_router,
+    shopping_router,
 )
 
 # Setup logging
@@ -75,6 +76,7 @@ app.include_router(demo_router, prefix=settings.API_V1_STR)
 app.include_router(devices_router, prefix=settings.API_V1_STR)
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(healthcare_router, prefix=settings.API_V1_STR)
+app.include_router(shopping_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

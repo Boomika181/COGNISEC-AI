@@ -34,14 +34,15 @@ class Settings(BaseSettings):
     VERIFIED_RECIPIENT_MAILBOXES: List[str] = []
     APP_BASE_URL: str = "http://127.0.0.1:5500"
     EXHIBITION_MODE: bool = False
+    DEMO_OTP_RECIPIENT_EMAIL: str = "boomikaram35@gmail.com"
 
     # Bootstrap Secret for Controlled Development/Admin Provisioning
     BOOTSTRAP_ADMIN_KEY: Optional[str] = "cognisec_dev_bootstrap_secret_2026"
     ADMIN_EMAIL: str = "cognisecai.security@gmail.com"
     ADMIN_INITIAL_PASSWORD: Optional[str] = "cognisecai2026"
 
-    # Observation Window Configuration (Default 30s as required by policy)
-    OBSERVATION_WINDOW_SECONDS: int = 30
+    # Observation Window Configuration (Default 20s as required by policy)
+    OBSERVATION_WINDOW_SECONDS: int = 20
 
     # Risk Engine Policies & Thresholds
     RISK_THRESHOLD_LOW: float = 0.30
@@ -95,11 +96,15 @@ class Settings(BaseSettings):
     # CORS: Explicit origins only (NO wildcard '*' with credentials)
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
+        "http://localhost:5000",
         "http://localhost:5500",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5500",
         "http://localhost:8000",
+        "http://localhost:8080",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5000",
+        "http://127.0.0.1:5500",
         "http://127.0.0.1:8000",
+        "http://127.0.0.1:8080",
     ]
 
     @field_validator("CORS_ORIGINS", mode="before")

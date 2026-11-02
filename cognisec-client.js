@@ -5,10 +5,12 @@
  * Captures passive behavioral features (Privacy-safe: NO raw passwords/sensitive keystrokes).
  */
 
-const COGNISEC_API_BASE = 'http://127.0.0.1:8000/api';
+const COGNISEC_API_BASE = (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost')
+  ? 'http://localhost:8000/api'
+  : 'http://127.0.0.1:8000/api';
 
-// Configurable observation window duration in seconds (Default 30s as required by policy)
-const COGNISEC_OBSERVATION_SECONDS = 30;
+// Configurable observation window duration in seconds (Default 20s as required by policy)
+const COGNISEC_OBSERVATION_SECONDS = 20;
 if (typeof window !== 'undefined') {
   window.COGNISEC_OBSERVATION_SECONDS = COGNISEC_OBSERVATION_SECONDS;
 }
@@ -1235,7 +1237,9 @@ class CognisecClient {
     this.lastTelemetryDispatchTime = null;
     this.clickCount = 0;
     this.scrollDeltaSum = 0;
-    this.sequenceNumber = 0;
+    this.sequenceNumber = this.sessionId
+      ? parseInt(localStorage.getItem('cognisec_seq_' + this.sessionId) || '0', 10)
+      : 0;
   }
 
   isSensitiveInput(target) {
@@ -1358,9 +1362,31 @@ class CognisecClient {
           return;
         }
 
-        if (obsStatus.status === 'PENDING_OBSERVATION' || obsStatus.status === 'PENDING_OTP') {
+        // Hydrate user profile if not cached in localStorage
+        if (!this.user || !this.user.email) {
+          try {
+            const meRes = await fetch(`${COGNISEC_API_BASE}/auth/me`, { headers: this.getHeaders() });
+            if (meRes.ok) {
+              const userProfile = await meRes.json();
+              this.user = {
+                id: userProfile.id,
+                name: userProfile.name,
+                email: userProfile.email,
+                role: userProfile.role,
+                account_status: userProfile.account_status || 'ACTIVE'
+              };
+              localStorage.setItem('cognisec_user', JSON.stringify(this.user));
+            }
+          } catch (_) {}
+        }
+
+        if (
+          obsStatus.status === 'PENDING_OBSERVATION' ||
+          obsStatus.status === 'PENDING_OTP' ||
+          (!obsStatus.is_completed && obsStatus.observation_seconds_remaining > 0)
+        ) {
           console.log(`[COGNISEC-AI] [DIAGNOSTIC] Resuming pending session ${this.sessionId} (${obsStatus.status}, ${obsStatus.observation_seconds_remaining}s remaining).`);
-          this.sessionStatus = obsStatus.status;
+          this.sessionStatus = obsStatus.status === 'PENDING_OTP' ? 'PENDING_OTP' : 'PENDING_OBSERVATION';
           localStorage.setItem('cognisec_session_status', this.sessionStatus);
           if (this.user) {
             this.user.account_status = this.sessionStatus;
@@ -1373,6 +1399,20 @@ class CognisecClient {
 
           // Seamlessly maintain background observation on the current page
           this.scheduleBackgroundOtpPrompt(obsStatus);
+          return;
+        }
+
+        if (obsStatus.status === 'STEP_UP_REQUIRED' || obsStatus.status === 'RESTRICTED') {
+          this.sessionStatus = obsStatus.status;
+          localStorage.setItem('cognisec_session_status', this.sessionStatus);
+          if (this.user) {
+            this.user.account_status = this.sessionStatus;
+            localStorage.setItem('cognisec_user', JSON.stringify(this.user));
+          }
+          this.startTelemetryLoop();
+          window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
+            detail: { isAuthenticated: true, isFullyVerified: false, user: this.user }
+          }));
           return;
         }
 
@@ -1409,10 +1449,16 @@ class CognisecClient {
     this.sessionId = null;
     this.user = null;
     this.sessionStatus = null;
+    this._obsActiveSessionId = null;
+    this._isRequestingOtp = false;
     this.revokeResourceClearance();
     if (this._obsTimer) {
       clearTimeout(this._obsTimer);
       this._obsTimer = null;
+    }
+    if (this._obsCountdownInterval) {
+      clearInterval(this._obsCountdownInterval);
+      this._obsCountdownInterval = null;
     }
     localStorage.removeItem('cognisec_token');
     localStorage.removeItem('cognisec_session_id');
@@ -1489,6 +1535,9 @@ class CognisecClient {
       window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
         detail: { isAuthenticated: true, isFullyVerified: isSessionActive, user: this.user }
       }));
+      if (!isSessionActive) {
+        this.startObservationFlow(data);
+      }
       return { success: true, data };
     } catch (error) {
       console.warn('[COGNISEC-AI] Login error:', error.message);
@@ -1530,7 +1579,7 @@ class CognisecClient {
     try {
       const res = await fetch(`${COGNISEC_API_BASE}/healthcare/appointments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         body: JSON.stringify(appointmentData)
       });
       const data = await res.json().catch(() => ({}));
@@ -1545,13 +1594,51 @@ class CognisecClient {
 
   async fetchHealthcareAppointments(email = null) {
     try {
-      if (!email) return [];
-      const res = await fetch(`${COGNISEC_API_BASE}/healthcare/appointments?email=${encodeURIComponent(email)}`);
+      const url = email
+        ? `${COGNISEC_API_BASE}/healthcare/appointments?email=${encodeURIComponent(email)}`
+        : `${COGNISEC_API_BASE}/healthcare/appointments`;
+      const res = await fetch(url, {
+        headers: this.getHeaders()
+      });
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
       console.warn('[COGNISEC-AI] Failed to fetch patient appointments:', e);
       return [];
+    }
+  }
+
+  async cancelHealthcareAppointment(referenceId, patientEmail = null) {
+    try {
+      const url = patientEmail
+        ? `${COGNISEC_API_BASE}/healthcare/appointments/${encodeURIComponent(referenceId)}/cancel?patient_email=${encodeURIComponent(patientEmail)}`
+        : `${COGNISEC_API_BASE}/healthcare/appointments/${encodeURIComponent(referenceId)}/cancel`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: this.getHeaders()
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || `Cancellation failed with status ${res.status}`);
+      }
+      return { success: true, data };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  async checkHealthcareSlotAvailability(doctorId, date, slot) {
+    try {
+      const url = `${COGNISEC_API_BASE}/healthcare/availability?doctor_id=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(date)}&slot=${encodeURIComponent(slot)}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders()
+      });
+      const data = await res.json().catch(() => ({ available: true }));
+      const isAvail = (data && data.available !== undefined) ? data.available : true;
+      return { success: true, available: isAvail, is_available: isAvail, data: { ...data, available: isAvail, is_available: isAvail } };
+    } catch (e) {
+      return { success: false, available: true, is_available: true, data: { available: true, is_available: true } };
     }
   }
 
@@ -1588,6 +1675,164 @@ class CognisecClient {
       this._activeChallengeId = data.challenge_id;
     }
     return data;
+  }
+
+  // ================= SHOPPING PAYMENT OTP METHODS =================
+  async requestShoppingPaymentOtp({ orderId, amount, itemSummary, items, shippingAddress, paymentMethod, sessionId = null }) {
+    const sid = sessionId || this.sessionId;
+    if (!sid) throw new Error("No active session available. Please sign in to complete payment.");
+    const res = await fetch(`${COGNISEC_API_BASE}/shopping/payment-otp/request`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        session_id: sid,
+        order_id: orderId,
+        amount: parseFloat(amount),
+        currency: 'INR',
+        item_summary: itemSummary || `Order ${orderId}`,
+        items: items || [],
+        shipping_address: shippingAddress || 'Indiranagar, Bengaluru - 560038',
+        payment_method: paymentMethod || 'UPI_1TAP'
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to dispatch payment authorization OTP.");
+    }
+    return data;
+  }
+
+  async verifyShoppingPaymentOtp({ orderId, challengeId, otpCode, sessionId = null }) {
+    const sid = sessionId || this.sessionId;
+    if (!sid) throw new Error("No active session available.");
+    const res = await fetch(`${COGNISEC_API_BASE}/shopping/payment-otp/verify`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        session_id: sid,
+        order_id: orderId,
+        challenge_id: challengeId,
+        otp_code: String(otpCode || '').trim()
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || "Payment OTP verification failed.");
+    }
+    return data;
+  }
+
+  async resendShoppingPaymentOtp({ orderId, sessionId = null }) {
+    const sid = sessionId || this.sessionId;
+    if (!sid) throw new Error("No active session available.");
+    const res = await fetch(`${COGNISEC_API_BASE}/shopping/payment-otp/resend`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        session_id: sid,
+        order_id: orderId,
+        amount: 0.0
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to resend payment code.");
+    }
+    return data;
+  }
+
+  async getShoppingOrders() {
+    if (!this.token) return [];
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/shopping/orders`, {
+        method: 'GET',
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (_) {}
+    return [];
+  }
+
+  // ================= HEALTHCARE APPOINTMENT OTP METHODS =================
+  async requestHealthcareAppointmentOtp({
+    sessionId = null,
+    doctorId,
+    appointmentDate,
+    timeSlot,
+    patientName,
+    patientPhone,
+    patientEmail,
+    department,
+    consultationMode = 'In-Person Hospital Visit',
+    room = null
+  }) {
+    const sid = sessionId || this.sessionId;
+    if (!sid) throw new Error("No active session available. Please sign in to book an appointment.");
+    const res = await fetch(`${COGNISEC_API_BASE}/healthcare/appointment-otp/request`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        session_id: sid,
+        doctor_id: doctorId,
+        appointment_date: appointmentDate,
+        time_slot: timeSlot,
+        patient_name: patientName,
+        patient_phone: patientPhone,
+        patient_email: patientEmail,
+        department: department,
+        consultation_mode: consultationMode,
+        room: room
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to dispatch appointment authorization OTP.");
+    }
+    return data;
+  }
+
+  async verifyHealthcareAppointmentOtp({ challengeId, otpCode, sessionId = null }) {
+    const sid = sessionId || this.sessionId;
+    if (!sid) throw new Error("No active session available.");
+    const res = await fetch(`${COGNISEC_API_BASE}/healthcare/appointment-otp/verify`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        session_id: sid,
+        challenge_id: challengeId,
+        otp_code: String(otpCode || '').trim()
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || "Appointment OTP verification failed.");
+    }
+    return data;
+  }
+
+  async resendHealthcareAppointmentOtp({ challengeId, sessionId = null }) {
+    const sid = sessionId || this.sessionId;
+    if (!sid) throw new Error("No active session available.");
+    const res = await fetch(`${COGNISEC_API_BASE}/healthcare/appointment-otp/resend`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        session_id: sid,
+        challenge_id: challengeId
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to resend appointment code.");
+    }
+    return data;
+  }
+
+  openAppointmentOtpModal(challenge, options = {}) {
+    return this.openPaymentOtpModal(challenge, {
+      ...options,
+      isAppointment: true
+    });
   }
 
   async verifyLoginOtp(otpCode, sessionId = null, challengeId = null) {
@@ -2176,14 +2421,25 @@ class CognisecClient {
 
   scheduleBackgroundOtpPrompt(loginData) {
     if (!loginData || !loginData.session_id) return;
+    this.ensureObservationModalInDom();
     const sid = loginData.session_id;
+
+    // Idempotent guard: if countdown is already actively ticking for this exact session, do not reset it
+    if (this._obsCountdownInterval && this._obsActiveSessionId === sid && this.observationSecondsRemaining > 0) {
+      return;
+    }
 
     if (this._obsTimer) {
       clearTimeout(this._obsTimer);
       this._obsTimer = null;
     }
+    if (this._obsCountdownInterval) {
+      clearInterval(this._obsCountdownInterval);
+      this._obsCountdownInterval = null;
+    }
+    this._obsActiveSessionId = sid;
 
-    const remaining = typeof loginData.observation_seconds_remaining === 'number'
+    let remaining = typeof loginData.observation_seconds_remaining === 'number'
       ? loginData.observation_seconds_remaining
       : this.observationDurationSeconds;
 
@@ -2199,12 +2455,44 @@ class CognisecClient {
       return;
     }
 
+    this.observationSecondsRemaining = remaining;
     console.log(`[COGNISEC-AI] [DIAGNOSTIC] Silent background observation active for session ${sid} (${remaining}s duration). Normal browsing permitted.`);
-    this._obsTimer = setTimeout(async () => {
-      this._obsTimer = null;
-      console.log(`[COGNISEC-AI] [DIAGNOSTIC] Background observation timer reached 0 for session ${sid}. Enforcing server transition...`);
-      await this.executeObservationOtpTransition(sid);
-    }, Math.max(500, remaining * 1000));
+
+    const updateCountdownDisplays = (secs) => {
+      const obsEl = document.getElementById('cv-observation-state');
+      if (obsEl) {
+        obsEl.textContent = `Calibrating Baseline (${secs}s)`;
+      }
+      const badgeEl = document.getElementById('cv-status-badge');
+      if (badgeEl && this.sessionStatus !== 'ACTIVE') {
+        badgeEl.textContent = `CALIBRATING (${secs}s)`;
+        badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 animate-pulse';
+      }
+      window.dispatchEvent(new CustomEvent('cognisec:observation_tick', {
+        detail: { remaining: secs, sessionId: sid }
+      }));
+    };
+
+    updateCountdownDisplays(remaining);
+
+    this._obsCountdownInterval = setInterval(async () => {
+      this.observationSecondsRemaining = Math.max(0, (this.observationSecondsRemaining || remaining) - 1);
+      updateCountdownDisplays(this.observationSecondsRemaining);
+      if (this.observationSecondsRemaining <= 0) {
+        clearInterval(this._obsCountdownInterval);
+        this._obsCountdownInterval = null;
+        if (this._obsTimer) {
+          clearTimeout(this._obsTimer);
+          this._obsTimer = null;
+        }
+        const obsEl = document.getElementById('cv-observation-state');
+        if (obsEl) obsEl.textContent = 'Observation Complete — Requesting OTP';
+        const badgeEl = document.getElementById('cv-status-badge');
+        if (badgeEl) badgeEl.textContent = 'OTP PENDING';
+        console.log(`[COGNISEC-AI] [DIAGNOSTIC] Background observation timer reached 0 for session ${sid}. Enforcing server transition...`);
+        await this.executeObservationOtpTransition(sid);
+      }
+    }, 1000);
   }
 
   async executeObservationOtpTransition(sessionId = null) {
@@ -2222,8 +2510,29 @@ class CognisecClient {
     }
     this._isRequestingOtp = true;
 
+    // Display clear sending indicator while SMTP request is processing
+    this.showToastNotification(
+      "Sending OTP...",
+      "Continuous observation verified. Dispatching email verification code to your registered Gmail address...",
+      "⚡"
+    );
+    if (typeof window.showNotificationToast === 'function') {
+      window.showNotificationToast(
+        "Sending OTP...",
+        "Continuous observation verified. Dispatching email verification code to your registered Gmail address...",
+        "info"
+      );
+    }
+
     try {
-      console.log(`[COGNISEC-AI] [DIAGNOSTIC] Requesting server to authorize observation completion & dispatch OTP for session ${sid}...`);
+      console.log(`[COGNISEC-AI] [DIAGNOSTIC] Submitting final observation telemetry and requesting server to authorize completion & dispatch OTP for session ${sid}...`);
+      // Flush active telemetry buffer so backend evaluates complete observation behavioral features
+      try {
+        await this.sendBehaviorTelemetry();
+      } catch (telemetryErr) {
+        console.warn(`[COGNISEC-AI] Pre-OTP telemetry flush notice:`, telemetryErr);
+      }
+
       const challenge = await this.requestLoginOtp(sid);
       console.log(`[COGNISEC-AI] [DIAGNOSTIC] Backend confirmed OTP challenge issued (ID: ${challenge.challenge_id}). Delivered to ${challenge.masked_email}.`);
 
@@ -2259,13 +2568,75 @@ class CognisecClient {
         return;
       }
 
-      this.showOtpDeliveryError(err.message || 'Verification code delivery failed. Access remains restricted.');
+      // Route to the correct UI based on the 403 reason — do NOT open OTP modal for non-OTP flows
+      const msg = err.message || '';
+      const msgLower = msg.toLowerCase();
+
+      if (msgLower.includes('neuraltrace verification required') || msgLower.includes('step_up_required') || msgLower.includes('step-up required')) {
+        this.sessionStatus = 'STEP_UP_REQUIRED';
+        localStorage.setItem('cognisec_session_status', 'STEP_UP_REQUIRED');
+        this.closeObservationOtpModal();
+        window.dispatchEvent(new CustomEvent('cognisec:step_up_required', {
+          detail: { reason: msg, session_status: 'STEP_UP_REQUIRED' }
+        }));
+        if (typeof this.openStepUpModal === 'function') {
+          this.openStepUpModal({
+            preferredFactor: 'GESTURE_PATTERN',
+            reason: msg
+          });
+        }
+        return;
+      }
+
+      if (msgLower.includes('high risk') || msgLower.includes('access restricted') || msgLower.includes('multi-factor authorization required')) {
+        this.sessionStatus = 'RESTRICTED';
+        localStorage.setItem('cognisec_session_status', 'RESTRICTED');
+        this.closeObservationOtpModal();
+        window.dispatchEvent(new CustomEvent('cognisec:step_up_required', {
+          detail: { reason: msg, session_status: 'RESTRICTED', riskLevel: 'HIGH' }
+        }));
+        this.showToastNotification(
+          'High Risk Detected',
+          'Elevated risk detected during 20-second behavioral observation. Complete sequential cognitive verification to proceed.',
+          '⚠️'
+        );
+        if (typeof this.openStepUpModal === 'function') {
+          this.openStepUpModal({
+            preferredFactor: 'HIGH_RISK_DUAL',
+            reason: msg
+          });
+        }
+        return;
+      }
+
+      if (msgLower.includes('critical security risk') || msgLower.includes('session terminated')) {
+        // CRITICAL risk: session TERMINATED — clear auth and notify user
+        this.clearAuth();
+        this.closeObservationOtpModal();
+        this.showToastNotification(
+          'Session Terminated',
+          'Session terminated due to critical security risk policy.',
+          '🚨'
+        );
+        window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
+          detail: { isAuthenticated: false, user: null, isFullyVerified: false }
+        }));
+        return;
+      }
+
+      // Genuine OTP delivery error (e.g. SMTP failure) — show in OTP modal error banner
+      this.showOtpDeliveryError(msg || 'Verification code delivery failed. Access remains restricted.');
     } finally {
       this._isRequestingOtp = false;
     }
   }
 
   openObservationOtpModal(challenge) {
+    this._activeObservationChallenge = challenge || null;
+    if (this._obsCountdownInterval) {
+      clearInterval(this._obsCountdownInterval);
+      this._obsCountdownInterval = null;
+    }
     this.ensureObservationModalInDom();
     const modal = document.getElementById('modal-login-observation');
     if (!modal) return;
@@ -2287,14 +2658,26 @@ class CognisecClient {
       }
     }
 
+    // Update subtitle to reflect actual risk level
+    const subtitle = document.getElementById('obs-modal-subtitle');
+    const riskLevel = (challenge && challenge.risk_level) || this.currentRiskLevel || 'LOW';
+    const riskLabel = String(riskLevel).toUpperCase();
+    const riskColors = { LOW: '#22c55e', MEDIUM: '#f59e0b', HIGH: '#ef4444', CRITICAL: '#dc2626' };
+    const riskColor = riskColors[riskLabel] || '#22c55e';
+    if (subtitle) {
+      subtitle.innerHTML = `<span style="color:${riskColor};font-weight:700;">${riskLabel} Risk</span> — Zero-Trust Baseline Verified // Email OTP Verification`;
+    }
+
     // Always clear previous error banners when opening on fresh challenge
     if (errBanner) {
       errBanner.textContent = '';
       errBanner.classList.add('hidden');
     }
+    // Display confirmed OTP status banner after SMTP acceptance
     if (successBanner) {
-      successBanner.textContent = '';
-      successBanner.classList.add('hidden');
+      const masked = (challenge && challenge.masked_email) || (this.user && this.maskEmail(this.user.email)) || 'registered email';
+      successBanner.textContent = (challenge && challenge.message) || `Verification code accepted by Gmail SMTP for transmission to ${masked}. Check your inbox and spam folder.`;
+      successBanner.classList.remove('hidden');
     }
     if (codeInput) {
       codeInput.value = '';
@@ -2360,6 +2743,16 @@ class CognisecClient {
     if (errBanner) {
       errBanner.textContent = errorMessage;
       errBanner.classList.remove('hidden');
+    }
+    const successBanner = document.getElementById('login-otp-success-banner');
+    if (successBanner) {
+      successBanner.textContent = '';
+      successBanner.classList.add('hidden');
+    }
+    const resendBtn = document.getElementById('btn-login-otp-resend');
+    if (resendBtn) {
+      resendBtn.disabled = false;
+      resendBtn.textContent = 'Retry Dispatch';
     }
   }
 
@@ -2466,7 +2859,7 @@ class CognisecClient {
 
     if (resendBtn) {
       resendBtn.disabled = true;
-      resendBtn.textContent = 'Dispatching...';
+      resendBtn.textContent = 'Sending OTP...';
     }
 
     try {
@@ -2477,18 +2870,37 @@ class CognisecClient {
         destEmail.textContent = challenge.masked_email || this.maskEmail(this.user?.email);
       }
       if (successBanner) {
-        successBanner.textContent = 'Fresh verification code dispatched to your registered email.';
+        const masked = challenge?.masked_email || (this.user && this.maskEmail(this.user.email)) || 'registered email';
+        successBanner.textContent = (challenge && challenge.message) || `Verification code accepted by Gmail SMTP for transmission to ${masked}. Check your inbox and spam folder.`;
         successBanner.classList.remove('hidden');
+      }
+
+      // Debounce resend requests with 15s cooldown to prevent rapid duplicate emails
+      if (resendBtn) {
+        let cooldown = 15;
+        resendBtn.disabled = true;
+        resendBtn.textContent = `Resend in ${cooldown}s`;
+        if (this._resendCooldownTimer) clearInterval(this._resendCooldownTimer);
+        this._resendCooldownTimer = setInterval(() => {
+          cooldown--;
+          if (cooldown <= 0) {
+            clearInterval(this._resendCooldownTimer);
+            this._resendCooldownTimer = null;
+            resendBtn.disabled = false;
+            resendBtn.textContent = 'Resend Code';
+          } else {
+            resendBtn.textContent = `Resend in ${cooldown}s`;
+          }
+        }, 1000);
       }
     } catch (err) {
       if (errBanner) {
         errBanner.textContent = err.message || 'Failed to dispatch verification code. Please retry.';
         errBanner.classList.remove('hidden');
       }
-    } finally {
       if (resendBtn) {
         resendBtn.disabled = false;
-        resendBtn.textContent = 'Resend Code';
+        resendBtn.textContent = 'Retry Dispatch';
       }
     }
   }
@@ -2497,6 +2909,468 @@ class CognisecClient {
     this.closeObservationOtpModal();
     this.logout();
     window.location.reload();
+  }
+
+  // ================= COLLEGE ONLINE EXAMINATION OTP CLIENT METHODS =================
+  async requestCollegeExamOtp({ courseName = 'CS F301 • End-Semester Proctored Assessment' } = {}) {
+    if (!this.sessionId) {
+      throw new Error('No active authenticated session. Please sign in to the College Portal.');
+    }
+    const res = await fetch(`${COGNISEC_API_BASE}/security/exam-otp/request`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        session_id: this.sessionId,
+        course_name: courseName
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Failed to dispatch examination verification code (HTTP ${res.status})`);
+    }
+    return await res.json();
+  }
+
+  async resendCollegeExamOtp({ courseName = 'CS F301 • End-Semester Proctored Assessment' } = {}) {
+    if (!this.sessionId) {
+      throw new Error('No active authenticated session.');
+    }
+    const res = await fetch(`${COGNISEC_API_BASE}/security/exam-otp/resend`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        session_id: this.sessionId,
+        course_name: courseName
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Failed to resend examination verification code (HTTP ${res.status})`);
+    }
+    return await res.json();
+  }
+
+  async verifyCollegeExamOtp({ challengeId, otpCode, courseName }) {
+    if (!this.sessionId) {
+      throw new Error('No active authenticated session.');
+    }
+    const res = await fetch(`${COGNISEC_API_BASE}/security/exam-otp/verify`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        session_id: this.sessionId,
+        challenge_id: challengeId,
+        otp: otpCode,
+        course_name: courseName
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Examination OTP verification failed.');
+    }
+    return await res.json();
+  }
+
+  async fetchAuthorizedExamSession(courseName = 'CS F301 • End-Semester Proctored Assessment') {
+    if (!this.sessionId) {
+      throw new Error('No active authenticated session.');
+    }
+    const params = new URLSearchParams({
+      session_id: this.sessionId,
+      course_name: courseName
+    });
+    const res = await fetch(`${COGNISEC_API_BASE}/security/exam-session?${params.toString()}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      cache: 'no-store'
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Online examination access denied by Zero-Trust policy.');
+    }
+    return await res.json();
+  }
+
+  openExamOtpModal(challenge, options = {}) {
+    return this.openPaymentOtpModal(challenge, Object.assign({}, options, { isExam: true }));
+  }
+
+  // ================= SHOPPING PAYMENT, HEALTHCARE APPOINTMENT & COLLEGE EXAM OTP MODAL CONTROLLER =================
+  openPaymentOtpModal(challenge, options = {}) {
+    if (this._paymentExpiryTimer) {
+      clearInterval(this._paymentExpiryTimer);
+      this._paymentExpiryTimer = null;
+    }
+    if (this._paymentResendCooldownTimer) {
+      clearInterval(this._paymentResendCooldownTimer);
+      this._paymentResendCooldownTimer = null;
+    }
+
+    this._activePaymentChallenge = challenge;
+    this._paymentOtpOptions = options;
+
+    this.ensurePaymentOtpModalInDom();
+    const modal = document.getElementById('modal-payment-otp');
+    if (!modal) return;
+
+    const isApt = challenge.challenge_type === 'HEALTHCARE_APPOINTMENT' || (options && options.isAppointment);
+    const isExam = challenge.challenge_type === 'COLLEGE_EXAM_OTP' || (options && options.isExam);
+    const modalTitle = document.getElementById('payment-modal-title');
+    const modalSubtitle = document.getElementById('payment-modal-subtitle');
+    const stageBadge = document.getElementById('payment-stage-badge');
+    const modalDescHeading = document.getElementById('payment-modal-desc-heading');
+    const modalDescText = document.getElementById('payment-modal-desc-text');
+    const orderLabel = document.getElementById('payment-otp-order-label');
+    const amountLabel = document.getElementById('payment-otp-amount-label');
+    const cancelBtn = document.getElementById('btn-payment-otp-cancel');
+    const destEmail = document.getElementById('payment-otp-dest-email');
+    const orderIdEl = document.getElementById('payment-otp-order-id');
+    const amountEl = document.getElementById('payment-otp-order-amount');
+    const errBanner = document.getElementById('payment-otp-error-banner');
+    const successBanner = document.getElementById('payment-otp-success-banner');
+    const codeInput = document.getElementById('payment-otp-code-input');
+    const verifyBtn = document.getElementById('btn-payment-otp-verify');
+    const resendBtn = document.getElementById('btn-payment-otp-resend');
+
+    if (destEmail) {
+      destEmail.textContent = challenge.masked_email || 'b***5@gmail.com';
+    }
+
+    if (isExam) {
+      if (modalTitle) modalTitle.textContent = 'BITS PILANI EXAMINATION AUTHORIZATION';
+      if (modalSubtitle) modalSubtitle.textContent = 'Zero-Trust Out-of-Band Proctored Exam Verification';
+      if (stageBadge) stageBadge.textContent = 'EXAM OTP';
+      if (modalDescHeading) modalDescHeading.textContent = 'Online Examination Identity Verification';
+      if (modalDescText) modalDescText.textContent = 'Proctored online examination requested. Enter the 6-digit verification code dispatched via Gmail SMTP to your registered email address.';
+      if (orderLabel) orderLabel.textContent = 'Assessment:';
+      if (amountLabel) amountLabel.textContent = 'Security Mode:';
+      if (orderIdEl) orderIdEl.textContent = challenge.course_name || options.courseName || 'CS F301 • End-Semester Exam';
+      if (amountEl) amountEl.textContent = 'Zero-Trust Proctored Shield';
+      if (verifyBtn) {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = '<span>Verify &amp; Launch Exam →</span>';
+      }
+      if (cancelBtn) cancelBtn.textContent = 'Cancel and return to portal';
+    } else if (isApt) {
+      if (modalTitle) modalTitle.textContent = 'AYUSYNC MEDCARE APPOINTMENT VERIFICATION';
+      if (modalSubtitle) modalSubtitle.textContent = 'Zero-Trust Out-of-Band Consultation Verification';
+      if (stageBadge) stageBadge.textContent = 'APPOINTMENT OTP';
+      if (modalDescHeading) modalDescHeading.textContent = 'Consultation Identity Verification';
+      if (modalDescText) modalDescText.textContent = 'Appointment slot requested. Enter the 6-digit confirmation code dispatched via Gmail SMTP to your registered email address.';
+      if (orderLabel) orderLabel.textContent = 'Specialist:';
+      if (amountLabel) amountLabel.textContent = 'Date & Slot:';
+      if (orderIdEl) orderIdEl.textContent = challenge.doctor_name || options.doctorName || 'Lead Specialist';
+      if (amountEl) amountEl.textContent = `${challenge.appointment_date || options.appointmentDate || ''} @ ${challenge.time_slot || options.timeSlot || ''}`;
+      if (verifyBtn) {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = '<span>Confirm Appointment →</span>';
+      }
+      if (cancelBtn) cancelBtn.textContent = 'Cancel and return to booking';
+    } else {
+      if (modalTitle) modalTitle.textContent = 'COGNISEC-AI PAYMENT AUTHORIZATION';
+      if (modalSubtitle) modalSubtitle.textContent = 'Zero-Trust Out-of-Band Payment Verification';
+      if (stageBadge) stageBadge.textContent = 'PAYMENT OTP';
+      if (modalDescHeading) modalDescHeading.textContent = 'Payment Identity Verification';
+      if (modalDescText) modalDescText.textContent = 'Simulated shopping order placed. Enter the 6-digit payment verification code dispatched via Gmail SMTP to your registered email address.';
+      if (orderLabel) orderLabel.textContent = 'Order:';
+      if (amountLabel) amountLabel.textContent = 'Amount:';
+      if (orderIdEl) {
+        orderIdEl.textContent = challenge.order_id || (options.order && options.order.orderId) || 'ORD-DEMO';
+      }
+      if (amountEl) {
+        const amt = (challenge.amount != null) ? challenge.amount : (options.order && options.order.amount);
+        amountEl.textContent = amt != null ? ('₹' + Number(amt).toLocaleString('en-IN')) : '₹0.00';
+      }
+      if (verifyBtn) {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = '<span>Verify &amp; Pay →</span>';
+      }
+      if (cancelBtn) cancelBtn.textContent = 'Cancel and return to checkout';
+    }
+
+    if (errBanner) {
+      errBanner.textContent = '';
+      errBanner.classList.add('hidden');
+    }
+    if (successBanner) {
+      const masked = challenge.masked_email || 'b***5@gmail.com';
+      successBanner.textContent = challenge.message || (isExam
+        ? `✓ Examination OTP dispatched via Gmail SMTP to ${masked}.`
+        : isApt
+          ? `✓ Appointment OTP dispatched via Gmail SMTP to ${masked}.`
+          : `✓ Payment OTP dispatched via Gmail SMTP to ${masked}.`);
+      successBanner.classList.remove('hidden');
+    }
+    if (codeInput) {
+      codeInput.value = '';
+      codeInput.disabled = false;
+    }
+
+    modal.classList.remove('hidden');
+    if (codeInput) {
+      setTimeout(() => codeInput.focus(), 150);
+    }
+
+    this.startPaymentModalOtpExpiryCountdown(challenge.expires_in_seconds || 300);
+    this.startPaymentModalResendCooldown(challenge.resend_cooldown_seconds || 15);
+    console.log('[COGNISEC-AI] [OTP_MODAL] OTP modal displayed for challenge:', challenge.challenge_id || challenge.order_id);
+  }
+
+  closePaymentOtpModal() {
+    if (this._paymentExpiryTimer) {
+      clearInterval(this._paymentExpiryTimer);
+      this._paymentExpiryTimer = null;
+    }
+    if (this._paymentResendCooldownTimer) {
+      clearInterval(this._paymentResendCooldownTimer);
+      this._paymentResendCooldownTimer = null;
+    }
+    const modal = document.getElementById('modal-payment-otp');
+    if (modal) modal.classList.add('hidden');
+    if (this._paymentOtpOptions && typeof this._paymentOtpOptions.onCancel === 'function') {
+      this._paymentOtpOptions.onCancel();
+    }
+  }
+
+  startPaymentModalOtpExpiryCountdown(ttlSeconds) {
+    if (this._paymentExpiryTimer) clearInterval(this._paymentExpiryTimer);
+    let remaining = ttlSeconds;
+    const timerEl = document.getElementById('payment-otp-expiry-timer');
+    const update = () => {
+      const m = Math.floor(remaining / 60);
+      const s = remaining % 60;
+      if (timerEl) {
+        timerEl.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }
+    };
+    update();
+    this._paymentExpiryTimer = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(this._paymentExpiryTimer);
+        this._paymentExpiryTimer = null;
+        if (timerEl) timerEl.textContent = 'EXPIRED';
+        const errBanner = document.getElementById('payment-otp-error-banner');
+        if (errBanner) {
+          errBanner.textContent = 'Verification code has expired. Please click "Resend Code" to receive a fresh verification code.';
+          errBanner.classList.remove('hidden');
+        }
+      } else {
+        update();
+      }
+    }, 1000);
+  }
+
+  startPaymentModalResendCooldown(cooldownSeconds) {
+    if (this._paymentResendCooldownTimer) clearInterval(this._paymentResendCooldownTimer);
+    let remaining = cooldownSeconds;
+    const resendBtn = document.getElementById('btn-payment-otp-resend');
+    if (!resendBtn) return;
+    resendBtn.disabled = true;
+    resendBtn.textContent = `Resend in ${remaining}s`;
+
+    this._paymentResendCooldownTimer = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(this._paymentResendCooldownTimer);
+        this._paymentResendCooldownTimer = null;
+        if (resendBtn) {
+          resendBtn.disabled = false;
+          resendBtn.textContent = 'Resend Code';
+        }
+      } else {
+        if (resendBtn) resendBtn.textContent = `Resend in ${remaining}s`;
+      }
+    }, 1000);
+  }
+
+  async submitPaymentOtpFromModal(event) {
+    if (event) event.preventDefault();
+    if (!this._activePaymentChallenge || this._isSubmittingPaymentOtp) {
+      return;
+    }
+    this._isSubmittingPaymentOtp = true;
+    const codeInput = document.getElementById('payment-otp-code-input');
+    const otpCode = codeInput ? codeInput.value.trim() : '';
+    const errBanner = document.getElementById('payment-otp-error-banner');
+    const successBanner = document.getElementById('payment-otp-success-banner');
+    const verifyBtn = document.getElementById('btn-payment-otp-verify');
+
+    if (errBanner) errBanner.classList.add('hidden');
+    if (successBanner) successBanner.classList.add('hidden');
+
+    if (!otpCode || otpCode.length !== 6 || !/^\d{6}$/.test(otpCode)) {
+      if (errBanner) {
+        errBanner.textContent = 'Please enter a valid 6-digit numeric verification code.';
+        errBanner.classList.remove('hidden');
+      }
+      if (codeInput) codeInput.focus();
+      this._isSubmittingPaymentOtp = false;
+      return;
+    }
+
+    const isApt = this._activePaymentChallenge.challenge_type === 'HEALTHCARE_APPOINTMENT';
+    const isExam = this._activePaymentChallenge.challenge_type === 'COLLEGE_EXAM_OTP';
+
+    if (verifyBtn) {
+      verifyBtn.disabled = true;
+      verifyBtn.innerHTML = isExam
+        ? '<span>Verifying Examination Code...</span>'
+        : isApt
+          ? '<span>Verifying Appointment Code...</span>'
+          : '<span>Verifying Payment Code...</span>';
+    }
+
+    try {
+      let verifyRes;
+      if (isExam) {
+        verifyRes = await this.verifyCollegeExamOtp({
+          challengeId: this._activePaymentChallenge.challenge_id,
+          otpCode: otpCode,
+          courseName: this._activePaymentChallenge.course_name
+        });
+        const examSession = await this.fetchAuthorizedExamSession(this._activePaymentChallenge.course_name);
+        verifyRes = Object.assign({}, verifyRes, examSession);
+        if (successBanner) {
+          successBanner.textContent = `✓ Examination Verified! Proctored Token: ${verifyRes.exam_token || '#BITS-EXM'}`;
+          successBanner.classList.remove('hidden');
+        }
+      } else if (isApt) {
+        verifyRes = await this.verifyHealthcareAppointmentOtp({
+          challengeId: this._activePaymentChallenge.challenge_id,
+          otpCode: otpCode
+        });
+        if (successBanner) {
+          successBanner.textContent = `✓ Appointment Confirmed! Booking Ref: ${verifyRes.reference_id}`;
+          successBanner.classList.remove('hidden');
+        }
+      } else {
+        verifyRes = await this.verifyShoppingPaymentOtp({
+          orderId: this._activePaymentChallenge.order_id,
+          challengeId: this._activePaymentChallenge.challenge_id,
+          otpCode: otpCode
+        });
+        if (successBanner) {
+          successBanner.textContent = `✓ Payment Authorized! Order ${this._activePaymentChallenge.order_id} marked PAID. Ref: ${verifyRes.payment_reference}`;
+          successBanner.classList.remove('hidden');
+        }
+      }
+
+      if (codeInput) codeInput.disabled = true;
+
+      setTimeout(() => {
+        const modal = document.getElementById('modal-payment-otp');
+        if (modal) modal.classList.add('hidden');
+        if (this._paymentExpiryTimer) clearInterval(this._paymentExpiryTimer);
+        if (this._paymentResendCooldownTimer) clearInterval(this._paymentResendCooldownTimer);
+
+        if (this._paymentOtpOptions && typeof this._paymentOtpOptions.onSuccess === 'function') {
+          this._paymentOtpOptions.onSuccess(verifyRes);
+        }
+      }, 1000);
+
+    } catch (err) {
+      console.warn('[COGNISEC-AI] OTP verification failed:', err);
+      if (verifyBtn) {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = isExam
+          ? '<span>Verify &amp; Launch Exam →</span>'
+          : isApt
+            ? '<span>Confirm Appointment →</span>'
+            : '<span>Verify &amp; Pay →</span>';
+      }
+      if (codeInput) {
+        codeInput.value = '';
+        codeInput.focus();
+      }
+      if (errBanner) {
+        errBanner.textContent = err.message || (isExam
+          ? 'Examination OTP verification failed. Exam remains locked.'
+          : isApt
+            ? 'Appointment OTP verification failed. Please try again.'
+            : 'Payment OTP verification failed. Please try again.');
+        errBanner.classList.remove('hidden');
+      }
+    } finally {
+      this._isSubmittingPaymentOtp = false;
+    }
+  }
+
+  async resendPaymentOtpFromModal() {
+    if (!this._activePaymentChallenge || this._isResendingPaymentOtp) return;
+    this._isResendingPaymentOtp = true;
+    const isApt = this._activePaymentChallenge.challenge_type === 'HEALTHCARE_APPOINTMENT';
+    const isExam = this._activePaymentChallenge.challenge_type === 'COLLEGE_EXAM_OTP';
+    const resendBtn = document.getElementById('btn-payment-otp-resend');
+    const errBanner = document.getElementById('payment-otp-error-banner');
+    const successBanner = document.getElementById('payment-otp-success-banner');
+
+    if (errBanner) {
+      errBanner.textContent = '';
+      errBanner.classList.add('hidden');
+    }
+    if (successBanner) {
+      successBanner.textContent = '';
+      successBanner.classList.add('hidden');
+    }
+    if (resendBtn) {
+      resendBtn.disabled = true;
+      resendBtn.textContent = 'Dispatching...';
+    }
+
+    try {
+      let freshChallenge;
+      if (isExam) {
+        freshChallenge = await this.resendCollegeExamOtp({
+          courseName: this._activePaymentChallenge.course_name
+        });
+      } else if (isApt) {
+        freshChallenge = await this.resendHealthcareAppointmentOtp({
+          challengeId: this._activePaymentChallenge.challenge_id
+        });
+      } else {
+        freshChallenge = await this.resendShoppingPaymentOtp({
+          orderId: this._activePaymentChallenge.order_id
+        });
+      }
+
+      this._activePaymentChallenge = freshChallenge;
+      this.startPaymentModalOtpExpiryCountdown(freshChallenge.expires_in_seconds || 300);
+      this.startPaymentModalResendCooldown(freshChallenge.resend_cooldown_seconds || 15);
+
+      const destEmail = document.getElementById('payment-otp-dest-email');
+      if (destEmail) {
+        destEmail.textContent = freshChallenge.masked_email || 'b***5@gmail.com';
+      }
+
+      if (successBanner) {
+        const masked = freshChallenge.masked_email || 'b***5@gmail.com';
+        successBanner.textContent = freshChallenge.message || (isExam
+          ? `✓ Fresh examination OTP dispatched via Gmail SMTP to ${masked}.`
+          : isApt
+            ? `✓ Fresh appointment OTP dispatched via Gmail SMTP to ${masked}.`
+            : `✓ Fresh payment OTP dispatched via Gmail SMTP to ${masked}.`);
+        successBanner.classList.remove('hidden');
+      }
+
+      const codeInput = document.getElementById('payment-otp-code-input');
+      if (codeInput) {
+        codeInput.value = '';
+        codeInput.focus();
+      }
+
+    } catch (err) {
+      if (errBanner) {
+        errBanner.textContent = err.message || (isApt ? 'Failed to dispatch fresh appointment code. Please retry.' : 'Failed to dispatch fresh payment code. Please retry.');
+        errBanner.classList.remove('hidden');
+      }
+      if (resendBtn) {
+        resendBtn.disabled = false;
+        resendBtn.textContent = 'Resend Code';
+      }
+    } finally {
+      this._isResendingPaymentOtp = false;
+    }
   }
 
   async register(name, email, password, role = 'USER', factorData = {}) {
@@ -3055,37 +3929,29 @@ class CognisecClient {
       this.clickCount = 0;
       this.scrollDeltaSum = 0;
 
+      // Record dynamic risk state from telemetry evaluation
+      if (result && result.risk_level) {
+        this.currentRiskLevel = result.risk_level;
+        localStorage.setItem('cognisec_current_risk_level', result.risk_level);
+      }
+      if (result && result.risk_score !== undefined) {
+        this.currentRiskScore = result.risk_score;
+      }
+
       // Handle critical risk session revocation
-      if (result && (result.decision === 'TERMINATE' || result.session_status === 'TERMINATED')) {
+      if (result && (result.decision === 'TERMINATE' || result.session_status === 'TERMINATED' || result.risk_level === 'CRITICAL')) {
         console.warn('[COGNISEC-AI] Critical risk detected: Session revoked by server security policy.');
         this.clearAuth();
         window.dispatchEvent(new CustomEvent('cognisec:session_locked', { detail: result }));
         return { success: false, error: 'Session terminated due to critical risk.' };
       }
 
-      // Handle step-up verification requirement
+      // Record step-up requirement state without popping up modal during normal portal navigation.
+      // Step-up verification is triggered ONLY when user explicitly accesses confidential vault.
       if (result && (result.session_status === 'STEP_UP_REQUIRED' || result.decision === 'STEP_UP_VERIFICATION' || result.verification_required)) {
-        // Stale telemetry guard: If current session is ACTIVE and result is from an old pending state, ignore it completely
-        if (this.sessionStatus === 'ACTIVE' && result.session_status !== 'STEP_UP_REQUIRED') {
-          console.log('[COGNISEC-AI] Stale pending telemetry response ignored; session is already ACTIVE.');
-          return { success: true, data: result };
-        }
-
-        // Prevent stale in-flight telemetry from reopening challenge if recently verified on backend
-        const recentlyVerified = this.lastStepUpVerifiedAt &&
-          (Date.now() - this.lastStepUpVerifiedAt < 30000) &&
-          (this.lastStepUpVerifiedSessionId === this.sessionId);
-
-        if (recentlyVerified) {
-          console.log('[COGNISEC-AI] Suppressing stale telemetry step-up trigger; session was recently verified.');
-          return { success: true, data: result };
-        }
-
-        console.warn('[COGNISEC-AI] Step-up verification required by backend Zero Trust policy decision');
-        this.sessionStatus = 'STEP_UP_REQUIRED';
-        localStorage.setItem('cognisec_session_status', 'STEP_UP_REQUIRED');
+        // Do not alter sessionStatus away from PENDING_OBSERVATION, PENDING_OTP, or ACTIVE.
+        // The elevated risk is recorded in currentRiskLevel and enforced authoritatively at vault boundaries.
         window.dispatchEvent(new CustomEvent('cognisec:step_up_required', { detail: result }));
-        this.openStepUpModal({ reason: result.user_message });
       }
 
       window.dispatchEvent(new CustomEvent('cognisec:telemetry_dispatched', { detail: result }));
@@ -3352,9 +4218,19 @@ class CognisecClient {
     const sid = sessionId || this.sessionId;
     if (!sid) return { success: false, error: 'No active session token available' };
     try {
+      let app = this.application || 'platform';
+      if (this.currentTargetResource === 'academic_vault' || (typeof window !== 'undefined' && window.location.pathname.includes('college'))) {
+        app = 'college';
+      } else if (this.currentTargetResource === 'financial_vault' || (typeof window !== 'undefined' && window.location.pathname.includes('shopping'))) {
+        app = 'shopping';
+      } else if (this.currentTargetResource === 'ehr_vault' || (typeof window !== 'undefined' && window.location.pathname.includes('healthcare'))) {
+        app = 'healthcare';
+      }
+      this.application = app;
+
       const body = {
         session_id: sid,
-        application: this.application || 'platform',
+        application: app,
         resource: this.currentTargetResource || null
       };
       if (preferredFactor) body.preferred_factor = preferredFactor;
@@ -3561,9 +4437,19 @@ class CognisecClient {
     const sid = sessionId || this.sessionId;
     if (!sid) return { success: false, error: 'No active session token available' };
     try {
+      let app = this.application || 'platform';
+      if (this.currentTargetResource === 'academic_vault' || (typeof window !== 'undefined' && window.location.pathname.includes('college'))) {
+        app = 'college';
+      } else if (this.currentTargetResource === 'financial_vault' || (typeof window !== 'undefined' && window.location.pathname.includes('shopping'))) {
+        app = 'shopping';
+      } else if (this.currentTargetResource === 'ehr_vault' || (typeof window !== 'undefined' && window.location.pathname.includes('healthcare'))) {
+        app = 'healthcare';
+      }
+      this.application = app;
+
       const body = {
         session_id: sid,
-        application: this.application || 'platform',
+        application: app,
         resource: this.currentTargetResource || null,
         ...payload
       };
@@ -4222,7 +5108,7 @@ class CognisecClient {
 
     const modalDiv = document.createElement('div');
     modalDiv.id = 'modal-login-observation';
-    modalDiv.className = 'fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 font-mono animate-fade-in';
+    modalDiv.className = 'fixed inset-0 z-[100] hidden bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 font-mono animate-fade-in';
     modalDiv.innerHTML = `
       <div id="obs-modal-container" class="relative w-full max-w-lg bg-[#08050e] border border-red-900/60 rounded-2xl shadow-[0_0_80px_rgba(220,38,38,0.4)] overflow-hidden flex flex-col transition-all duration-300">
         <div class="px-6 py-4 border-b border-red-950 flex items-center justify-between bg-gradient-to-r from-red-950/40 via-black to-red-950/20">
@@ -4272,6 +5158,79 @@ class CognisecClient {
             </div>
             <div class="text-center pt-2">
               <button type="button" onclick="window.cancelObservationAndReturnToLogin ? window.cancelObservationAndReturnToLogin() : (window.cognisec && window.cognisec.cancelObservationAndLogout())" class="text-[11px] font-mono text-slate-500 hover:text-slate-300 underline cursor-pointer">Cancel and sign in with another account</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalDiv);
+  }
+
+  ensurePaymentOtpModalInDom() {
+    if (document.getElementById('modal-payment-otp')) return;
+
+    const modalDiv = document.createElement('div');
+    modalDiv.id = 'modal-payment-otp';
+    modalDiv.className = 'fixed inset-0 z-[100] hidden bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 font-mono animate-fade-in';
+    modalDiv.innerHTML = `
+      <div id="payment-modal-container" class="relative w-full max-w-lg bg-[#08050e] border border-orange-600/70 rounded-2xl shadow-[0_0_80px_rgba(234,88,12,0.35)] overflow-hidden flex flex-col transition-all duration-300">
+        <div class="px-6 py-4 border-b border-orange-950 flex items-center justify-between bg-gradient-to-r from-orange-950/40 via-black to-orange-950/20">
+          <div class="flex items-center gap-3">
+            <div class="p-2 rounded-xl bg-orange-950/80 border border-orange-800 text-orange-400">
+              <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            </div>
+            <div>
+              <h3 id="payment-modal-title" class="font-heading font-extrabold text-base text-white tracking-wide">COGNISEC-AI PAYMENT AUTHORIZATION</h3>
+              <p id="payment-modal-subtitle" class="text-xs font-mono text-slate-400">Zero-Trust Out-of-Band Payment Verification</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="payment-stage-badge" class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-orange-950 text-orange-300 border border-orange-700/60 uppercase tracking-wider">PAYMENT OTP</span>
+            <button id="payment-modal-close-btn" type="button" onclick="window.cognisec && window.cognisec.closePaymentOtpModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-orange-950/50 transition-colors" title="Close">✕</button>
+          </div>
+        </div>
+
+        <div id="payment-otp-view" class="p-6 sm:p-8 space-y-6">
+          <div class="text-center space-y-2 max-w-md mx-auto">
+            <div class="inline-flex p-3 rounded-2xl bg-orange-950/50 border border-orange-800 text-orange-400 mb-1">
+              <svg class="w-8 h-8" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            </div>
+            <h4 id="payment-modal-desc-heading" class="font-heading font-bold text-xl text-white">Payment Identity Verification</h4>
+            <p id="payment-modal-desc-text" class="text-xs font-mono text-slate-300 leading-relaxed">Simulated shopping order placed. Enter the 6-digit payment verification code dispatched via Gmail SMTP to your registered email address.</p>
+          </div>
+          <div class="p-3 rounded-xl bg-black/70 border border-orange-950 flex items-center justify-between text-xs font-mono">
+            <div class="flex items-center gap-2">
+              <span class="text-slate-400">Sent to:</span>
+              <span id="payment-otp-dest-email" class="text-white font-bold">b***5@gmail.com</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-slate-400">Expires:</span>
+              <span id="payment-otp-expiry-timer" class="text-orange-400 font-bold">05:00</span>
+            </div>
+          </div>
+          <div class="p-3 rounded-xl bg-orange-950/30 border border-orange-900/50 flex items-center justify-between text-xs font-mono">
+            <div>
+              <span id="payment-otp-order-label" class="text-slate-400">Order:</span>
+              <span id="payment-otp-order-id" class="text-orange-200 font-bold ml-1">ORD-DEMO</span>
+            </div>
+            <div>
+              <span id="payment-otp-amount-label" class="text-slate-400">Amount:</span>
+              <span id="payment-otp-order-amount" class="text-white font-extrabold ml-1">₹0.00</span>
+            </div>
+          </div>
+          <div id="payment-otp-error-banner" class="hidden p-3.5 rounded-xl bg-red-950/90 border border-red-700 text-red-200 text-xs font-mono leading-relaxed"></div>
+          <div id="payment-otp-success-banner" class="hidden p-3.5 rounded-xl bg-emerald-950/90 border border-emerald-700 text-emerald-200 text-xs font-mono leading-relaxed"></div>
+          <form id="payment-otp-form" onsubmit="window.cognisec && window.cognisec.submitPaymentOtpFromModal(event)" class="space-y-4">
+            <div class="space-y-2">
+              <label for="payment-otp-code-input" class="text-xs font-bold text-slate-300 uppercase tracking-wider block text-center font-mono">Enter 6-Digit One-Time Password</label>
+              <input id="payment-otp-code-input" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="000000" autocomplete="one-time-code" required class="w-full text-center text-3xl font-mono font-extrabold tracking-[0.4em] px-4 py-3.5 rounded-xl bg-black border border-orange-900/60 text-white focus:outline-none focus:border-orange-500 shadow-inner" />
+            </div>
+            <div class="flex items-center gap-3 pt-2">
+              <button id="btn-payment-otp-resend" type="button" onclick="window.cognisec && window.cognisec.resendPaymentOtpFromModal()" class="flex-1 py-3 px-4 rounded-xl bg-black hover:bg-orange-950/60 border border-orange-900/50 hover:border-orange-700 text-slate-300 hover:text-white font-mono font-semibold text-xs uppercase tracking-wider transition-colors cursor-pointer">Resend Code</button>
+              <button id="btn-payment-otp-verify" type="submit" class="flex-[2] py-3.5 px-5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-heading font-extrabold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(234,88,12,0.4)] transition-all cursor-pointer flex items-center justify-center gap-2"><span>Verify &amp; Pay →</span></button>
+            </div>
+            <div class="text-center pt-2">
+              <button id="btn-payment-otp-cancel" type="button" onclick="window.cognisec && window.cognisec.closePaymentOtpModal()" class="text-[11px] font-mono text-slate-500 hover:text-slate-300 underline cursor-pointer">Cancel and return to checkout</button>
             </div>
           </form>
         </div>
@@ -4482,9 +5441,23 @@ class CognisecClient {
     this.isStepUpSubmitting = false;
 
     this.currentTargetResource = options.targetResource || null;
+    if (this.currentTargetResource === 'academic_vault' || (typeof window !== 'undefined' && window.location.pathname.includes('college'))) {
+      this.application = 'college';
+    } else if (this.currentTargetResource === 'financial_vault' || (typeof window !== 'undefined' && window.location.pathname.includes('shopping'))) {
+      this.application = 'shopping';
+    } else if (this.currentTargetResource === 'ehr_vault' || (typeof window !== 'undefined' && window.location.pathname.includes('healthcare'))) {
+      this.application = 'healthcare';
+    }
+
     this.stepUpSuccessCallback = options.onSuccess || null;
     this.stepUpCancelCallback = options.onCancel || null;
     this.currentStepUpFactor = options.preferredFactor || null;
+
+    // Reset challenge states cleanly
+    this.currentChallenge = null;
+    this.currentChallengeExpiresAt = null;
+    this.challengeGestureNodes = [];
+    this.challengeImageSequence = [];
 
     const modalTitle = document.getElementById('stepup-modal-title');
     const modalSubtitle = document.getElementById('stepup-modal-subtitle');
@@ -4508,25 +5481,20 @@ class CognisecClient {
     }
 
     const sRef = this.sessionId ? this.sessionId.substring(0, 10) : 'Active';
-    const cRef = this.currentChallenge && this.currentChallenge.challenge_id ? this.currentChallenge.challenge_id.substring(0, 10) : 'Pending';
     if (sessionBadge) {
-      sessionBadge.textContent = `Session: ${sRef} | Ref: ${cRef}`;
+      sessionBadge.textContent = `Session: ${sRef} | Ref: Requesting...`;
     }
 
     if (feedback) feedback.className = 'hidden';
     if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = isGesture ? `<span>Verify Route →</span>` : `<span>Verify &amp; Restore Access →</span>`;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = isGesture ? `<span>Loading Neural Route...</span>` : `<span>Loading Challenge...</span>`;
     }
     if (reqBtn) {
       reqBtn.disabled = false;
       reqBtn.textContent = isGesture ? 'Clear / Reset' : '🔄 Fresh Code';
     }
     if (attemptsInfo) attemptsInfo.textContent = '3 attempts remaining';
-
-    // Reset challenge states
-    this.challengeGestureNodes = [];
-    this.challengeImageSequence = [];
 
     // Immediately reveal and initialize the requested challenge factor pane
     const paneOtp = document.getElementById('stepup-pane-otp');
@@ -4544,20 +5512,8 @@ class CognisecClient {
       this.initStepUpGestureGrid();
     }
 
-    // If an unexpired challenge already exists for this session, reuse it unless forceNew or different factor
-    const hasValidChallenge = this.currentChallenge &&
-      this.currentChallenge.session_id === this.sessionId &&
-      this.currentChallengeExpiresAt &&
-      (Date.now() < this.currentChallengeExpiresAt) &&
-      (!options.preferredFactor || this.currentChallenge.challenge_type === options.preferredFactor);
-
-    if (hasValidChallenge && !options.forceNew) {
-      this.currentChallengePromise = null;
-      this.renderChallengeUi(this.currentChallenge);
-    } else {
-      this.currentChallengePromise = this.triggerNewStepUpChallenge(options.preferredFactor || null);
-      await this.currentChallengePromise;
-    }
+    this.currentChallengePromise = this.triggerNewStepUpChallenge(options.preferredFactor || null);
+    await this.currentChallengePromise;
   }
 
   closeStepUpModal() {
@@ -4598,6 +5554,11 @@ class CognisecClient {
     const otpInput = document.getElementById('stepup-otp-input');
     const privInput = document.getElementById('stepup-private-input');
     const submitBtn = document.getElementById('stepup-btn-submit');
+    const reqBtn = document.getElementById('stepup-btn-request-new');
+    const sessionBadge = document.getElementById('stepup-session-badge');
+
+    this.currentChallenge = null;
+    this.currentChallengeExpiresAt = null;
 
     if (feedback) feedback.className = 'hidden';
     if (otpInput) {
@@ -4609,10 +5570,9 @@ class CognisecClient {
       privInput.disabled = false;
     }
     if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = preferredFactor === 'GESTURE_PATTERN' ? `<span>Verify Route →</span>` : `<span>Verify &amp; Restore Access →</span>`;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = preferredFactor === 'GESTURE_PATTERN' ? `<span>Loading Route...</span>` : `<span>Loading Challenge...</span>`;
     }
-    const reqBtn = document.getElementById('stepup-btn-request-new');
     if (reqBtn && preferredFactor === 'GESTURE_PATTERN') {
       reqBtn.textContent = 'Clear / Reset';
     }
@@ -4622,15 +5582,18 @@ class CognisecClient {
     const res = await this.requestStepUpChallenge(preferredFactor);
     if (!this.isStepUpModalOpen) return;
     if (!res.success) {
+      this.currentChallenge = null;
       if (feedback) {
         feedback.className = 'p-3 rounded-xl bg-red-950/60 border border-red-800 text-red-300 font-mono text-xs block';
         feedback.textContent = `Challenge Issuance Error: ${res.error || 'Failed to generate challenge. Please click Retry.'}`;
       }
       if (demoOtpSpan) demoOtpSpan.textContent = 'Unavailable';
-      const reqBtn = document.getElementById('stepup-btn-request-new');
       if (reqBtn) {
         reqBtn.disabled = false;
         reqBtn.textContent = '🔄 Retry';
+      }
+      if (submitBtn) {
+        submitBtn.disabled = true;
       }
       return;
     }
@@ -4677,6 +5640,7 @@ class CognisecClient {
 
     const submitBtn = document.getElementById('stepup-btn-submit');
     const reqBtn = document.getElementById('stepup-btn-request-new');
+    if (submitBtn) submitBtn.disabled = false;
     if (cType === 'GESTURE_PATTERN') {
       if (submitBtn) submitBtn.innerHTML = `<span>Verify Route →</span>`;
       if (reqBtn) reqBtn.textContent = 'Clear / Reset';
@@ -4962,31 +5926,25 @@ class CognisecClient {
       }
     }
 
-    let cType = (this.currentChallenge && this.currentChallenge.challenge_type) || this.currentStepUpFactor;
-    if (!cType) {
-      const paneGesture = document.getElementById('stepup-pane-gesture');
-      const paneImage = document.getElementById('stepup-pane-image');
-      const panePrivate = document.getElementById('stepup-pane-private');
-      if (paneGesture && !paneGesture.classList.contains('hidden')) {
-        cType = 'GESTURE_PATTERN';
-      } else if (paneImage && !paneImage.classList.contains('hidden')) {
-        cType = 'COGNITIVE_IMAGE_SEQUENCE';
-      } else if (panePrivate && !panePrivate.classList.contains('hidden')) {
-        cType = 'PRIVATE_RESPONSE';
-      } else {
-        cType = 'OTP';
-      }
-    }
-
     const submitBtn = document.getElementById('stepup-btn-submit');
     const reqBtn = document.getElementById('stepup-btn-request-new');
     const feedback = document.getElementById('stepup-feedback-banner');
     const attemptsInfo = document.getElementById('stepup-attempts-info');
 
-    let payload = { challenge_type: cType };
-    if (this.currentChallenge && this.currentChallenge.challenge_id) {
-      payload.challenge_id = this.currentChallenge.challenge_id;
+    if (!this.currentChallenge || !this.currentChallenge.challenge_id) {
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-amber-950/60 border border-amber-800 text-amber-300 font-mono text-xs block';
+        feedback.textContent = 'No active challenge found or challenge expired. Please click "Clear / Reset" or "🔄 Fresh Code" to request a new challenge.';
+      }
+      return;
     }
+
+    let cType = this.currentChallenge.challenge_type || this.currentStepUpFactor || 'GESTURE_PATTERN';
+
+    let payload = {
+      challenge_type: cType,
+      challenge_id: this.currentChallenge.challenge_id
+    };
 
     if (cType === 'OTP') {
       const input = document.getElementById('stepup-otp-input');

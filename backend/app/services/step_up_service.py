@@ -1,5 +1,6 @@
 import hmac
 import hashlib
+import json
 import logging
 import secrets
 import threading
@@ -42,6 +43,9 @@ class StepUpService:
     _password_resets: Dict[str, Dict[str, Any]] = {}  # keyed by normalized email
     _neuraltrace_resets: Dict[str, Dict[str, Any]] = {}  # keyed by challenge_id
     _reset_tickets: Dict[str, Dict[str, Any]] = {}  # keyed by ticket_token
+    _inflight_appointment_sessions: set = set()
+    _inflight_login_sessions: set = set()
+    _inflight_exam_sessions: set = set()
 
     DEFAULT_TTL_SECONDS = 300  # 5 minutes
     MAX_ATTEMPTS = 3
@@ -121,6 +125,9 @@ class StepUpService:
             for c in to_delete:
                 cls._delete_challenge(c)
             cls._challenges.pop(session_id, None)
+            cls._challenges.pop(f"exam:{session_id}", None)
+            cls._challenges.pop(f"apt:{session_id}", None)
+            cls._challenges.pop(f"login:{session_id}", None)
             for k in list(cls._challenges.keys()):
                 if k.startswith(f"{session_id}:") or k == session_id:
                     cls._challenges.pop(k, None)
@@ -151,7 +158,7 @@ class StepUpService:
         from app.services.session_service import SessionService
         norm_app = SessionService.normalize_application(application)
         norm_res = SessionService.normalize_resource(resource) if resource else SessionService.get_resource_for_application(norm_app)
-        if not norm_app and norm_res:
+        if (not norm_app or norm_app == "platform") and norm_res:
             norm_app = SessionService.get_application_for_resource(norm_res)
         if not norm_res and norm_app:
             norm_res = SessionService.get_resource_for_application(norm_app)
@@ -210,20 +217,22 @@ class StepUpService:
                     selected_type = "OTP"
 
             else:
-                # Mild deviation (risk < 0.50) or user-initiated step-up
-                if preferred_factor and preferred_factor.upper() in [
-                    "GESTURE_PATTERN", "COGNITIVE_IMAGE_SEQUENCE", "PRIVATE_RESPONSE", "HIGH_RISK_DUAL"
+                # Mild deviation (risk < 0.50), confidential vault access, or user-initiated step-up
+                is_confidential_vault = norm_res in ("academic_vault", "financial_vault", "ehr_vault") or norm_app in ("college", "shopping", "healthcare")
+                pref = (preferred_factor or "").upper().strip()
+
+                if is_confidential_vault or pref == "GESTURE_PATTERN":
+                    if not enrollment.get("has_gesture_pattern"):
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail=NEURALTRACE_NOT_ENROLLED_DETAIL
+                        )
+                    selected_type = "GESTURE_PATTERN"
+                    min_len = 4
+                elif pref in [
+                    "COGNITIVE_IMAGE_SEQUENCE", "PRIVATE_RESPONSE", "HIGH_RISK_DUAL"
                 ]:
-                    pref = preferred_factor.upper()
-                    if pref == "GESTURE_PATTERN":
-                        if not enrollment.get("has_gesture_pattern"):
-                            raise HTTPException(
-                                status_code=status.HTTP_409_CONFLICT,
-                                detail=NEURALTRACE_NOT_ENROLLED_DETAIL
-                            )
-                        selected_type = "GESTURE_PATTERN"
-                        min_len = 4
-                    elif pref == "COGNITIVE_IMAGE_SEQUENCE":
+                    if pref == "COGNITIVE_IMAGE_SEQUENCE":
                         if not enrollment.get("has_cognitive_image_sequence"):
                             raise HTTPException(
                                 status_code=status.HTTP_409_CONFLICT,
@@ -277,7 +286,8 @@ class StepUpService:
                 and (not norm_app or existing.get("application") == norm_app)
             ):
                 user = db.query(User).filter(User.id == user_id).first()
-                masked_email = EmailService.mask_email(user.email) if user and user.email else None
+                delivery_email = EmailService.resolve_delivery_recipient(user.email) if user and user.email else None
+                masked_email = EmailService.mask_email(delivery_email) if delivery_email else None
                 return_otp = existing.get("otp", "") if (settings.EXHIBITION_MODE or settings.ENVIRONMENT in ("test", "testing")) else ""
                 return {
                     "challenge_id": existing["challenge_id"],
@@ -314,13 +324,13 @@ class StepUpService:
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Authenticated user account does not have a registered email address."
                     )
-                user_email = user.email
-                masked_email = EmailService.mask_email(user_email)
+                delivery_email = EmailService.resolve_delivery_recipient(user.email)
+                masked_email = EmailService.mask_email(delivery_email)
 
                 # Out-of-band email dispatch
                 delivery_status = "PENDING"
                 email_ok, email_msg = EmailService.send_otp_email(
-                    recipient_email=user_email,
+                    recipient_email=delivery_email,
                     otp_code=otp_val,
                     expires_in_minutes=ttl_seconds // 60,
                     challenge_id=challenge_id
@@ -453,6 +463,10 @@ class StepUpService:
             from app.services.session_service import SessionService
             norm_app = SessionService.normalize_application(application)
             norm_res = SessionService.normalize_resource(resource) if resource else None
+            if (not norm_app or norm_app == "platform") and norm_res:
+                norm_app = SessionService.get_application_for_resource(norm_res)
+            if not norm_res and norm_app:
+                norm_res = SessionService.get_resource_for_application(norm_app)
 
             challenge = None
             chal_key = None
@@ -474,6 +488,13 @@ class StepUpService:
                         challenge = c
                         chal_key = k
                         break
+                if not challenge:
+                    return (
+                        False,
+                        "No active step-up challenge found or challenge expired/already used. Please request a new challenge.",
+                        False,
+                        None
+                    )
 
             # 3. Lookup by application-scoped session key
             if not challenge and norm_app:
@@ -813,8 +834,8 @@ class StepUpService:
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Authenticated user account does not have a registered email address."
                     )
-                user_email = user.email
-                masked_email = EmailService.mask_email(user_email)
+                delivery_email = EmailService.resolve_delivery_recipient(user.email)
+                masked_email = EmailService.mask_email(delivery_email)
                 return_otp = existing.get("otp", "") if (settings.EXHIBITION_MODE or settings.ENVIRONMENT in ("test", "testing")) else ""
                 return {
                     "challenge_id": existing["challenge_id"],
@@ -822,64 +843,75 @@ class StepUpService:
                     "challenge_type": "LOGIN_OTP",
                     "masked_email": masked_email,
                     "expires_in_seconds": int((existing["expires_at"] - now).total_seconds()),
-                    "message": f"Verification code sent to {masked_email}.",
+                    "message": f"Active verification code pending. Check your inbox and spam folder ({masked_email}).",
                     "otp": return_otp,
                     "is_demo_otp": bool(settings.EXHIBITION_MODE)
                 }
 
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user or not user.email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Authenticated user account does not have a registered email address."
+            if session_id in cls._inflight_login_sessions:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Verification code transmission is already in progress. Please check your inbox."
+                )
+            cls._inflight_login_sessions.add(session_id)
+
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user or not user.email:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Authenticated user account does not have a registered email address."
+                )
+            delivery_email = EmailService.resolve_delivery_recipient(user.email)
+            masked_email = EmailService.mask_email(delivery_email)
+
+            otp_val = f"{secrets.randbelow(1000000):06d}"
+            otp_hash = cls._hash_otp(otp_val)
+            challenge_id = f"chal_login_{secrets.token_hex(8)}"
+            expires_at = now + timedelta(seconds=ttl_seconds)
+
+            # Dispatch via SMTP without holding threading lock
+            email_ok, email_msg = EmailService.send_otp_email(
+                recipient_email=delivery_email,
+                otp_code=otp_val,
+                expires_in_minutes=ttl_seconds // 60,
+                challenge_id=challenge_id
             )
-        user_email = user.email
-        masked_email = EmailService.mask_email(user_email)
+            if not email_ok:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Email OTP transmission failed: {email_msg}. Please retry."
+                )
 
-        otp_val = f"{secrets.randbelow(1000000):06d}"
-        otp_hash = cls._hash_otp(otp_val)
-        challenge_id = f"chal_login_{secrets.token_hex(8)}"
-        expires_at = now + timedelta(seconds=ttl_seconds)
+            return_otp = otp_val if (settings.EXHIBITION_MODE or settings.ENVIRONMENT in ("test", "testing")) else ""
 
-        # Dispatch via SMTP without holding threading lock
-        email_ok, email_msg = EmailService.send_otp_email(
-            recipient_email=user_email,
-            otp_code=otp_val,
-            expires_in_minutes=ttl_seconds // 60,
-            challenge_id=challenge_id
-        )
-        if not email_ok:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Email OTP transmission failed: {email_msg}. Please retry."
-            )
+            with cls._lock:
+                cls._challenges[session_id] = {
+                    "challenge_id": challenge_id,
+                    "session_id": session_id,
+                    "user_id": user_id,
+                    "challenge_type": "LOGIN_OTP",
+                    "otp_hash": otp_hash,
+                    "otp": return_otp,
+                    "created_at": now,
+                    "expires_at": expires_at,
+                    "attempts": 0,
+                    "max_attempts": cls.MAX_ATTEMPTS,
+                }
 
-        return_otp = otp_val if (settings.EXHIBITION_MODE or settings.ENVIRONMENT in ("test", "testing")) else ""
-
-        with cls._lock:
-            cls._challenges[session_id] = {
+            return {
                 "challenge_id": challenge_id,
                 "session_id": session_id,
-                "user_id": user_id,
                 "challenge_type": "LOGIN_OTP",
-                "otp_hash": otp_hash,
+                "masked_email": masked_email,
+                "expires_in_seconds": ttl_seconds,
+                "message": f"Verification code accepted by Gmail SMTP for transmission to {masked_email}. Check your inbox and spam folder.",
                 "otp": return_otp,
-                "created_at": now,
-                "expires_at": expires_at,
-                "attempts": 0,
-                "max_attempts": cls.MAX_ATTEMPTS,
+                "is_demo_otp": bool(settings.EXHIBITION_MODE)
             }
-
-        return {
-            "challenge_id": challenge_id,
-            "session_id": session_id,
-            "challenge_type": "LOGIN_OTP",
-            "masked_email": masked_email,
-            "expires_in_seconds": ttl_seconds,
-            "message": f"Verification code sent to {masked_email}.",
-            "otp": return_otp,
-            "is_demo_otp": bool(settings.EXHIBITION_MODE)
-        }
+        finally:
+            with cls._lock:
+                cls._inflight_login_sessions.discard(session_id)
 
     @classmethod
     def resend_login_otp_challenge(
@@ -919,66 +951,76 @@ class StepUpService:
                 detail="Session is already authenticated and active."
             )
 
-        # Invalidate previous challenge atomically
+        # Invalidate previous challenge atomically with in-flight guard
         with cls._lock:
+            if session_id in cls._inflight_login_sessions:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Verification code transmission is already in progress. Please check your inbox."
+                )
             cls._challenges.pop(session_id, None)
+            cls._inflight_login_sessions.add(session_id)
 
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user or not user.email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Authenticated user account does not have a registered email address."
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user or not user.email:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Authenticated user account does not have a registered email address."
+                )
+            delivery_email = EmailService.resolve_delivery_recipient(user.email)
+            masked_email = EmailService.mask_email(delivery_email)
+
+            otp_val = f"{secrets.randbelow(1000000):06d}"
+            otp_hash = cls._hash_otp(otp_val)
+            challenge_id = f"chal_login_{secrets.token_hex(8)}"
+            now = utc_now()
+            expires_at = now + timedelta(seconds=ttl_seconds)
+
+            email_ok, email_msg = EmailService.send_otp_email(
+                recipient_email=delivery_email,
+                otp_code=otp_val,
+                expires_in_minutes=ttl_seconds // 60,
+                challenge_id=challenge_id
             )
-        user_email = user.email
-        masked_email = EmailService.mask_email(user_email)
+            if not email_ok:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Email OTP transmission failed: {email_msg}. Please retry."
+                )
 
-        otp_val = f"{secrets.randbelow(1000000):06d}"
-        otp_hash = cls._hash_otp(otp_val)
-        challenge_id = f"chal_login_{secrets.token_hex(8)}"
-        now = utc_now()
-        expires_at = now + timedelta(seconds=ttl_seconds)
+            return_otp = otp_val if (settings.EXHIBITION_MODE or settings.ENVIRONMENT in ("test", "testing")) else ""
 
-        email_ok, email_msg = EmailService.send_otp_email(
-            recipient_email=user_email,
-            otp_code=otp_val,
-            expires_in_minutes=ttl_seconds // 60,
-            challenge_id=challenge_id
-        )
-        if not email_ok:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Email OTP transmission failed: {email_msg}. Please retry."
-            )
+            with cls._lock:
+                cls._challenges[session_id] = {
+                    "challenge_id": challenge_id,
+                    "session_id": session_id,
+                    "user_id": user_id,
+                    "challenge_type": "LOGIN_OTP",
+                    "otp_hash": otp_hash,
+                    "otp": return_otp,
+                    "created_at": now,
+                    "expires_at": expires_at,
+                    "attempts": 0,
+                    "max_attempts": cls.MAX_ATTEMPTS,
+                }
 
-        return_otp = otp_val if (settings.EXHIBITION_MODE or settings.ENVIRONMENT in ("test", "testing")) else ""
+            session.login_otp_challenge_id = challenge_id
+            db.commit()
 
-        with cls._lock:
-            cls._challenges[session_id] = {
+            return {
                 "challenge_id": challenge_id,
                 "session_id": session_id,
-                "user_id": user_id,
                 "challenge_type": "LOGIN_OTP",
-                "otp_hash": otp_hash,
+                "masked_email": masked_email,
+                "expires_in_seconds": ttl_seconds,
+                "message": f"Verification code accepted by Gmail SMTP for transmission to {masked_email}. Check your inbox and spam folder.",
                 "otp": return_otp,
-                "created_at": now,
-                "expires_at": expires_at,
-                "attempts": 0,
-                "max_attempts": cls.MAX_ATTEMPTS,
+                "is_demo_otp": bool(settings.EXHIBITION_MODE)
             }
-
-        session.login_otp_challenge_id = challenge_id
-        db.commit()
-
-        return {
-            "challenge_id": challenge_id,
-            "session_id": session_id,
-            "challenge_type": "LOGIN_OTP",
-            "masked_email": masked_email,
-            "expires_in_seconds": ttl_seconds,
-            "message": f"Verification code sent to {masked_email}.",
-            "otp": return_otp,
-            "is_demo_otp": bool(settings.EXHIBITION_MODE)
-        }
+        finally:
+            with cls._lock:
+                cls._inflight_login_sessions.discard(session_id)
 
     @classmethod
     def verify_login_otp(
@@ -1034,6 +1076,1193 @@ class StepUpService:
                 False,
                 "Invalid verification code. For your security, this pending login session has been terminated. Please sign in again."
             )
+
+    @classmethod
+    def create_payment_otp_challenge(
+        cls,
+        session_id: str,
+        user_id: int,
+        order_id: str,
+        amount: float,
+        item_summary: str,
+        db: Session,
+        ttl_seconds: int = 300
+    ) -> Dict[str, Any]:
+        """
+        Generates and transmits a single-use 6-digit payment verification OTP for Shopping checkout.
+        Enforces:
+        - Authenticated user account with resolved recipient email (boomikaram35@gmail.com).
+        - Order ID and amount binding.
+        - Cooldown between resend requests (15s).
+        - Direct synchronous SMTP dispatch awaiting result (fails if SMTP transmission fails).
+        - Strict challenge purpose: 'SHOPPING_PAYMENT'.
+        """
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or not user.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Authenticated user account does not have a registered email address."
+            )
+
+        delivery_email = EmailService.resolve_delivery_recipient(user.email)
+        masked_email = EmailService.mask_email(delivery_email)
+        now = utc_now()
+
+        # Check existing active payment challenge cooldown for this order
+        with cls._lock:
+            cls._cleanup_expired()
+            existing = cls._challenges.get(f"pay:{order_id}")
+            if existing and existing.get("challenge_type") == "SHOPPING_PAYMENT":
+                cooldown_until = existing.get("cooldown_until")
+                if cooldown_until and now < cooldown_until:
+                    rem_sec = max(1, int((cooldown_until - now).total_seconds()))
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=f"Please wait {rem_sec} seconds before requesting a new payment verification code."
+                    )
+
+        otp_val = f"{secrets.randbelow(1000000):06d}"
+        otp_hash = cls._hash_otp(otp_val)
+        challenge_id = f"chal_pay_{secrets.token_hex(8)}"
+        expires_at = now + timedelta(seconds=ttl_seconds)
+
+        # Immediate synchronous SMTP delivery
+        email_ok, email_msg = EmailService.send_payment_otp_email(
+            recipient_email=delivery_email,
+            otp_code=otp_val,
+            order_id=order_id,
+            amount=amount,
+            item_summary=item_summary,
+            expires_in_minutes=ttl_seconds // 60,
+            challenge_id=challenge_id
+        )
+        if not email_ok:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Email OTP transmission failed: {email_msg}. Please retry."
+            )
+
+        return_otp = otp_val if (settings.EXHIBITION_MODE or settings.ENVIRONMENT in ("test", "testing")) else ""
+
+        challenge_payload = {
+            "challenge_id": challenge_id,
+            "session_id": session_id,
+            "user_id": user_id,
+            "order_id": order_id,
+            "amount": amount,
+            "challenge_type": "SHOPPING_PAYMENT",
+            "otp_hash": otp_hash,
+            "otp": return_otp,
+            "created_at": now,
+            "expires_at": expires_at,
+            "attempts": 0,
+            "max_attempts": cls.MAX_ATTEMPTS,
+            "cooldown_until": now + timedelta(seconds=15),
+        }
+
+        with cls._lock:
+            # Purge prior payment challenges for this order
+            for k, c in list(cls._challenges.items()):
+                if c.get("challenge_type") == "SHOPPING_PAYMENT" and c.get("order_id") == order_id:
+                    cls._challenges.pop(k, None)
+            cls._challenges[challenge_id] = challenge_payload
+            cls._challenges[f"pay:{order_id}"] = challenge_payload
+
+        logger.info(
+            f"[COGNISEC-AI] [PAYMENT_OTP_ISSUED] challenge_id={challenge_id} "
+            f"order_id={order_id} recipient={masked_email} amount={amount}"
+        )
+
+        return {
+            "challenge_id": challenge_id,
+            "order_id": order_id,
+            "challenge_type": "SHOPPING_PAYMENT",
+            "masked_email": masked_email,
+            "expires_in_seconds": ttl_seconds,
+            "resend_cooldown_seconds": 15,
+            "message": f"Verification code sent to {masked_email} for simulated demo payment.",
+            "amount": amount,
+            "currency": "INR",
+            "otp": return_otp,
+            "is_demo_otp": bool(settings.EXHIBITION_MODE)
+        }
+
+    @classmethod
+    def verify_payment_otp(
+        cls,
+        session_id: str,
+        user_id: int,
+        order_id: str,
+        challenge_id: str,
+        otp_code: str,
+        db: Session
+    ) -> Tuple[bool, str, Optional[str]]:
+        """
+        Atomically verifies the single-use payment OTP for Shopping checkout.
+        Enforces:
+        - Challenge type strictly 'SHOPPING_PAYMENT'.
+        - Challenge must match session, user, and order ID.
+        - Expiry checking.
+        - Max attempt limiting (3 attempts).
+        - Atomic consumption upon success (cannot be reused).
+        - Updates ShoppingOrder to PAID and sets payment reference upon valid code.
+        """
+        from app.models.shopping_order import ShoppingOrder
+        from app.models.security_event import SecurityEvent
+
+        with cls._lock:
+            cls._cleanup_expired()
+
+            # Find challenge by challenge_id
+            challenge = cls._challenges.get(challenge_id) or cls._challenges.get(f"pay:{order_id}")
+            if not challenge or challenge.get("challenge_type") != "SHOPPING_PAYMENT":
+                return (False, "No active payment verification challenge found or challenge expired.", None)
+
+            if challenge.get("challenge_id") != challenge_id:
+                return (False, "Challenge ID mismatch or obsolete payment verification code. Please request a new code.", None)
+
+            if challenge.get("user_id") != user_id:
+                return (False, "Unauthorized: Payment challenge does not belong to the requesting user.", None)
+
+            if challenge.get("session_id") != session_id:
+                return (False, "Unauthorized: Payment challenge does not belong to the requesting session.", None)
+
+            if challenge.get("order_id") != order_id:
+                return (False, "Unauthorized: Payment challenge does not match the order ID.", None)
+
+            now = utc_now()
+            if now > challenge["expires_at"]:
+                cls._challenges.pop(challenge_id, None)
+                cls._challenges.pop(f"pay:{order_id}", None)
+                return (False, "Verification code has expired. Please request a new code.", None)
+
+            if challenge["attempts"] >= challenge["max_attempts"]:
+                cls._challenges.pop(challenge_id, None)
+                cls._challenges.pop(f"pay:{order_id}", None)
+                return (False, "Maximum verification attempts exceeded. Payment challenge locked. Please request a new code.", None)
+
+            # Validate code atomically
+            input_code = str(otp_code or "").strip()
+            computed_hash = cls._hash_otp(input_code)
+            is_valid = hmac.compare_digest(challenge["otp_hash"], computed_hash)
+
+            if not is_valid:
+                challenge["attempts"] += 1
+                rem = challenge["max_attempts"] - challenge["attempts"]
+                if rem <= 0:
+                    cls._challenges.pop(challenge_id, None)
+                    cls._challenges.pop(f"pay:{order_id}", None)
+                    return (False, "Invalid verification code. Maximum attempts exceeded. Please request a fresh payment code.", None)
+                return (False, f"Invalid verification code. {rem} attempt(s) remaining.", None)
+
+            # Succeeded: Consume challenge atomically so it can NEVER be reused
+            cls._challenges.pop(challenge_id, None)
+            cls._challenges.pop(f"pay:{order_id}", None)
+
+            # Generate unique demo payment reference
+            payment_ref = f"SIM-PAY-{secrets.token_hex(4).upper()}"
+
+            # Update database order
+            order = db.query(ShoppingOrder).filter(ShoppingOrder.order_id == order_id).first()
+            if order:
+                order.payment_status = "PAID"
+                order.payment_reference = payment_ref
+                order.paid_at = now
+                db.commit()
+
+            # Record security audit event
+            try:
+                sec_event = SecurityEvent(
+                    session_id=session_id,
+                    event_type="PAYMENT_OTP_VERIFIED",
+                    details=f"Payment authorization code verified for order {order_id} (amount=₹{challenge.get('amount')}). Ref: {payment_ref}",
+                    ip_address="127.0.0.1"
+                )
+                db.add(sec_event)
+                db.commit()
+            except Exception as ev_err:
+                logger.debug(f"[COGNISEC-AI] Payment event audit notice: {ev_err}")
+
+            return (True, "Simulated payment verified successfully.", payment_ref)
+
+    @classmethod
+    def resend_payment_otp_challenge(
+        cls,
+        session_id: str,
+        user_id: int,
+        order_id: str,
+        db: Session
+    ) -> Dict[str, Any]:
+        """
+        Resends payment verification OTP for Shopping checkout subject to cooldown.
+        Retrieves existing order details, invalidates prior challenge, and issues fresh code.
+        """
+        from app.models.shopping_order import ShoppingOrder
+        order = db.query(ShoppingOrder).filter(
+            ShoppingOrder.user_id == user_id,
+            ShoppingOrder.order_id == order_id
+        ).first()
+        if not order:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Order '{order_id}' not found."
+            )
+        if order.payment_status == "PAID":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Order is already paid."
+            )
+        return cls.create_payment_otp_challenge(
+            session_id=session_id,
+            user_id=user_id,
+            order_id=order_id,
+            amount=order.amount,
+            item_summary=order.item_summary,
+            db=db
+        )
+
+    @classmethod
+    def create_appointment_otp_challenge(
+        cls,
+        session_id: str,
+        user_id: int,
+        appointment_data: Dict[str, Any],
+        db: Session,
+        ttl_seconds: int = 300
+    ) -> Dict[str, Any]:
+        """
+        Generates and transmits a single-use 6-digit verification OTP for Healthcare appointment booking.
+        Enforces:
+        - Authenticated user account with resolved recipient email (boomikaram35@gmail.com).
+        - Pre-check on doctor validity and slot availability prior to OTP generation.
+        - Concurrency lock: rejects or deduplicates simultaneous in-flight requests per session.
+        - Cooldown between requests (15s), checked in DB and memory.
+        - Persistent challenge record in PostgreSQL (OTPChallenge table) with HMAC-SHA256 hashed code.
+        - Direct synchronous SMTP dispatch awaiting result (fails if SMTP transmission fails).
+        - Strict challenge purpose: 'HEALTHCARE_APPOINTMENT' / 'APPOINTMENT_OTP'.
+        """
+        from app.services.healthcare_service import HealthcareService
+        from app.models.otp_challenge import OTPChallenge
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or not user.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Authenticated user account does not have a registered email address."
+            )
+
+        # Validate doctor exists
+        doctor = HealthcareService.get_doctor_by_id(appointment_data.get("doctor_id", ""))
+        if not doctor:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Selected doctor '{appointment_data.get('doctor_id')}' is not in the hospital registry."
+            )
+
+        # Ensure slot is available before dispatching OTP
+        is_open = HealthcareService.check_slot_availability(
+            db=db,
+            doctor_id=doctor["id"],
+            date=appointment_data["appointment_date"],
+            slot=appointment_data["time_slot"]
+        )
+        if not is_open:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"The selected time slot ({appointment_data['time_slot']} on {appointment_data['appointment_date']}) is already booked. Please choose another slot."
+            )
+
+        appointment_data["doctor_name"] = doctor["name"]
+        appointment_data["department"] = doctor["dept_label"]
+        appointment_data["room"] = doctor["room"]
+
+        delivery_email = EmailService.resolve_delivery_recipient(user.email)
+        masked_email = EmailService.mask_email(delivery_email)
+        now = utc_now()
+
+        # Check existing active appointment challenge cooldown and in-flight lock for this session
+        with cls._lock:
+            cls._cleanup_expired()
+            if session_id in cls._inflight_appointment_sessions:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="An appointment verification code is currently being dispatched. Please wait a moment."
+                )
+
+            # In-memory cooldown check
+            existing = cls._challenges.get(f"apt:{session_id}")
+            if existing and existing.get("challenge_type") == "HEALTHCARE_APPOINTMENT":
+                cooldown_until = existing.get("cooldown_until")
+                if cooldown_until and now < cooldown_until:
+                    rem_sec = max(1, int((cooldown_until - now).total_seconds()))
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=f"Please wait {rem_sec} seconds before requesting a new appointment verification code."
+                    )
+
+            # DB cooldown check
+            db_existing = (
+                db.query(OTPChallenge)
+                .filter(
+                    OTPChallenge.session_id == session_id,
+                    OTPChallenge.purpose == "APPOINTMENT_OTP",
+                    OTPChallenge.is_consumed == False,
+                    OTPChallenge.expires_at > now
+                )
+                .order_by(OTPChallenge.created_at.desc())
+                .first()
+            )
+            if db_existing and db_existing.cooldown_until:
+                cooldown_db = (
+                    db_existing.cooldown_until
+                    if db_existing.cooldown_until.tzinfo
+                    else db_existing.cooldown_until.replace(tzinfo=timezone.utc)
+                )
+                if now < cooldown_db:
+                    rem_sec = max(1, int((cooldown_db - now).total_seconds()))
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=f"Please wait {rem_sec} seconds before requesting a new appointment verification code."
+                    )
+
+            # Acquire in-flight lock
+            cls._inflight_appointment_sessions.add(session_id)
+
+        try:
+            otp_val = f"{secrets.randbelow(1000000):06d}"
+            otp_hash = cls._hash_otp(otp_val)
+            challenge_id = f"chal_apt_{secrets.token_hex(8)}"
+            expires_at = now + timedelta(seconds=ttl_seconds)
+            cooldown_until = now + timedelta(seconds=15)
+
+            # Invalidate any prior unconsumed appointment challenges for this session in DB
+            db.query(OTPChallenge).filter(
+                OTPChallenge.session_id == session_id,
+                OTPChallenge.purpose == "APPOINTMENT_OTP",
+                OTPChallenge.is_consumed == False
+            ).update({"is_consumed": True, "consumed_at": now})
+            db.commit()
+
+            # Persist new challenge record to PostgreSQL
+            db_challenge = OTPChallenge(
+                challenge_id=challenge_id,
+                session_id=session_id,
+                user_id=user_id,
+                purpose="APPOINTMENT_OTP",
+                recipient_email=delivery_email,
+                otp_hash=otp_hash,
+                appointment_data=json.dumps(appointment_data),
+                attempts=0,
+                max_attempts=cls.MAX_ATTEMPTS,
+                is_consumed=False,
+                expires_at=expires_at,
+                cooldown_until=cooldown_until,
+                created_at=now
+            )
+            db.add(db_challenge)
+            db.commit()
+
+            # Immediate synchronous SMTP delivery
+            email_ok, email_msg = EmailService.send_appointment_otp_email(
+                recipient_email=delivery_email,
+                otp_code=otp_val,
+                patient_name=appointment_data.get("patient_name", "Valued Patient"),
+                doctor_name=doctor["name"],
+                appointment_date=appointment_data["appointment_date"],
+                time_slot=appointment_data["time_slot"],
+                department=doctor["dept_label"],
+                expires_in_minutes=ttl_seconds // 60,
+                challenge_id=challenge_id
+            )
+            if not email_ok:
+                db.delete(db_challenge)
+                db.commit()
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Email OTP transmission failed: {email_msg}. Please retry."
+                )
+
+            return_otp = otp_val if (settings.EXHIBITION_MODE or settings.ENVIRONMENT in ("test", "testing")) else ""
+
+            challenge_payload = {
+                "challenge_id": challenge_id,
+                "session_id": session_id,
+                "user_id": user_id,
+                "challenge_type": "HEALTHCARE_APPOINTMENT",
+                "appointment_data": appointment_data,
+                "otp_hash": otp_hash,
+                "otp": return_otp,
+                "created_at": now,
+                "expires_at": expires_at,
+                "attempts": 0,
+                "max_attempts": cls.MAX_ATTEMPTS,
+                "cooldown_until": cooldown_until,
+            }
+
+            with cls._lock:
+                # Purge prior appointment challenges for this session
+                for k, c in list(cls._challenges.items()):
+                    if c.get("challenge_type") == "HEALTHCARE_APPOINTMENT" and c.get("session_id") == session_id:
+                        cls._challenges.pop(k, None)
+                cls._challenges[challenge_id] = challenge_payload
+                cls._challenges[f"apt:{session_id}"] = challenge_payload
+
+            logger.info(
+                f"[COGNISEC-AI] [APPOINTMENT_OTP_ISSUED] challenge_id={challenge_id} "
+                f"session_id={session_id} recipient={masked_email} doctor={doctor['name']} date={appointment_data['appointment_date']}"
+            )
+
+            return {
+                "challenge_id": challenge_id,
+                "challenge_type": "HEALTHCARE_APPOINTMENT",
+                "masked_email": masked_email,
+                "expires_in_seconds": ttl_seconds,
+                "resend_cooldown_seconds": 15,
+                "message": f"Verification code accepted by Gmail SMTP for transmission to {masked_email}. Check your inbox and spam folder.",
+                "doctor_name": doctor["name"],
+                "appointment_date": appointment_data["appointment_date"],
+                "time_slot": appointment_data["time_slot"],
+                "otp": return_otp,
+                "is_demo_otp": bool(settings.EXHIBITION_MODE)
+            }
+        finally:
+            with cls._lock:
+                cls._inflight_appointment_sessions.discard(session_id)
+
+    @classmethod
+    def verify_appointment_otp(
+        cls,
+        session_id: str,
+        user_id: int,
+        challenge_id: str,
+        otp_code: str,
+        db: Session
+    ) -> Tuple[bool, str, Optional[Any]]:
+        """
+        Atomically verifies the single-use appointment OTP for AyuSync MedCare.
+        Enforces:
+        - Challenge type strictly 'HEALTHCARE_APPOINTMENT' / 'APPOINTMENT_OTP'.
+        - Challenge must match session and user.
+        - Expiry checking.
+        - Max attempt limiting (3 attempts) with persistent counter in DB.
+        - Atomic consumption upon success (cannot be reused).
+        - Re-checks slot availability atomically upon verification to prevent concurrent collisions.
+        - Persists HealthcareAppointment upon valid code.
+        - Strictly isolated: does NOT unlock clinical vault or elevate permissions.
+        """
+        from app.models.appointment import HealthcareAppointment
+        from app.services.healthcare_service import HealthcareService
+        from app.models.security_event import SecurityEvent
+        from app.models.otp_challenge import OTPChallenge
+
+        now = utc_now()
+
+        # Step 1: Look up challenge from DB first
+        db_challenge = None
+        if challenge_id:
+            db_challenge = db.query(OTPChallenge).filter(OTPChallenge.challenge_id == challenge_id).first()
+        if not db_challenge and session_id:
+            db_challenge = (
+                db.query(OTPChallenge)
+                .filter(
+                    OTPChallenge.session_id == session_id,
+                    OTPChallenge.purpose == "APPOINTMENT_OTP",
+                    OTPChallenge.is_consumed == False
+                )
+                .order_by(OTPChallenge.created_at.desc())
+                .first()
+            )
+
+        # Fallback to memory challenge if DB record not found (e.g. mock test environment)
+        mem_challenge = None
+        with cls._lock:
+            cls._cleanup_expired()
+            mem_challenge = cls._challenges.get(challenge_id) or cls._challenges.get(f"apt:{session_id}")
+
+        if not db_challenge and not mem_challenge:
+            return (False, "No active appointment verification challenge found or challenge expired.", None)
+
+        if db_challenge:
+            if db_challenge.user_id != user_id:
+                return (False, "Unauthorized: Appointment challenge does not belong to the requesting user.", None)
+            if db_challenge.session_id != session_id:
+                return (False, "Unauthorized: Appointment challenge does not belong to the requesting session.", None)
+            if db_challenge.is_consumed:
+                return (False, "This appointment verification code has already been used. Please request a new code.", None)
+
+            exp = db_challenge.expires_at if db_challenge.expires_at.tzinfo else db_challenge.expires_at.replace(tzinfo=timezone.utc)
+            if now > exp:
+                db_challenge.is_consumed = True
+                db.commit()
+                with cls._lock:
+                    cls._challenges.pop(challenge_id, None)
+                    cls._challenges.pop(f"apt:{session_id}", None)
+                return (False, "Verification code has expired. Please request a new code.", None)
+
+            if db_challenge.attempts >= db_challenge.max_attempts:
+                db_challenge.is_consumed = True
+                db.commit()
+                with cls._lock:
+                    cls._challenges.pop(challenge_id, None)
+                    cls._challenges.pop(f"apt:{session_id}", None)
+                return (False, "Maximum verification attempts exceeded. Appointment challenge locked. Please request a new code.", None)
+
+            # Validate code atomically
+            input_code = str(otp_code or "").strip()
+            computed_hash = cls._hash_otp(input_code)
+            is_valid = hmac.compare_digest(db_challenge.otp_hash, computed_hash)
+
+            if not is_valid:
+                db_challenge.attempts += 1
+                rem = db_challenge.max_attempts - db_challenge.attempts
+                if rem <= 0:
+                    db_challenge.is_consumed = True
+                    db.commit()
+                    with cls._lock:
+                        cls._challenges.pop(challenge_id, None)
+                        cls._challenges.pop(f"apt:{session_id}", None)
+                    return (False, "Invalid verification code. Maximum attempts exceeded. Please request a fresh appointment code.", None)
+                db.commit()
+                return (False, f"Invalid verification code. {rem} attempt(s) remaining.", None)
+
+            # Succeeded: Consume challenge atomically so it can NEVER be reused
+            db_challenge.is_consumed = True
+            db_challenge.consumed_at = now
+            db.commit()
+
+            with cls._lock:
+                cls._challenges.pop(challenge_id, None)
+                cls._challenges.pop(f"apt:{session_id}", None)
+
+            apt_data = json.loads(db_challenge.appointment_data) if isinstance(db_challenge.appointment_data, str) else (db_challenge.appointment_data or {})
+
+        else:
+            challenge = mem_challenge
+            if challenge.get("challenge_type") != "HEALTHCARE_APPOINTMENT":
+                return (False, "No active appointment verification challenge found or challenge expired.", None)
+
+            if challenge.get("challenge_id") != challenge_id and challenge_id:
+                return (False, "Challenge ID mismatch or obsolete appointment verification code. Please request a new code.", None)
+
+            if challenge.get("user_id") != user_id:
+                return (False, "Unauthorized: Appointment challenge does not belong to the requesting user.", None)
+
+            if challenge.get("session_id") != session_id:
+                return (False, "Unauthorized: Appointment challenge does not belong to the requesting session.", None)
+
+            if now > challenge["expires_at"]:
+                with cls._lock:
+                    cls._challenges.pop(challenge_id, None)
+                    cls._challenges.pop(f"apt:{session_id}", None)
+                return (False, "Verification code has expired. Please request a new code.", None)
+
+            if challenge["attempts"] >= challenge["max_attempts"]:
+                with cls._lock:
+                    cls._challenges.pop(challenge_id, None)
+                    cls._challenges.pop(f"apt:{session_id}", None)
+                return (False, "Maximum verification attempts exceeded. Appointment challenge locked. Please request a new code.", None)
+
+            input_code = str(otp_code or "").strip()
+            computed_hash = cls._hash_otp(input_code)
+            is_valid = hmac.compare_digest(challenge["otp_hash"], computed_hash)
+
+            if not is_valid:
+                challenge["attempts"] += 1
+                rem = challenge["max_attempts"] - challenge["attempts"]
+                if rem <= 0:
+                    with cls._lock:
+                        cls._challenges.pop(challenge_id, None)
+                        cls._challenges.pop(f"apt:{session_id}", None)
+                    return (False, "Invalid verification code. Maximum attempts exceeded. Please request a fresh appointment code.", None)
+                return (False, f"Invalid verification code. {rem} attempt(s) remaining.", None)
+
+            with cls._lock:
+                cls._challenges.pop(challenge_id, None)
+                cls._challenges.pop(f"apt:{session_id}", None)
+
+            apt_data = challenge["appointment_data"]
+
+        # Re-check slot availability atomically before persisting
+        is_open = HealthcareService.check_slot_availability(
+            db=db,
+            doctor_id=apt_data["doctor_id"],
+            date=apt_data["appointment_date"],
+            slot=apt_data["time_slot"]
+        )
+        if not is_open:
+            return (False, f"Slot {apt_data['time_slot']} on {apt_data['appointment_date']} was just booked by another patient. Please select another slot.", None)
+
+        # Persist appointment
+        ref_id = f"AYU-{datetime.now().year}-{secrets.token_hex(3).upper()}"
+        appointment = HealthcareAppointment(
+            reference_id=ref_id,
+            patient_name=apt_data["patient_name"],
+            patient_phone=apt_data["patient_phone"],
+            patient_email=apt_data["patient_email"],
+            department=apt_data.get("department", "General Medicine"),
+            doctor_id=apt_data["doctor_id"],
+            doctor_name=apt_data["doctor_name"],
+            appointment_date=apt_data["appointment_date"],
+            time_slot=apt_data["time_slot"],
+            consultation_mode=apt_data.get("consultation_mode", "In-Person Hospital Visit"),
+            room=apt_data.get("room"),
+            status="CONFIRMED",
+            user_id=user_id
+        )
+        db.add(appointment)
+        db.commit()
+        db.refresh(appointment)
+
+        # Record security audit event
+        try:
+            sec_event = SecurityEvent(
+                session_id=session_id,
+                event_type="APPOINTMENT_OTP_VERIFIED",
+                details=f"Appointment OTP verified for {appointment.doctor_name} on {appointment.appointment_date} {appointment.time_slot}. Ref: {ref_id}",
+                ip_address="127.0.0.1"
+            )
+            db.add(sec_event)
+            db.commit()
+        except Exception as ev_err:
+            logger.debug(f"[COGNISEC-AI] Appointment event audit notice: {ev_err}")
+
+        return (True, "Appointment confirmed successfully.", appointment)
+
+    @classmethod
+    def resend_appointment_otp_challenge(
+        cls,
+        session_id: str,
+        user_id: int,
+        challenge_id: str,
+        db: Session
+    ) -> Dict[str, Any]:
+        """
+        Resends appointment verification OTP subject to cooldown.
+        Retrieves existing challenge details, invalidates prior challenge, and issues fresh code.
+        """
+        from app.models.otp_challenge import OTPChallenge
+
+        now = utc_now()
+
+        # Query DB challenge first
+        db_challenge = None
+        if challenge_id:
+            db_challenge = db.query(OTPChallenge).filter(OTPChallenge.challenge_id == challenge_id).first()
+        if not db_challenge and session_id:
+            db_challenge = (
+                db.query(OTPChallenge)
+                .filter(
+                    OTPChallenge.session_id == session_id,
+                    OTPChallenge.purpose == "APPOINTMENT_OTP"
+                )
+                .order_by(OTPChallenge.created_at.desc())
+                .first()
+            )
+
+        if db_challenge:
+            if db_challenge.user_id != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Unauthorized: Challenge does not belong to requesting user."
+                )
+            if db_challenge.cooldown_until:
+                cooldown_db = (
+                    db_challenge.cooldown_until
+                    if db_challenge.cooldown_until.tzinfo
+                    else db_challenge.cooldown_until.replace(tzinfo=timezone.utc)
+                )
+                if now < cooldown_db:
+                    rem_sec = max(1, int((cooldown_db - now).total_seconds()))
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=f"Please wait {rem_sec} seconds before requesting a new appointment verification code."
+                    )
+            apt_data = json.loads(db_challenge.appointment_data) if isinstance(db_challenge.appointment_data, str) else (db_challenge.appointment_data or {})
+            db_challenge.is_consumed = True
+            db.commit()
+        else:
+            with cls._lock:
+                challenge = cls._challenges.get(challenge_id) or cls._challenges.get(f"apt:{session_id}")
+                if not challenge or challenge.get("challenge_type") != "HEALTHCARE_APPOINTMENT":
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="No active appointment verification challenge found to resend."
+                    )
+                if challenge.get("user_id") != user_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Unauthorized: Challenge does not belong to requesting user."
+                    )
+                cooldown_until = challenge.get("cooldown_until")
+                if cooldown_until and now < cooldown_until:
+                    rem_sec = max(1, int((cooldown_until - now).total_seconds()))
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=f"Please wait {rem_sec} seconds before requesting a new appointment verification code."
+                    )
+                apt_data = dict(challenge.get("appointment_data", {}))
+
+        return cls.create_appointment_otp_challenge(
+            session_id=session_id,
+            user_id=user_id,
+            appointment_data=apt_data,
+            db=db
+        )
+
+    @classmethod
+    def create_exam_otp_challenge(
+        cls,
+        session_id: str,
+        user_id: int,
+        course_name: str,
+        db: Session,
+        ttl_seconds: int = DEFAULT_TTL_SECONDS,
+        force_new: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Generates and dispatches a 6-digit OTP to the student's registered email
+        before launching a proctored online examination in the College Portal.
+        - Deduplicates repeated exam launch requests so no duplicate or conflicting
+          OTP emails are sent for the same active challenge window.
+        - Only reports email delivery after Gmail SMTP confirms acceptance.
+        """
+        from app.models.session import Session as DbSession
+        from app.models.otp_challenge import OTPChallenge
+
+        db_session = db.query(DbSession).filter(DbSession.id == session_id).first()
+        if not db_session or db_session.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid or unauthorized session for online examination."
+            )
+        if db_session.status == "TERMINATED" or db_session.current_risk_level == "CRITICAL":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Session terminated due to critical security risk. Cannot launch online examination."
+            )
+        if db_session.status == "PENDING_OBSERVATION":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Initial 20-second behavioral observation is still in progress. Complete login verification first."
+            )
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or not user.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Authenticated student account has no registered email address."
+            )
+
+        delivery_email = EmailService.resolve_delivery_recipient(user.email)
+        masked_email = EmailService.mask_email(delivery_email)
+        clean_course = (course_name or "CS F301 • End-Semester Proctored Assessment").strip()
+        now = utc_now()
+
+        with cls._lock:
+            cls._cleanup_expired()
+            if session_id in cls._inflight_exam_sessions:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="An examination verification code is currently being dispatched. Please wait a moment."
+                )
+
+            if not force_new:
+                existing_mem = cls._challenges.get(f"exam:{session_id}")
+                if (
+                    existing_mem
+                    and existing_mem.get("challenge_type") == "COLLEGE_EXAM_OTP"
+                    and existing_mem.get("attempts", 0) == 0
+                    and now < existing_mem.get("expires_at", now)
+                ):
+                    rem_ttl = max(1, int((existing_mem["expires_at"] - now).total_seconds()))
+                    cd_until = existing_mem.get("cooldown_until")
+                    rem_cd = max(0, int((cd_until - now).total_seconds())) if (cd_until and now < cd_until) else 0
+                    logger.info(
+                        f"[COGNISEC-AI] [EXAM_OTP_DEDUP] Reusing active un-attempted exam OTP challenge "
+                        f"challenge_id={existing_mem['challenge_id']} session_id={session_id}"
+                    )
+                    return {
+                        "challenge_id": existing_mem["challenge_id"],
+                        "session_id": session_id,
+                        "challenge_type": "COLLEGE_EXAM_OTP",
+                        "course_name": existing_mem.get("course_name", clean_course),
+                        "masked_email": masked_email,
+                        "expires_in_seconds": rem_ttl,
+                        "resend_cooldown_seconds": rem_cd,
+                        "email_delivered": True,
+                        "deduplicated": True,
+                        "message": f"Verification code already sent to {masked_email}. Please enter the 6-digit code to launch the exam.",
+                        "otp": existing_mem.get("otp", ""),
+                        "is_demo_otp": bool(settings.EXHIBITION_MODE)
+                    }
+
+            cls._inflight_exam_sessions.add(session_id)
+
+        try:
+            otp_val = f"{secrets.randbelow(1000000):06d}"
+            otp_hash = cls._hash_otp(otp_val)
+            challenge_id = f"chal_exam_{secrets.token_hex(8)}"
+            expires_at = now + timedelta(seconds=ttl_seconds)
+            cooldown_until = now + timedelta(seconds=15)
+
+            # Invalidate any prior unconsumed exam challenges for this session in DB
+            db.query(OTPChallenge).filter(
+                OTPChallenge.session_id == session_id,
+                OTPChallenge.purpose == "COLLEGE_EXAM_OTP",
+                OTPChallenge.is_consumed == False
+            ).update({"is_consumed": True, "consumed_at": now})
+            db.commit()
+
+            exam_meta = {"course_name": clean_course, "student_email": delivery_email}
+            db_challenge = OTPChallenge(
+                challenge_id=challenge_id,
+                session_id=session_id,
+                user_id=user_id,
+                purpose="COLLEGE_EXAM_OTP",
+                recipient_email=delivery_email,
+                otp_hash=otp_hash,
+                appointment_data=json.dumps(exam_meta),
+                attempts=0,
+                max_attempts=cls.MAX_ATTEMPTS,
+                is_consumed=False,
+                expires_at=expires_at,
+                cooldown_until=cooldown_until,
+                created_at=now
+            )
+            db.add(db_challenge)
+            db.commit()
+
+            email_ok, email_msg = EmailService.send_otp_email(
+                recipient_email=delivery_email,
+                otp_code=otp_val,
+                expires_in_minutes=ttl_seconds // 60,
+                challenge_id=challenge_id
+            )
+            if not email_ok:
+                db.delete(db_challenge)
+                db.commit()
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Email OTP transmission failed: {email_msg}. Please retry."
+                )
+
+            return_otp = otp_val if (settings.EXHIBITION_MODE or settings.ENVIRONMENT in ("test", "testing")) else ""
+            challenge_payload = {
+                "challenge_id": challenge_id,
+                "session_id": session_id,
+                "user_id": user_id,
+                "challenge_type": "COLLEGE_EXAM_OTP",
+                "course_name": clean_course,
+                "otp_hash": otp_hash,
+                "otp": return_otp,
+                "created_at": now,
+                "expires_at": expires_at,
+                "attempts": 0,
+                "max_attempts": cls.MAX_ATTEMPTS,
+                "cooldown_until": cooldown_until,
+            }
+
+            with cls._lock:
+                for k, c in list(cls._challenges.items()):
+                    if c.get("challenge_type") == "COLLEGE_EXAM_OTP" and c.get("session_id") == session_id:
+                        cls._challenges.pop(k, None)
+                cls._challenges[challenge_id] = challenge_payload
+                cls._challenges[f"exam:{session_id}"] = challenge_payload
+
+            logger.info(
+                f"[COGNISEC-AI] [EXAM_OTP_ISSUED] challenge_id={challenge_id} "
+                f"session_id={session_id} recipient={masked_email} course={clean_course}"
+            )
+
+            return {
+                "challenge_id": challenge_id,
+                "session_id": session_id,
+                "challenge_type": "COLLEGE_EXAM_OTP",
+                "course_name": clean_course,
+                "masked_email": masked_email,
+                "expires_in_seconds": ttl_seconds,
+                "resend_cooldown_seconds": 15,
+                "email_delivered": True,
+                "deduplicated": False,
+                "message": f"Verification code accepted by Gmail SMTP for delivery to {masked_email}.",
+                "otp": return_otp,
+                "is_demo_otp": bool(settings.EXHIBITION_MODE)
+            }
+        finally:
+            with cls._lock:
+                cls._inflight_exam_sessions.discard(session_id)
+
+    @classmethod
+    def resend_exam_otp_challenge(
+        cls,
+        session_id: str,
+        user_id: int,
+        course_name: Optional[str],
+        db: Session
+    ) -> Dict[str, Any]:
+        """
+        Resends examination verification OTP subject to 15-second cooldown.
+        Invalidates previous exam challenge and dispatches a fresh 6-digit OTP.
+        """
+        from app.models.otp_challenge import OTPChallenge
+
+        now = utc_now()
+        resolved_course = course_name or "CS F301 • End-Semester Proctored Assessment"
+
+        db_challenge = (
+            db.query(OTPChallenge)
+            .filter(
+                OTPChallenge.session_id == session_id,
+                OTPChallenge.purpose == "COLLEGE_EXAM_OTP",
+                OTPChallenge.is_consumed == False
+            )
+            .order_by(OTPChallenge.created_at.desc())
+            .first()
+        )
+        if db_challenge:
+            if db_challenge.user_id != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Unauthorized: Challenge does not belong to requesting user."
+                )
+            if db_challenge.cooldown_until:
+                cd_db = (
+                    db_challenge.cooldown_until
+                    if db_challenge.cooldown_until.tzinfo
+                    else db_challenge.cooldown_until.replace(tzinfo=timezone.utc)
+                )
+                if now < cd_db:
+                    rem_sec = max(1, int((cd_db - now).total_seconds()))
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=f"Please wait {rem_sec} seconds before requesting a new examination verification code."
+                    )
+            try:
+                meta = json.loads(db_challenge.appointment_data) if isinstance(db_challenge.appointment_data, str) else (db_challenge.appointment_data or {})
+                if not course_name and meta.get("course_name"):
+                    resolved_course = meta["course_name"]
+            except Exception:
+                pass
+            db_challenge.is_consumed = True
+            db_challenge.consumed_at = now
+            db.commit()
+        else:
+            with cls._lock:
+                mem_chal = cls._challenges.get(f"exam:{session_id}")
+                if mem_chal and mem_chal.get("challenge_type") == "COLLEGE_EXAM_OTP":
+                    if mem_chal.get("user_id") != user_id:
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Unauthorized: Challenge does not belong to requesting user."
+                        )
+                    cd_until = mem_chal.get("cooldown_until")
+                    if cd_until and now < cd_until:
+                        rem_sec = max(1, int((cd_until - now).total_seconds()))
+                        raise HTTPException(
+                            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail=f"Please wait {rem_sec} seconds before requesting a new examination verification code."
+                        )
+                    if not course_name and mem_chal.get("course_name"):
+                        resolved_course = mem_chal["course_name"]
+                    cls._delete_challenge(mem_chal)
+                    cls._challenges.pop(f"exam:{session_id}", None)
+
+        return cls.create_exam_otp_challenge(
+            session_id=session_id,
+            user_id=user_id,
+            course_name=resolved_course,
+            db=db,
+            force_new=True
+        )
+
+    @classmethod
+    def verify_exam_otp_challenge(
+        cls,
+        session_id: str,
+        user_id: int,
+        challenge_id: Optional[str],
+        otp_code: str,
+        course_name: Optional[str],
+        db: Session
+    ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """
+        Atomically verifies the single-use College Examination OTP.
+        - Rejects expired, invalid, reused, or incorrect OTPs.
+        - Records an authoritative ApplicationGrant for (application='college', resource='online_exam', factor='EXAM_OTP').
+        """
+        from app.models.otp_challenge import OTPChallenge
+        from app.models.security_event import SecurityEvent
+        from app.services.session_service import SessionService
+
+        now = utc_now()
+
+        db_challenge = None
+        if challenge_id:
+            db_challenge = db.query(OTPChallenge).filter(OTPChallenge.challenge_id == challenge_id).first()
+        if not db_challenge and session_id:
+            db_challenge = (
+                db.query(OTPChallenge)
+                .filter(
+                    OTPChallenge.session_id == session_id,
+                    OTPChallenge.purpose == "COLLEGE_EXAM_OTP"
+                )
+                .order_by(OTPChallenge.created_at.desc())
+                .first()
+            )
+
+        mem_challenge = None
+        with cls._lock:
+            cls._cleanup_expired()
+            mem_challenge = (cls._challenges.get(challenge_id) if challenge_id else None) or cls._challenges.get(f"exam:{session_id}")
+
+        if not db_challenge and not mem_challenge:
+            return (False, "No active examination verification challenge found or challenge has expired.", None)
+
+        resolved_course = course_name or "CS F301 • End-Semester Proctored Assessment"
+
+        if db_challenge:
+            if db_challenge.user_id != user_id:
+                return (False, "Unauthorized: Examination challenge does not belong to the requesting user.", None)
+            if db_challenge.session_id != session_id:
+                return (False, "Unauthorized: Examination challenge does not belong to the requesting session.", None)
+            if challenge_id and db_challenge.challenge_id != challenge_id:
+                return (False, "Challenge ID mismatch or obsolete examination verification code. Please request a new code.", None)
+            if db_challenge.is_consumed:
+                return (False, "This examination verification code has already been used or invalidated.", None)
+
+            exp = db_challenge.expires_at if db_challenge.expires_at.tzinfo else db_challenge.expires_at.replace(tzinfo=timezone.utc)
+            if now > exp:
+                db_challenge.is_consumed = True
+                db_challenge.consumed_at = now
+                db.commit()
+                with cls._lock:
+                    if challenge_id:
+                        cls._challenges.pop(challenge_id, None)
+                    cls._challenges.pop(f"exam:{session_id}", None)
+                return (False, "Verification code has expired. Please request a new code.", None)
+
+            if db_challenge.attempts >= db_challenge.max_attempts:
+                db_challenge.is_consumed = True
+                db_challenge.consumed_at = now
+                db.commit()
+                with cls._lock:
+                    if challenge_id:
+                        cls._challenges.pop(challenge_id, None)
+                    cls._challenges.pop(f"exam:{session_id}", None)
+                return (False, "Maximum verification attempts exceeded. Examination challenge locked.", None)
+
+            input_code = str(otp_code or "").strip()
+            computed_hash = cls._hash_otp(input_code)
+            is_valid = hmac.compare_digest(db_challenge.otp_hash, computed_hash)
+
+            if not is_valid:
+                db_challenge.attempts += 1
+                rem = db_challenge.max_attempts - db_challenge.attempts
+                if mem_challenge:
+                    mem_challenge["attempts"] = db_challenge.attempts
+                if rem <= 0:
+                    db_challenge.is_consumed = True
+                    db_challenge.consumed_at = now
+                    db.commit()
+                    with cls._lock:
+                        if challenge_id:
+                            cls._challenges.pop(challenge_id, None)
+                        cls._challenges.pop(f"exam:{session_id}", None)
+                    return (False, "Invalid verification code. Maximum attempts exceeded. Examination remains locked.", None)
+                db.commit()
+                return (False, f"Invalid verification code. {rem} attempt(s) remaining.", None)
+
+            # Consume single-use challenge
+            db_challenge.is_consumed = True
+            db_challenge.consumed_at = now
+            db.commit()
+            try:
+                meta = json.loads(db_challenge.appointment_data) if isinstance(db_challenge.appointment_data, str) else (db_challenge.appointment_data or {})
+                if meta.get("course_name"):
+                    resolved_course = meta["course_name"]
+            except Exception:
+                pass
+            with cls._lock:
+                if challenge_id:
+                    cls._challenges.pop(challenge_id, None)
+                cls._challenges.pop(db_challenge.challenge_id, None)
+                cls._challenges.pop(f"exam:{session_id}", None)
+        else:
+            challenge = mem_challenge
+            if challenge.get("challenge_type") != "COLLEGE_EXAM_OTP":
+                return (False, "No active examination verification challenge found or challenge has expired.", None)
+            if challenge_id and challenge.get("challenge_id") != challenge_id:
+                return (False, "Challenge ID mismatch or obsolete examination verification code.", None)
+            if challenge.get("user_id") != user_id or challenge.get("session_id") != session_id:
+                return (False, "Unauthorized: Examination challenge does not belong to the requesting session.", None)
+            if now > challenge["expires_at"]:
+                with cls._lock:
+                    cls._delete_challenge(challenge)
+                    cls._challenges.pop(f"exam:{session_id}", None)
+                return (False, "Verification code has expired. Please request a new code.", None)
+            if challenge["attempts"] >= challenge["max_attempts"]:
+                with cls._lock:
+                    cls._delete_challenge(challenge)
+                    cls._challenges.pop(f"exam:{session_id}", None)
+                return (False, "Maximum verification attempts exceeded. Examination challenge locked.", None)
+
+            input_code = str(otp_code or "").strip()
+            computed_hash = cls._hash_otp(input_code)
+            if not hmac.compare_digest(challenge["otp_hash"], computed_hash):
+                challenge["attempts"] += 1
+                rem = challenge["max_attempts"] - challenge["attempts"]
+                if rem <= 0:
+                    with cls._lock:
+                        cls._delete_challenge(challenge)
+                        cls._challenges.pop(f"exam:{session_id}", None)
+                    return (False, "Invalid verification code. Maximum attempts exceeded. Examination remains locked.", None)
+                return (False, f"Invalid verification code. {rem} attempt(s) remaining.", None)
+
+            resolved_course = challenge.get("course_name") or resolved_course
+            with cls._lock:
+                cls._delete_challenge(challenge)
+                cls._challenges.pop(f"exam:{session_id}", None)
+
+        # Create authoritative ApplicationGrant for online_exam
+        grant = SessionService.record_application_grant(
+            db=db,
+            session_id=session_id,
+            user_id=user_id,
+            application="college",
+            resource="online_exam",
+            factor="EXAM_OTP",
+            validity_minutes=30
+        )
+        if not grant:
+            return (False, "Session is no longer active or eligible for examination authorization.", None)
+
+        exam_token = f"#BITS-EXM-{secrets.token_hex(3).upper()}"
+        try:
+            sec_event = SecurityEvent(
+                user_id=user_id,
+                session_id=session_id,
+                application="college",
+                event_type="EXAM_OTP_VERIFIED",
+                severity="INFO",
+                decision="ALLOW",
+                details=f"Online examination OTP verified for course '{resolved_course}'. Exam token: {exam_token}"
+            )
+            db.add(sec_event)
+            db.commit()
+        except Exception:
+            pass
+
+        return (
+            True,
+            "Examination identity verification complete. Proctored exam unlocked.",
+            {
+                "authorized": True,
+                "session_id": session_id,
+                "course_name": resolved_course,
+                "exam_token": exam_token,
+                "grant_expires_at": grant.expires_at.isoformat() if grant.expires_at else None
+            }
+        )
 
     @classmethod
     def get_challenge(cls, session_id: str, application: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -1096,10 +2325,12 @@ class StepUpService:
                 f"If this account is registered, a verification code has been sent to {masked}.",
                 masked,
                 False,
-                "UNREGISTERED_ACCOUNT"
+                "UNREGISTERED_ACCOUNT",
+                None
             )
 
-        masked_email = EmailService.mask_email(user.email)
+        delivery_email = EmailService.resolve_delivery_recipient(user.email)
+        masked_email = EmailService.mask_email(delivery_email)
         otp = f"{secrets.randbelow(1000000):06d}"
         otp_hash = cls._hash_otp(otp)
         now = utc_now()
@@ -1111,12 +2342,14 @@ class StepUpService:
                 logger.info(
                     f"[COGNISEC-AI] [PASSWORD_RESET_DEDUP] Duplicate reset request for {norm_email} deduplicated within 15s cooldown."
                 )
-                return (True, f"Verification code sent to {masked_email}.", masked_email, True, "DELIVERED")
+                ret_otp = existing.get("otp") if (settings.EXHIBITION_MODE or settings.ENVIRONMENT in ("test", "testing")) else None
+                return (True, f"Verification code sent to {masked_email}.", masked_email, True, "DELIVERED", ret_otp)
 
             cls._password_resets[norm_email] = {
                 "user_id": user.id,
                 "email": user.email,
                 "otp_hash": otp_hash,
+                "otp": otp,
                 "created_at": now,
                 "expires_at": expires_at,
                 "attempts": 0,
@@ -1125,7 +2358,7 @@ class StepUpService:
 
         # Send via EmailService using dedicated password reset template
         email_ok, email_msg = EmailService.send_password_reset_email(
-            recipient_email=user.email,
+            recipient_email=delivery_email,
             otp_code=otp,
             expires_in_minutes=ttl_seconds // 60
         )
@@ -1147,7 +2380,8 @@ class StepUpService:
             )
 
         delivery_status = "DELIVERED" if email_ok else ("EXHIBITION" if settings.EXHIBITION_MODE else "PENDING")
-        return (True, f"Verification code sent to {masked_email}.", masked_email, email_ok, delivery_status)
+        return_otp = otp if (settings.EXHIBITION_MODE or settings.ENVIRONMENT in ("test", "testing")) else None
+        return (True, f"Verification code sent to {masked_email}.", masked_email, email_ok, delivery_status, return_otp)
 
     @classmethod
     def resend_password_reset_challenge(
@@ -1208,6 +2442,7 @@ class StepUpService:
                 "user_id": user.id,
                 "email": user.email,
                 "otp_hash": otp_hash,
+                "otp": otp,
                 "created_at": now,
                 "expires_at": expires_at,
                 "attempts": 0,

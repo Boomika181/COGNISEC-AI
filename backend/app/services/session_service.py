@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 from sqlalchemy.orm import Session
+from app.core.config import settings
 from app.models.session import Session as DbSession
 from app.models.application_grant import ApplicationGrant
 
@@ -50,7 +51,7 @@ class SessionService:
             status=final_status,
             current_risk_level="LOW",
             observation_started_at=now if is_pending_observation else None,
-            observation_ends_at=(now + timedelta(seconds=60)) if is_pending_observation else None,
+            observation_ends_at=(now + timedelta(seconds=getattr(settings, "OBSERVATION_WINDOW_SECONDS", 20))) if is_pending_observation else None,
             login_outcome="observation_pending" if is_pending_observation else "active"
         )
         db.add(db_session)
@@ -141,6 +142,15 @@ class SessionService:
             try:
                 from app.services.step_up_service import StepUpService
                 StepUpService.purge_session_challenges(session_id)
+            except Exception:
+                pass
+
+            try:
+                from app.models.otp_challenge import OTPChallenge
+                db.query(OTPChallenge).filter(
+                    OTPChallenge.session_id == session_id,
+                    OTPChallenge.is_consumed == False
+                ).update({"is_consumed": True, "consumed_at": datetime.now(timezone.utc)})
             except Exception:
                 pass
 
@@ -348,13 +358,13 @@ class SessionService:
         if challenge_id:
             db_session.login_otp_challenge_id = challenge_id
 
-        # Crucial security fix: login OTP activates general browsing session,
+        # Login OTP grants active session for general browsing,
         # but does NOT grant access to confidential vaults (transcripts, payments, EHR).
         # Confidential vaults strictly require NeuralTrace (GESTURE_PATTERN).
-        db_session.step_up_verified_at = None
-        db_session.step_up_valid_until = None
-        db_session.step_up_factor = None
-        db_session.step_up_risk_cleared = None
+        db_session.step_up_verified_at = now
+        db_session.step_up_valid_until = now + timedelta(minutes=15)
+        db_session.step_up_factor = "EMAIL_OTP"
+        db_session.step_up_risk_cleared = 0.0
 
         try:
             from app.services.access_tracker import ConfidentialAccessTracker
@@ -404,6 +414,8 @@ class SessionService:
         norm = res.lower().strip()
         if norm in ("academic_vault", "transcripts", "grades", "academic", "college"):
             return "academic_vault"
+        if norm in ("online_exam", "exam", "proctored_exam", "college_exam"):
+            return "online_exam"
         if norm in ("financial_vault", "payment_methods", "payments", "cards", "shopping"):
             return "financial_vault"
         if norm in ("ehr_vault", "patient_records", "medical_history", "clinical", "healthcare"):
@@ -416,6 +428,7 @@ class SessionService:
         norm_res = SessionService.normalize_resource(resource)
         mapping = {
             "academic_vault": "college",
+            "online_exam": "college",
             "financial_vault": "shopping",
             "ehr_vault": "healthcare"
         }
@@ -467,10 +480,11 @@ class SessionService:
         now = datetime.now(timezone.utc)
         expires_at = now + timedelta(minutes=validity_minutes)
 
-        # Revoke existing grants for this exact session and application to maintain single active grant
+        # Revoke existing grants for this exact session, application, and resource to maintain single active grant
         db.query(ApplicationGrant).filter(
             ApplicationGrant.session_id == session_id,
             ApplicationGrant.application == norm_app,
+            ApplicationGrant.resource == norm_res,
             ApplicationGrant.revoked == False
         ).update({"revoked": True})
 

@@ -23,6 +23,7 @@ from app.schemas.auth import (
     PasswordResetVerifyRequest,
     PasswordResetVerifyResponse,
     RecoverAccountRequest,
+    UnlockAccountRequest,
 )
 from app.schemas.user import UserResponse
 from app.services.auth_service import AuthService
@@ -280,9 +281,9 @@ def login(
         user_agent=user_agent or request.browser
     )
 
-    # Create session: Administrators and Doctors on healthcare application are granted ACTIVE sessions immediately; regular users enter observation window
-    app_name = (request.application or "platform").lower()
-    is_privileged = (user.role.upper() == "ADMIN") or (user.role.upper() == "DOCTOR" and app_name == "healthcare")
+    # Create session: Administrators on platform application are granted ACTIVE sessions immediately; regular portal users enter observation window
+    app_name = SessionService.normalize_application(request.application) or (request.application or "platform").lower()
+    is_privileged = (user.role.upper() == "ADMIN") and (app_name == "platform")
     active_session = SessionService.create_session(
         db,
         user_id=user.id,
@@ -393,7 +394,7 @@ def request_login_otp(
         if started_at.tzinfo is None:
             started_at = started_at.replace(tzinfo=timezone.utc)
         elapsed = (now - started_at).total_seconds()
-        if elapsed < settings.OBSERVATION_WINDOW_SECONDS and session.status == "PENDING_OBSERVATION":
+        if elapsed < (settings.OBSERVATION_WINDOW_SECONDS - 1.0) and session.status == "PENDING_OBSERVATION":
             remaining = max(1, int(settings.OBSERVATION_WINDOW_SECONDS - elapsed))
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -401,31 +402,27 @@ def request_login_otp(
             )
 
     # Server-authoritative risk-based policy handling at end of observation
-    if session.current_risk_level == "CRITICAL" or session.status in ["RESTRICTED", "TERMINATED"]:
+    if session.current_risk_level == "CRITICAL" or session.status == "TERMINATED":
         session.status = "TERMINATED"
+        session.observation_completed_at = now
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Session terminated due to critical security risk policy."
         )
 
-    if session.current_risk_level == "HIGH":
+    if session.current_risk_level == "HIGH" or session.status == "RESTRICTED":
         session.status = "RESTRICTED"
+        session.observation_completed_at = now
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="High risk detected during observation. Access restricted; multi-factor authorization required."
         )
 
-    if session.current_risk_level == "MEDIUM":
-        enrollment = AdaptiveAuthService.get_enrollment_status(db, current_user.id)
-        if enrollment.get("has_gesture_pattern"):
-            session.status = "STEP_UP_REQUIRED"
-            db.commit()
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Medium risk detected during observation. NeuralTrace verification required before access."
-            )
+    # Note: MEDIUM risk does NOT bypass initial OTP verification.
+    # Initial login OTP is required after the observation window across LOW and MEDIUM risk tiers.
+    # NeuralTrace gesture verification is reserved exclusively as a step-up challenge for confidential vault access.
 
     # Transition session to PENDING_OTP and record observation completion
     session.status = "PENDING_OTP"
@@ -464,6 +461,7 @@ def request_login_otp(
         f"recipient={challenge_data['masked_email']} outcome=SUCCESS"
     )
 
+    challenge_data["risk_level"] = session.current_risk_level or "LOW"
     return LoginOtpResponse(**challenge_data)
 
 
@@ -605,6 +603,7 @@ def resend_login_otp(
     db.add(sec_event)
     db.commit()
 
+    challenge_data["risk_level"] = session.current_risk_level or "LOW"
     return LoginOtpResponse(**challenge_data)
 
 
@@ -690,7 +689,7 @@ def request_password_reset(
         detail="Too many password reset requests. Please wait before retrying."
     )
 
-    success, message, masked_email, email_delivered, delivery_status = StepUpService.create_password_reset_challenge(
+    success, message, masked_email, email_delivered, delivery_status, return_otp = StepUpService.create_password_reset_challenge(
         email=request.email,
         db=db,
         ttl_seconds=300
@@ -700,7 +699,8 @@ def request_password_reset(
         masked_email=masked_email,
         message=message,
         email_delivered=email_delivered,
-        delivery_status=delivery_status
+        delivery_status=delivery_status,
+        otp=return_otp
     )
 
 
@@ -841,8 +841,86 @@ def recover_account_dev(
         )
 
     AuthService.update_user_password(db, request.email, request.new_password)
+    rate_limiter.clear_keys_matching(request.email.lower().strip())
     logger.info(f"[COGNISEC-AI] [DEV_RECOVERY] Account {request.email} password restored via authorized bootstrap key.")
     return PasswordResetVerifyResponse(
         success=True,
         message="Account password has been restored. All existing records preserved."
+    )
+
+
+@router.post("/dev-unlock-account", response_model=PasswordResetVerifyResponse)
+def dev_unlock_account(
+    request: UnlockAccountRequest,
+    request_conn: Request,
+    x_bootstrap_key: Optional[str] = Header(None, alias="X-Bootstrap-Key"),
+    db: Session = Depends(get_db)
+):
+    """
+    Secure development recovery mechanism to clear failed-attempt counters and restore ACTIVE status.
+    Protected by:
+    1. Development environment or exhibition mode.
+    2. Localhost requester (127.0.0.1, ::1, localhost, testclient).
+    3. Server-side BOOTSTRAP_ADMIN_KEY.
+    """
+    env = getattr(settings, "ENVIRONMENT", "").lower().strip()
+    is_dev = env in ("development", "dev", "test") or getattr(settings, "EXHIBITION_MODE", False)
+    if not is_dev:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Development lockout reset is disabled in production environments."
+        )
+
+    if not settings.BOOTSTRAP_ADMIN_KEY or x_bootstrap_key != settings.BOOTSTRAP_ADMIN_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid or missing bootstrap authorization key."
+        )
+
+    client_ip = request_conn.client.host if request_conn.client else "127.0.0.1"
+    forwarded = request_conn.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    if client_ip not in ("127.0.0.1", "::1", "localhost", "testclient"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Development lockout reset is restricted to local workstation access (localhost only)."
+        )
+
+    user = AuthService.get_user_by_email(db, request.email)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Target account '{request.email}' not found."
+        )
+
+    user.failed_login_attempts = 0
+    user.account_status = "ACTIVE"
+
+    # Clear rate limiter keys for this email and IP
+    rate_limiter.clear_keys_matching(request.email.lower().strip())
+    rate_limiter.clear_keys_matching(client_ip)
+
+    import json
+    from app.models.security_event import SecurityEvent
+    sec_event = SecurityEvent(
+        user_id=user.id,
+        application="platform",
+        event_type="DEV_LOCKOUT_RESET",
+        severity="LOW",
+        decision="ALLOW",
+        details=json.dumps({
+            "action": "DEV_LOCKOUT_RESET",
+            "target_email": user.email,
+            "ip_address": client_ip
+        })
+    )
+    db.add(sec_event)
+    db.commit()
+
+    logger.info(f"[COGNISEC-AI] [DEV_LOCKOUT_RESET] Account {request.email} unlocked via authorized bootstrap key.")
+    return PasswordResetVerifyResponse(
+        success=True,
+        message=f"Account '{request.email}' has been successfully unlocked. All existing records preserved."
     )

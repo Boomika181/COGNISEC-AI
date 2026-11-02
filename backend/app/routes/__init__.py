@@ -8,6 +8,7 @@ from app.routes.demo import router as demo_router
 from app.routes.devices import router as devices_router
 from app.routes.notifications import router as notifications_router
 from app.routes.healthcare import router as healthcare_router
+from app.routes.shopping import router as shopping_router
 
 __all__ = [
     "auth_router",
@@ -20,4 +21,5 @@ __all__ = [
     "devices_router",
     "notifications_router",
     "healthcare_router",
+    "shopping_router",
 ]

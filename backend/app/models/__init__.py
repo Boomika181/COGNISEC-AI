@@ -9,6 +9,8 @@ from app.models.adaptive_factor import AdaptiveFactor
 from app.models.notification import DeviceNotification
 from app.models.application_grant import ApplicationGrant
 from app.models.appointment import HealthcareAppointment
+from app.models.shopping_order import ShoppingOrder
+from app.models.otp_challenge import OTPChallenge
 
 __all__ = [
     "Base",
@@ -23,4 +25,6 @@ __all__ = [
     "DeviceNotification",
     "ApplicationGrant",
     "HealthcareAppointment",
+    "ShoppingOrder",
+    "OTPChallenge",
 ]

@@ -86,7 +86,7 @@ def test_doctor_login_success(client: TestClient, test_doctor_user: User):
     assert data["token_type"] == "bearer"
     assert data["role"] == "DOCTOR"
     assert data["name"] == "Dr. Boomika Ram"
-    assert data["session_status"] == "ACTIVE"
+    assert data["session_status"] in ("ACTIVE", "PENDING_OBSERVATION")
 
 
 def test_doctor_login_invalid_password(client: TestClient, test_doctor_user: User):
@@ -161,6 +161,13 @@ def test_clinical_vault_authorized_access(client: TestClient, test_doctor_user: 
     token = login_data["access_token"]
     session_id = login_data["session_id"]
     headers = {"Authorization": f"Bearer {token}"}
+
+    # Activate session for vault grant testing (simulating observation completion)
+    from app.models.session import Session as DBSession
+    sess_rec = db_session.query(DBSession).filter(DBSession.id == session_id).first()
+    if sess_rec:
+        sess_rec.status = "ACTIVE"
+        db_session.commit()
 
     # 2. Before grant: vault access must be rejected with HTTP 403 Forbidden
     vault_unauth = client.get(f"/api/security/vault/ehr_vault?session_id={session_id}", headers=headers)

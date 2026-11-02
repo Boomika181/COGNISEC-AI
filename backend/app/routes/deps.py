@@ -84,6 +84,22 @@ def get_current_user(
     return user
 
 
+def get_optional_current_user(
+    auth_creds: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """
+    Non-blocking current user resolution. Returns None if unauthenticated,
+    or User if valid Bearer token is provided.
+    """
+    if not auth_creds:
+        return None
+    try:
+        return get_current_user(auth_creds, db)
+    except Exception:
+        return None
+
+
 def verify_session_access(session: Optional[DbSession], user: User) -> None:
     """
     BOLA Authorization Guard:
