@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.services.profile_service import ProfileService
 from app.ml.model_manager import ModelManager
+from app.ml.feature_engineering import MODALITY_FEATURE_GROUPS
 from app.services.behavior_drift_service import BehavioralDriftTracker
 from app.services.access_tracker import ConfidentialAccessTracker
 
@@ -16,7 +17,9 @@ class RiskService:
         session_id: str,
         application: str,
         behavior_vector: np.ndarray,
-        context_signals: Dict[str, Any]
+        context_signals: Dict[str, Any],
+        observed_modalities: Optional[Dict[str, bool]] = None,
+        sample_counts: Optional[Dict[str, int]] = None
     ) -> Tuple[float, float, str, List[str], bool, str]:
         """
         Calculates multi-factor zero-trust risk score by synthesizing:
@@ -116,11 +119,23 @@ class RiskService:
         # -------------------------------------------------------------
         # 2. Behavioral Anomaly & Continuous Drift Detection (Feature 2)
         # -------------------------------------------------------------
-        detector = ModelManager.ensure_hydrated(db, user_id, baseline_stats)
+        is_simulation = bool(
+            (session_id and str(session_id).startswith("sim_"))
+            or (isinstance(context_signals, dict) and context_signals.get("simulated") is True)
+        )
+        detector = ModelManager.ensure_hydrated(
+            db,
+            user_id,
+            baseline_stats,
+            namespace="simulator" if is_simulation else "prod"
+        )
         raw_is_anomaly, raw_anomaly_score, ml_status = detector.predict_anomaly(
             sample_vector=behavior_vector,
             baseline_stats=baseline_stats,
-            sample_count=sample_count
+            sample_count=sample_count,
+            observed_modalities=observed_modalities,
+            context_signals=context_signals,
+            sample_counts=sample_counts
         )
 
         # Evaluate continuous behavioral drift vs isolated single-sample variance
@@ -152,7 +167,20 @@ class RiskService:
         # -------------------------------------------------------------
         # 3. Multi-Factor Risk Synthesis Governed by Baseline Maturity
         # -------------------------------------------------------------
-        maturity_status, _, _ = ProfileService.get_maturity_info(sample_count)
+        modality_counts = baseline_stats.get("modality_sample_counts")
+        maturity_status, _, is_mature = ProfileService.get_maturity_info(
+            sample_count=sample_count,
+            modality_counts=modality_counts
+        )
+
+        # Modality with insufficient observations must remain immature even if other modalities have many samples
+        if observed_modalities and isinstance(observed_modalities, dict) and modality_counts:
+            active_immature = [
+                m for m, active in observed_modalities.items()
+                if active and m in MODALITY_FEATURE_GROUPS and int(modality_counts.get(m, 0)) < ProfileService.MIN_MATURE_SAMPLES
+            ]
+            if active_immature:
+                maturity_status = "COLD_START" if any(int(modality_counts.get(m, 0)) == 0 for m in active_immature) else "LEARNING"
 
         if maturity_status == "COLD_START":
             b_weight = 0.05
@@ -169,15 +197,31 @@ class RiskService:
         risk_score = round(risk_score, 4)
 
         # -------------------------------------------------------------
-        # 4. Zero Trust Risk Level Categorization
+        # 4. Zero Trust Risk Level Categorization (Canonical Classifier)
         # -------------------------------------------------------------
-        if risk_score < settings.RISK_THRESHOLD_LOW:
-            risk_level = "LOW"
-        elif risk_score < settings.RISK_THRESHOLD_MEDIUM:
-            risk_level = "MEDIUM"
-        elif risk_score < settings.RISK_THRESHOLD_HIGH:
-            risk_level = "HIGH"
-        else:
-            risk_level = "CRITICAL"
+        risk_level = RiskService.classify_risk_level(risk_score)
 
         return risk_score, round(anomaly_score, 4), risk_level, contributing_factors, is_anomaly, ml_status
+
+    @classmethod
+    def classify_risk_level(cls, risk_score: Optional[float]) -> str:
+        """
+        Authoritative canonical Zero Trust risk classifier.
+        Categorizes multi-factor risk scores according to core security thresholds:
+        - LOW:      risk_score < settings.RISK_THRESHOLD_LOW (0.30)
+        - MEDIUM:   settings.RISK_THRESHOLD_LOW <= risk_score < settings.RISK_THRESHOLD_MEDIUM (0.65)
+        - HIGH:     settings.RISK_THRESHOLD_MEDIUM <= risk_score < settings.RISK_THRESHOLD_HIGH (0.85)
+        - CRITICAL: risk_score >= settings.RISK_THRESHOLD_HIGH (0.85)
+        """
+        if risk_score is None:
+            return "LOW"
+        score = float(risk_score)
+        if score < settings.RISK_THRESHOLD_LOW:
+            return "LOW"
+        elif score < settings.RISK_THRESHOLD_MEDIUM:
+            return "MEDIUM"
+        elif score < settings.RISK_THRESHOLD_HIGH:
+            return "HIGH"
+        else:
+            return "CRITICAL"
+

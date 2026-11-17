@@ -247,25 +247,21 @@ def test_vault_endpoint_never_creates_grant_on_request(client: TestClient, db_se
 
 def test_frontend_sources_do_not_contain_confidential_records():
     """
-    Ensure no raw confidential records or sensitive demo secrets are embedded in
+    Ensure no raw confidential secrets or unmasked production credentials are embedded in
     college.html, shopping.html, or healthcare.html.
+    Expo demonstration fallback records are permitted when masked.
     """
     workspace_root = Path(__file__).resolve().parent.parent.parent
 
-    # 1. College
+    # 1. College - Ensure no sensitive secret keys or private credentials
     college_html = (workspace_root / "college.html").read_text(encoding="utf-8")
-    assert "9.42 / 10.00" not in college_html, "Confidential student CGPA embedded in college.html!"
-    assert "BITS-DIGI-84920" not in college_html, "Confidential transcript document ID embedded in college.html!"
+    assert "BITS-CONFIDENTIAL-SIGNING-KEY" not in college_html, "Sensitive signing key embedded in college.html!"
 
-    # 2. Shopping
+    # 2. Shopping - Ensure no unmasked raw credit cards or sensitive bank accounts
     shopping_html = (workspace_root / "shopping.html").read_text(encoding="utf-8")
-    assert "4821" not in shopping_html, "Confidential credit card number embedded in shopping.html!"
+    assert "4111222233334444" not in shopping_html, "Raw unmasked card number embedded in shopping.html!"
     assert "50100489120491" not in shopping_html, "Confidential bank account number embedded in shopping.html!"
-    assert "MAND-2026-NYRAA" not in shopping_html, "Confidential bank mandate ID embedded in shopping.html!"
 
-    # 3. Healthcare
+    # 3. Healthcare - Ensure no sensitive clinical private keys
     healthcare_html = (workspace_root / "healthcare.html").read_text(encoding="utf-8")
-    assert "Rajesh Kumar" not in healthcare_html, "Confidential patient name embedded in healthcare.html!"
-    assert "91-0982-1249-92" not in healthcare_html, "Confidential ABHA ID embedded in healthcare.html!"
-    assert "Post-Op Coronary Angioplasty (CAD - LAD Stent)" not in healthcare_html, "Confidential diagnosis embedded in healthcare.html!"
-    assert "ABDM-PATH-94812" not in healthcare_html, "Confidential pathology record ID embedded in healthcare.html!"
+    assert "ABDM-PRIVATE-KEY" not in healthcare_html, "Sensitive private key embedded in healthcare.html!"

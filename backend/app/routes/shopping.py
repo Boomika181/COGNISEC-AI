@@ -10,6 +10,8 @@ from app.routes.deps import get_current_user
 from app.services.session_service import SessionService
 from app.services.step_up_service import StepUpService
 from app.services.shopping_service import ShoppingService
+from app.services.portal_lock_service import PortalLockService
+from app.services.adaptive_auth_service import AdaptiveAuthService
 from app.schemas.shopping import (
     PaymentOtpRequest,
     PaymentOtpResponse,
@@ -45,6 +47,9 @@ def request_payment_otp(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found."
         )
+
+    PortalLockService.enforce_not_locked(db, current_user.id, "shopping")
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
 
     if session.user_id != current_user.id:
         raise HTTPException(
@@ -125,11 +130,17 @@ def verify_payment_otp(
             detail="Session not found."
         )
 
+    PortalLockService.enforce_not_locked(db, current_user.id, "shopping")
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
+
     if session.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Session does not belong to the authenticated user."
         )
+
+    PortalLockService.enforce_not_locked(db, current_user.id, "shopping")
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
 
     success, message, payment_ref = StepUpService.verify_payment_otp(
         session_id=request.session_id,
@@ -141,6 +152,9 @@ def verify_payment_otp(
     )
 
     if not success:
+        active_lock = PortalLockService.get_active_lock(db, current_user.id, "shopping")
+        if active_lock:
+            PortalLockService.raise_locked_http_exception(active_lock, status_code=status.HTTP_423_LOCKED)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=message
@@ -179,6 +193,9 @@ def resend_payment_otp(
             detail="Invalid session."
         )
 
+    PortalLockService.enforce_not_locked(db, current_user.id, "shopping")
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
+
     challenge_data = StepUpService.resend_payment_otp_challenge(
         session_id=request.session_id,
         user_id=current_user.id,
@@ -194,6 +211,8 @@ def get_shopping_orders(
     db: Session = Depends(get_db)
 ):
     """Returns order history for the authenticated customer."""
+    PortalLockService.enforce_not_locked(db, current_user.id, "shopping")
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
     return ShoppingService.get_user_orders(db, current_user.id)
 
 

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.database.base import Base
 
@@ -18,6 +18,10 @@ class User(Base):
     role = Column(String(20), default="USER", nullable=False)  # "USER" or "ADMIN"
     account_status = Column(String(20), default="ACTIVE", nullable=False)  # "ACTIVE", "LOCKED", "SUSPENDED"
     failed_login_attempts = Column(Integer, default=0, nullable=False)
+    registration_source = Column(String(40), nullable=True)  # "PUBLIC_REGISTRATION", "ADMIN_BOOTSTRAP", "SEED_SCRIPT", "TEST_FIXTURE"
+    email_verified = Column(Boolean, default=False, nullable=False)
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
+    security_enrollment_completed = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     # Relationships

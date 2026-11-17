@@ -22,6 +22,10 @@ class BehaviorEventCreate(BaseModel):
     # Contextual metadata
     context_signals: Optional[Dict[str, Any]] = None
 
+    # Modality-aware observation presence flags and telemetry sample counts
+    observed_modalities: Optional[Dict[str, bool]] = None
+    sample_counts: Optional[Dict[str, int]] = None
+
     # Anti-Replay / Anti-Tamper Security Controls
     timestamp: Optional[float] = None  # Unix epoch seconds of telemetry capture
     sequence_number: Optional[int] = None  # Monotonically increasing stream sequence
@@ -59,6 +63,8 @@ class BehaviorProfileResponse(BaseModel):
     baseline_status: str = "COLD_START"  # "COLD_START", "LEARNING", "ESTABLISHED"
     maturity_confidence: float = 0.0  # 0.0 to 1.0
     is_mature: bool = False  # True if sample_count >= 5
+    modality_sample_counts: Optional[Dict[str, int]] = None
+    modality_maturity: Optional[Dict[str, Any]] = None
 
     # Machine Learning Isolation Forest Information
     ml_status: str = "ML_COLD_START"  # "ML_COLD_START", "ML_LEARNING", "ML_READY"
@@ -73,6 +79,19 @@ class BehaviorProfileResponse(BaseModel):
     latest_decision: Optional[str] = None
     latest_risk_score: Optional[float] = None
     latest_risk_level: Optional[str] = None
+
+
+class UserBehaviorSummaryResponse(BaseModel):
+    """Privacy-safe user-facing security & calibration status without internal ML, risk, or baseline internals."""
+    session_status: str = "ACTIVE"
+    verification_required: bool = False
+    security_status_label: str = "Protected"
+    security_status_message: str = "Your session is being monitored."
+    is_profile_ready: bool = False
+    enrollment_status: str = "NOT_ENROLLED"
+    calibration_samples_collected: int = 0
+    calibration_samples_required: int = 5
+    last_checked_at: Optional[datetime.datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

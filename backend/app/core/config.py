@@ -34,7 +34,8 @@ class Settings(BaseSettings):
     VERIFIED_RECIPIENT_MAILBOXES: List[str] = []
     APP_BASE_URL: str = "http://127.0.0.1:5500"
     EXHIBITION_MODE: bool = False
-    DEMO_OTP_RECIPIENT_EMAIL: str = "boomikaram35@gmail.com"
+    EXHIBITION_DEMO_MAILBOX_OVERRIDE: bool = False
+    DEMO_OTP_RECIPIENT_EMAIL: Optional[str] = None
 
     # Bootstrap Secret for Controlled Development/Admin Provisioning
     BOOTSTRAP_ADMIN_KEY: Optional[str] = "cognisec_dev_bootstrap_secret_2026"
@@ -93,6 +94,17 @@ class Settings(BaseSettings):
         "navigation_entropy": {"min": 0.0, "max": 5.0},
     }
 
+    # Agentic AI & LLM Infrastructure Configuration
+    LLM_PROVIDER: str = "mock"  # "mock", "gemini"
+    GEMINI_MODEL: Optional[str] = None  # Configurable Gemini model identifier (e.g. "gemini-3.5-flash-lite")
+    LLM_MODEL: str = "gemini-3.5-flash-lite"
+    GEMINI_API_KEY: Optional[str] = None
+    LLM_TIMEOUT_SECONDS: float = 2.0
+    LLM_MAX_RETRIES: int = 2
+    LLM_MAX_CONCURRENT_REQUESTS: int = 5
+    AGENTIC_AI_ENABLED: bool = True
+    AGENT_EXECUTION_TIMEOUT_SECONDS: float = 0.8  # Inline 800ms strict latency budget
+
     # CORS: Explicit origins only (NO wildcard '*' with credentials)
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
@@ -138,6 +150,16 @@ class Settings(BaseSettings):
         elif isinstance(v, list):
             return [str(m).strip().lower() for m in v if m and str(m).strip()]
         return v or []
+
+    @field_validator("DEMO_OTP_RECIPIENT_EMAIL", mode="before")
+    @classmethod
+    def validate_demo_recipient_email(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v_clean = str(v).strip()
+        if not v_clean:
+            return None
+        return v_clean.lower()
 
     model_config = SettingsConfigDict(
         case_sensitive=True,

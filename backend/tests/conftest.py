@@ -24,6 +24,7 @@ from app.models.behavior import BehaviorProfile
 # Configure test environment
 settings.ENVIRONMENT = "test"
 settings.EXHIBITION_MODE = True
+settings.LLM_PROVIDER = "mock"
 settings.VERIFIED_COGNISIC_MAILBOXES = [
     "test.admin@cognisec.ai",
     "test.user@cognisec.ai",
@@ -35,6 +36,19 @@ settings.VERIFIED_COGNISIC_MAILBOXES = [
 
 
 @pytest.fixture(autouse=True)
+def restore_settings_defaults():
+    orig_env = settings.ENVIRONMENT
+    orig_exh = settings.EXHIBITION_MODE
+    orig_smtp = settings.SMTP_ENABLED
+    orig_llm = settings.LLM_PROVIDER
+    yield
+    settings.ENVIRONMENT = orig_env
+    settings.EXHIBITION_MODE = orig_exh
+    settings.SMTP_ENABLED = orig_smtp
+    settings.LLM_PROVIDER = orig_llm
+
+
+@pytest.fixture(autouse=True)
 def mock_smtp_in_tests(monkeypatch):
     """Prevents tests from connecting to real Gmail SMTP unless explicitly testing live delivery."""
     from app.services.email_service import EmailService
@@ -42,10 +56,14 @@ def mock_smtp_in_tests(monkeypatch):
     original_send_alert = getattr(EmailService, "_original_send_alert", EmailService.send_new_device_login_alert)
     original_send_reset = getattr(EmailService, "_original_send_reset", EmailService.send_password_reset_email)
     original_send_pay = getattr(EmailService, "_original_send_pay", EmailService.send_payment_otp_email)
+    original_send_exam = getattr(EmailService, "_original_send_exam", EmailService.send_exam_otp_email)
+    original_send_recovery = getattr(EmailService, "_original_send_recovery", EmailService.send_recovery_otp_email)
     EmailService._original_send_otp = original_send_otp
     EmailService._original_send_alert = original_send_alert
     EmailService._original_send_reset = original_send_reset
     EmailService._original_send_pay = original_send_pay
+    EmailService._original_send_exam = original_send_exam
+    EmailService._original_send_recovery = original_send_recovery
 
     def mocked_send_otp(recipient_email, otp_code, expires_in_minutes=5, *args, **kwargs):
         if not EmailService.is_configured():
@@ -66,6 +84,26 @@ def mock_smtp_in_tests(monkeypatch):
         if os.getenv("TEST_USE_REAL_SMTP", "false").lower() == "true":
             return original_send_pay(recipient_email, otp_code, order_id, amount, item_summary, expires_in_minutes, *args, **kwargs)
         return (True, f"Mocked payment email dispatched to {EmailService.mask_email(recipient_email)}")
+
+    def mocked_send_exam(recipient_email, otp_code, course_name=None, assessment_name=None, expires_in_minutes=5, *args, **kwargs):
+        if not EmailService.is_configured():
+            return original_send_exam(recipient_email, otp_code, course_name, assessment_name, expires_in_minutes, *args, **kwargs)
+        is_deliv, reason = EmailService.is_deliverable_recipient(recipient_email)
+        if not is_deliv:
+            return (False, f"Delivery rejected: {reason}")
+        if os.getenv("TEST_USE_REAL_SMTP", "false").lower() == "true":
+            return original_send_exam(recipient_email, otp_code, course_name, assessment_name, expires_in_minutes, *args, **kwargs)
+        return (True, f"Mocked exam email dispatched to {EmailService.mask_email(recipient_email)}")
+
+    def mocked_send_recovery(recipient_email, otp_code, portal, security_reference_id, request_timestamp=None, expires_in_minutes=5, *args, **kwargs):
+        if not EmailService.is_configured():
+            return original_send_recovery(recipient_email, otp_code, portal, security_reference_id, request_timestamp, expires_in_minutes, *args, **kwargs)
+        is_deliv, reason = EmailService.is_deliverable_recipient(recipient_email)
+        if not is_deliv:
+            return (False, f"Delivery rejected: {reason}")
+        if os.getenv("TEST_USE_REAL_SMTP", "false").lower() == "true":
+            return original_send_recovery(recipient_email, otp_code, portal, security_reference_id, request_timestamp, expires_in_minutes, *args, **kwargs)
+        return (True, f"Mocked recovery email dispatched to {EmailService.mask_email(recipient_email)}")
 
     def mocked_send_reset(recipient_email, otp_code, expires_in_minutes=5, *args, **kwargs):
         if not EmailService.is_configured():
@@ -88,10 +126,30 @@ def mock_smtp_in_tests(monkeypatch):
             return original_send_alert(*args, **kwargs)
         return (True, "Mocked new device alert dispatched")
 
+    original_send_pwd_chg = getattr(EmailService, "_original_send_pwd_chg", EmailService.send_password_changed_notification)
+    EmailService._original_send_pwd_chg = original_send_pwd_chg
+
+    def mocked_send_pwd_notify(*args, **kwargs):
+        if os.getenv("TEST_USE_REAL_SMTP", "false").lower() == "true":
+            return original_send_pwd_chg(*args, **kwargs)
+        return (True, "Mocked password changed security notice dispatched")
+
+    original_send_portal_sec = getattr(EmailService, "_original_send_portal_sec", EmailService.send_portal_security_notification)
+    EmailService._original_send_portal_sec = original_send_portal_sec
+
+    def mocked_send_portal_sec(*args, **kwargs):
+        if os.getenv("TEST_USE_REAL_SMTP", "false").lower() == "true":
+            return original_send_portal_sec(*args, **kwargs)
+        return (True, "Mocked portal security notification dispatched")
+
     monkeypatch.setattr("app.services.email_service.EmailService.send_otp_email", mocked_send_otp)
     monkeypatch.setattr("app.services.email_service.EmailService.send_payment_otp_email", mocked_send_pay)
+    monkeypatch.setattr("app.services.email_service.EmailService.send_exam_otp_email", mocked_send_exam)
+    monkeypatch.setattr("app.services.email_service.EmailService.send_recovery_otp_email", mocked_send_recovery)
     monkeypatch.setattr("app.services.email_service.EmailService.send_new_device_login_alert", mocked_send_alert)
     monkeypatch.setattr("app.services.email_service.EmailService.send_password_reset_email", mocked_send_reset)
+    monkeypatch.setattr("app.services.email_service.EmailService.send_password_changed_notification", mocked_send_pwd_notify)
+    monkeypatch.setattr("app.services.email_service.EmailService.send_portal_security_notification", mocked_send_portal_sec)
 
 TEST_DB_URL = "sqlite:///./test_cognisec.db"
 test_engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})

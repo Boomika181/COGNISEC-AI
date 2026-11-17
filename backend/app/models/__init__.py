@@ -2,7 +2,7 @@ from app.database.base import Base
 from app.models.user import User
 from app.models.device import Device
 from app.models.session import Session
-from app.models.behavior import BehaviorLog, BehaviorProfile
+from app.models.behavior import BehaviorLog, BehaviorProfile, BehavioralTrainingEvent
 from app.models.security_event import SecurityEvent
 from app.models.alert import Alert
 from app.models.adaptive_factor import AdaptiveFactor
@@ -11,6 +11,8 @@ from app.models.application_grant import ApplicationGrant
 from app.models.appointment import HealthcareAppointment
 from app.models.shopping_order import ShoppingOrder
 from app.models.otp_challenge import OTPChallenge
+from app.models.password_change import PasswordChangeTransaction
+from app.models.portal_lock import PortalSecurityLock, VerificationAttemptCounter
 
 __all__ = [
     "Base",
@@ -19,6 +21,7 @@ __all__ = [
     "Session",
     "BehaviorLog",
     "BehaviorProfile",
+    "BehavioralTrainingEvent",
     "SecurityEvent",
     "Alert",
     "AdaptiveFactor",
@@ -27,4 +30,7 @@ __all__ = [
     "HealthcareAppointment",
     "ShoppingOrder",
     "OTPChallenge",
+    "PasswordChangeTransaction",
+    "PortalSecurityLock",
+    "VerificationAttemptCounter",
 ]

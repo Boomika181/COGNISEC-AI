@@ -979,7 +979,9 @@ class CognisecClient {
     this.token = localStorage.getItem('cognisec_token') || null;
     this.user = JSON.parse(localStorage.getItem('cognisec_user') || 'null');
     this.sessionId = localStorage.getItem('cognisec_session_id') || null;
-    this.application = 'platform';
+    this.application = this._detectPortalApplication();
+    this._navReentryCorrId = 'nav_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now().toString(36);
+    this._activePortalLock = null;
     this.observationDurationSeconds = COGNISEC_OBSERVATION_SECONDS;
     this._obsTimer = null;
     this._isRequestingOtp = false;
@@ -1219,6 +1221,10 @@ class CognisecClient {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       this.revokeResourceClearance(resource);
+      if (this._detectPortalLockPayload(res, err)) {
+        const lockObj = await this.checkAndEnforcePortalLock({ recordReentry: false }).catch(() => null);
+        this.handlePortalEjection(lockObj || { locked: true, lock_reason: err.detail });
+      }
       throw new Error(err.detail || "Vault access denied by Zero Trust policy.");
     }
     return await res.json();
@@ -1281,8 +1287,9 @@ class CognisecClient {
 
   getHeaders() {
     const headers = { 'Content-Type': 'application/json' };
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    const authToken = this.token || this._recoveryToken;
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
     return headers;
   }
@@ -1326,6 +1333,15 @@ class CognisecClient {
   async validateSessionOnStartup() {
     if (this.token && this.sessionId) {
       try {
+        const portalLock = await this.checkAndEnforcePortalLock({
+          application: this._detectPortalApplication(),
+          recordReentry: true,
+          source: 'STARTUP_OR_REFRESH',
+        });
+        if (portalLock && portalLock.locked) {
+          return;
+        }
+
         // Query observation status directly from server
         const obsStatus = await this.getObservationStatus(this.sessionId);
 
@@ -1386,32 +1402,52 @@ class CognisecClient {
           (!obsStatus.is_completed && obsStatus.observation_seconds_remaining > 0)
         ) {
           console.log(`[COGNISEC-AI] [DIAGNOSTIC] Resuming pending session ${this.sessionId} (${obsStatus.status}, ${obsStatus.observation_seconds_remaining}s remaining).`);
-          this.sessionStatus = obsStatus.status === 'PENDING_OTP' ? 'PENDING_OTP' : 'PENDING_OBSERVATION';
-          localStorage.setItem('cognisec_session_status', this.sessionStatus);
-          if (this.user) {
-            this.user.account_status = this.sessionStatus;
-            localStorage.setItem('cognisec_user', JSON.stringify(this.user));
-          }
+          const resolvedStatus = obsStatus.status === 'PENDING_OTP' ? 'PENDING_OTP' : 'PENDING_OBSERVATION';
+          this._syncLocalSessionState(resolvedStatus, { forceDispatch: true });
           this.startTelemetryLoop();
-          window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
-            detail: { isAuthenticated: true, isFullyVerified: false, user: this.user }
-          }));
 
-          // Seamlessly maintain background observation on the current page
+          // Seamlessly confirm backend completion & dispatch Email OTP when window elapsed
           this.scheduleBackgroundOtpPrompt(obsStatus);
           return;
         }
 
         if (obsStatus.status === 'STEP_UP_REQUIRED' || obsStatus.status === 'RESTRICTED') {
+          const curApp = this._detectPortalApplication();
+          const obsApp = (obsStatus.application || '').toLowerCase();
+          if (obsStatus.status === 'RESTRICTED' && curApp === 'platform') {
+            this.sessionStatus = 'RESTRICTED';
+            localStorage.setItem('cognisec_session_status', this.sessionStatus);
+            if (this.user) {
+              this.user.account_status = 'ACTIVE';
+              localStorage.setItem('cognisec_user', JSON.stringify(this.user));
+            }
+            this.stopTelemetryLoop();
+            await this.getPortalLocksSummary().catch(() => null);
+            window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
+              detail: { isAuthenticated: true, isFullyVerified: false, globalSessionValid: true, user: this.user }
+            }));
+            return;
+          }
+          if (obsStatus.status === 'RESTRICTED' && obsApp && curApp !== 'platform' && obsApp !== curApp) {
+            // Prior session was restricted on a DIFFERENT portal; allow this unlocked portal cleanly
+            window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
+              detail: { isAuthenticated: true, isFullyVerified: false, globalSessionValid: true, user: this.user }
+            }));
+            return;
+          }
           this.sessionStatus = obsStatus.status;
           localStorage.setItem('cognisec_session_status', this.sessionStatus);
           if (this.user) {
             this.user.account_status = this.sessionStatus;
             localStorage.setItem('cognisec_user', JSON.stringify(this.user));
           }
-          this.startTelemetryLoop();
+          if (obsStatus.status !== 'RESTRICTED') {
+            this.startTelemetryLoop();
+          } else {
+            this.stopTelemetryLoop();
+          }
           window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
-            detail: { isAuthenticated: true, isFullyVerified: false, user: this.user }
+            detail: { isAuthenticated: true, isFullyVerified: false, globalSessionValid: true, user: this.user }
           }));
           return;
         }
@@ -1446,10 +1482,13 @@ class CognisecClient {
 
   clearAuth() {
     this.token = null;
+    this._recoveryToken = null;
     this.sessionId = null;
     this.user = null;
     this.sessionStatus = null;
+    this.observationSecondsRemaining = 0;
     this._obsActiveSessionId = null;
+    this._activeObservationChallenge = null;
     this._isRequestingOtp = false;
     this.revokeResourceClearance();
     if (this._obsTimer) {
@@ -1462,11 +1501,12 @@ class CognisecClient {
     }
     localStorage.removeItem('cognisec_token');
     localStorage.removeItem('cognisec_session_id');
+    localStorage.removeItem('cognisec_session_status');
     localStorage.removeItem('cognisec_user');
     localStorage.removeItem('cognisec_obs_start');
     this.stopTelemetryLoop();
     this.resetInteractionBuffers();
-    window.dispatchEvent(new CustomEvent('cognisec:auth_change', { detail: { isAuthenticated: false, user: null } }));
+    window.dispatchEvent(new CustomEvent('cognisec:auth_change', { detail: { isAuthenticated: false, isFullyVerified: false, user: null } }));
   }
 
   async login(email, password, application = 'platform', customFingerprint = null, locationData = null, nickname = null, options = {}) {
@@ -1504,10 +1544,37 @@ class CognisecClient {
             message = err.detail.map(d => (d.msg || d.message || '').replace(/^Value error,\s*/i, '')).filter(Boolean).join('. ') || message;
           } else if (typeof err.detail === 'string') {
             message = err.detail;
+          } else if (typeof err.detail === 'object' && err.detail.message) {
+            message = err.detail.message;
+          }
+        }
+        const isPortalLock = (
+          res.status === 423
+          || res.headers.get('X-Cognisec-Portal-Locked') === 'true'
+          || message.includes('SECURITY ACCESS SUSPENDED')
+        );
+        const lockPortal = (res.headers.get('X-Cognisec-Locked-Portal') || application || 'platform').toLowerCase();
+        const lockSecRef = res.headers.get('X-Cognisec-Security-Ref') || null;
+        if (isPortalLock && lockPortal !== 'platform' && options.autoEnterRecoveryOnLock !== false) {
+          const recAuth = await this.authenticateForPortalRecovery(email, password, lockPortal, lockSecRef);
+          if (recAuth && recAuth.success) {
+            return {
+              success: false,
+              portalLocked: true,
+              recoverySessionReady: true,
+              lockedPortal: lockPortal,
+              securityReferenceId: lockSecRef || recAuth.portal_lock?.security_reference_id || null,
+              portal_lock: recAuth.portal_lock,
+              error: message,
+              details: err.detail || null
+            };
           }
         }
         const customErr = new Error(message);
         customErr.raw = err;
+        customErr.portalLocked = isPortalLock;
+        customErr.lockedPortal = lockPortal;
+        customErr.securityReferenceId = lockSecRef;
         throw customErr;
       }
 
@@ -1515,14 +1582,16 @@ class CognisecClient {
       this.token = data.access_token;
       this.sessionId = data.session_id;
       this.sequenceNumber = parseInt(localStorage.getItem('cognisec_seq_' + (this.sessionId || '')) || '0', 10);
-      const isSessionActive = data.session_status === 'ACTIVE';
+      const isSessionActive = data.session_status === 'ACTIVE' && !data.portal_locked;
       this.sessionStatus = data.session_status || 'PENDING_OBSERVATION';
       this.user = {
         id: data.user_id,
         name: data.name,
         email: data.email,
         role: data.role,
-        account_status: this.sessionStatus
+        account_status: this.sessionStatus,
+        security_enrollment_completed: data.security_enrollment_completed !== false,
+        missing_factors: Array.isArray(data.missing_factors) ? data.missing_factors : []
       };
 
       localStorage.setItem('cognisec_token', this.token);
@@ -1531,6 +1600,18 @@ class CognisecClient {
       localStorage.setItem('cognisec_session_status', this.sessionStatus);
 
       this.resetInteractionBuffers();
+      const termBanner = document.getElementById('cognisec-login-terminated-banner');
+      if (termBanner) termBanner.classList.add('hidden');
+      try { sessionStorage.removeItem('cognisec_terminated_notice'); } catch (_) {}
+
+      if (data.portal_locked && data.portal_lock) {
+        window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
+          detail: { isAuthenticated: true, isFullyVerified: false, globalSessionValid: true, user: this.user }
+        }));
+        this.handlePortalEjection(data.portal_lock, application, { redirectToDashboard: false });
+        return { success: true, portal_locked: true, data };
+      }
+
       this.startTelemetryLoop();
       window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
         detail: { isAuthenticated: true, isFullyVerified: isSessionActive, user: this.user }
@@ -1575,6 +1656,67 @@ class CognisecClient {
     }
   }
 
+  async _fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    let timer = null;
+    if (controller) {
+      timer = setTimeout(() => controller.abort(), timeoutMs);
+    }
+    try {
+      return await fetch(url, {
+        ...options,
+        ...(controller ? { signal: controller.signal } : {})
+      });
+    } catch (err) {
+      if (err && err.name === 'AbortError') {
+        const tErr = new Error('Request timed out waiting for the security server / email relay. Please retry.');
+        tErr.isTimeout = true;
+        throw tErr;
+      }
+      throw err;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  _formatHttpChallengeError(statusCode, data, context = 'verification challenge') {
+    const backendDetail = this._extractErrorDetail(data, '');
+    if (statusCode === 401) {
+      return backendDetail || 'Authentication session expired (HTTP 401). Please sign in again to continue.';
+    }
+    if (statusCode === 403) {
+      return backendDetail || `Access restricted by Zero Trust policy (HTTP 403) while requesting ${context}.`;
+    }
+    if (statusCode === 404) {
+      return backendDetail || `Session or booking record not found (HTTP 404). Please refresh and sign in again.`;
+    }
+    if (statusCode === 422) {
+      return backendDetail || 'Submitted booking or verification fields failed server validation (HTTP 422).';
+    }
+    if (statusCode === 400 || statusCode === 409 || statusCode === 429) {
+      return backendDetail || `Could not complete ${context} (HTTP ${statusCode}).`;
+    }
+    if (statusCode === 502) {
+      return backendDetail || 'Email delivery relay rejected or failed to dispatch the OTP (HTTP 502). Please check your email and retry.';
+    }
+    if (statusCode >= 500) {
+      return backendDetail || `Security server error (HTTP ${statusCode}) while issuing ${context}. Please retry.`;
+    }
+    return backendDetail || `Failed to create ${context} (HTTP ${statusCode}).`;
+  }
+
+  _extractErrorDetail(data, fallback) {
+    if (!data || data.detail == null) return fallback;
+    if (Array.isArray(data.detail)) {
+      const msgs = data.detail
+        .map(d => (d && (d.msg || d.message)) ? String(d.msg || d.message).replace(/^Value error,\s*/i, '') : '')
+        .filter(Boolean);
+      return msgs.length > 0 ? msgs.join('. ') : fallback;
+    }
+    if (typeof data.detail === 'string') return data.detail;
+    return fallback;
+  }
+
   async bookHealthcareAppointment(appointmentData) {
     try {
       const res = await fetch(`${COGNISEC_API_BASE}/healthcare/appointments`, {
@@ -1584,7 +1726,7 @@ class CognisecClient {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.detail || `Appointment booking failed with status ${res.status}`);
+        throw new Error(this._extractErrorDetail(data, `Appointment booking failed with status ${res.status}`));
       }
       return { success: true, data };
     } catch (e) {
@@ -1627,6 +1769,20 @@ class CognisecClient {
     }
   }
 
+  async fetchDoctorSlotsForDate(doctorId, date) {
+    try {
+      const url = `${COGNISEC_API_BASE}/healthcare/doctors/${encodeURIComponent(doctorId)}/slots?date=${encodeURIComponent(date)}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders()
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      return null;
+    }
+  }
+
   async checkHealthcareSlotAvailability(doctorId, date, slot) {
     try {
       const url = `${COGNISEC_API_BASE}/healthcare/availability?doctor_id=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(date)}&slot=${encodeURIComponent(slot)}`;
@@ -1643,6 +1799,104 @@ class CognisecClient {
   }
 
   // --- OBSERVATION & LOGIN OTP FLOW ---
+  _syncLocalSessionState(nextStatus, { forceDispatch = false } = {}) {
+    if (!nextStatus) return false;
+    const changed = this.sessionStatus !== nextStatus || (this.user && this.user.account_status !== nextStatus);
+    this.sessionStatus = nextStatus;
+    localStorage.setItem('cognisec_session_status', nextStatus);
+    if (this.user) {
+      this.user.account_status = nextStatus;
+      localStorage.setItem('cognisec_user', JSON.stringify(this.user));
+    }
+    if (changed || forceDispatch) {
+      window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
+        detail: {
+          isAuthenticated: this.isAuthenticated(),
+          isFullyVerified: this.isFullyVerified(),
+          sessionStatus: this.sessionStatus,
+          user: this.user
+        }
+      }));
+    }
+    return changed;
+  }
+
+  async refreshAuthoritativeSessionStatus(sessionId = null) {
+    const sid = sessionId || this.sessionId;
+    if (!this.token || !sid) {
+      return { authenticated: false, session_status: null, is_verified: false };
+    }
+
+    let secRes = null;
+    let obsRes = null;
+    try {
+      [secRes, obsRes] = await Promise.all([
+        fetch(`${COGNISEC_API_BASE}/security/status/${sid}`, { headers: this.getHeaders() }),
+        fetch(`${COGNISEC_API_BASE}/auth/observation-status/${sid}`, { headers: this.getHeaders() })
+      ]);
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Authoritative status check network warning:', e.message);
+      return {
+        authenticated: this.isAuthenticated(),
+        session_status: this.sessionStatus,
+        is_verified: this.isFullyVerified(),
+        observation_seconds_remaining: this.observationSecondsRemaining,
+        is_observation_completed: this.observationSecondsRemaining <= 0,
+        network_error: true
+      };
+    }
+
+    if (secRes.status === 401 || secRes.status === 404 || obsRes.status === 401 || obsRes.status === 404) {
+      this.clearAuth();
+      return {
+        authenticated: false,
+        terminated: true,
+        session_status: 'TERMINATED',
+        is_verified: false,
+        message: 'Your session has expired or is no longer valid. Please sign in again.'
+      };
+    }
+
+    const secData = secRes.ok ? await secRes.json().catch(() => null) : null;
+    const obsData = obsRes.ok ? await obsRes.json().catch(() => null) : null;
+
+    if (obsData && typeof obsData.observation_seconds_remaining === 'number') {
+      this.observationSecondsRemaining = obsData.observation_seconds_remaining;
+    }
+
+    const authStatus = (secData && secData.session_status) || (obsData && obsData.status) || this.sessionStatus;
+    if (authStatus === 'TERMINATED') {
+      this.clearAuth();
+      return {
+        authenticated: false,
+        terminated: true,
+        session_status: 'TERMINATED',
+        is_verified: false,
+        decision: secData?.decision || 'TERMINATE_SESSION',
+        message: secData?.message || 'Session terminated by Zero Trust security policy.'
+      };
+    }
+
+    if (authStatus) {
+      this._syncLocalSessionState(authStatus);
+    }
+
+    return {
+      authenticated: true,
+      session_status: authStatus,
+      is_verified: authStatus === 'ACTIVE',
+      decision: secData?.decision || null,
+      message: secData?.message || null,
+      risk_level: secData?.risk_level || null,
+      recommended_factor: secData?.recommended_factor || null,
+      verification_required: Boolean(secData?.verification_required),
+      observation_seconds_remaining: typeof obsData?.observation_seconds_remaining === 'number'
+        ? obsData.observation_seconds_remaining
+        : this.observationSecondsRemaining,
+      is_observation_completed: Boolean(obsData?.is_completed)
+    };
+  }
+
   async getObservationStatus(sessionId = null) {
     const sid = sessionId || this.sessionId;
     if (!sid) return null;
@@ -1717,6 +1971,19 @@ class CognisecClient {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      if (this._detectPortalLockPayload(res, data)) {
+        const lockObj = await this.checkAndEnforcePortalLock({ application: 'shopping', recordReentry: false }).catch(() => null);
+        const info = lockObj && lockObj.locked ? lockObj : {
+          locked: true,
+          portal: 'shopping',
+          security_reference_id: res.headers?.get('X-Cognisec-Security-Ref') || 'SEC-LOCK-ACTIVE',
+          lock_reason: data.detail || 'Shopping payment Email OTP verification failed.',
+        };
+        const err = new Error(data.detail || 'Shopping portal access suspended.');
+        err.portalLocked = true;
+        err.lockInfo = info;
+        throw err;
+      }
       throw new Error(data.detail || "Payment OTP verification failed.");
     }
     return data;
@@ -1760,70 +2027,124 @@ class CognisecClient {
     appointmentDate,
     timeSlot,
     patientName,
+    patientAge = null,
+    patientGender = null,
     patientPhone,
     patientEmail,
+    reasonForVisit = null,
     department,
     consultationMode = 'In-Person Hospital Visit',
     room = null
   }) {
-    const sid = sessionId || this.sessionId;
-    if (!sid) throw new Error("No active session available. Please sign in to book an appointment.");
-    const res = await fetch(`${COGNISEC_API_BASE}/healthcare/appointment-otp/request`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify({
-        session_id: sid,
-        doctor_id: doctorId,
-        appointment_date: appointmentDate,
-        time_slot: timeSlot,
-        patient_name: patientName,
-        patient_phone: patientPhone,
-        patient_email: patientEmail,
-        department: department,
-        consultation_mode: consultationMode,
-        room: room
-      })
-    });
+    const sid = sessionId || this.sessionId || null;
+    let res;
+    try {
+      res = await this._fetchWithTimeout(`${COGNISEC_API_BASE}/healthcare/appointment-otp/request`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          session_id: sid,
+          doctor_id: doctorId,
+          appointment_date: appointmentDate,
+          time_slot: timeSlot,
+          patient_name: patientName,
+          patient_age: patientAge != null && patientAge !== '' ? Number(patientAge) : null,
+          patient_gender: patientGender || null,
+          patient_phone: patientPhone,
+          patient_email: patientEmail,
+          reason_for_visit: reasonForVisit || null,
+          department: department,
+          consultation_mode: consultationMode,
+          room: room
+        })
+      }, 22000);
+    } catch (netErr) {
+      const msg = netErr && netErr.isTimeout
+        ? netErr.message
+        : `Could not reach the healthcare booking server at ${COGNISEC_API_BASE}. Ensure the backend server is running on port 8000 and retry.`;
+      const wrapped = new Error(msg);
+      wrapped.isNetworkError = true;
+      throw wrapped;
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.detail || "Failed to dispatch appointment authorization OTP.");
+      const err = new Error(this._formatHttpChallengeError(res.status, data, 'appointment OTP'));
+      err.status = res.status;
+      throw err;
     }
+    this._lastPendingAppointmentId = data.pending_appointment_id || null;
+    this._lastPendingReferenceId = data.pending_reference_id || null;
     return data;
   }
 
   async verifyHealthcareAppointmentOtp({ challengeId, otpCode, sessionId = null }) {
-    const sid = sessionId || this.sessionId;
-    if (!sid) throw new Error("No active session available.");
-    const res = await fetch(`${COGNISEC_API_BASE}/healthcare/appointment-otp/verify`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify({
-        session_id: sid,
-        challenge_id: challengeId,
-        otp_code: String(otpCode || '').trim()
-      })
-    });
+    const sid = sessionId || this.sessionId || null;
+    let res;
+    try {
+      res = await this._fetchWithTimeout(`${COGNISEC_API_BASE}/healthcare/appointment-otp/verify`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          session_id: sid,
+          challenge_id: challengeId,
+          otp_code: String(otpCode || '').trim()
+        })
+      }, 20000);
+    } catch (netErr) {
+      const msg = netErr && netErr.isTimeout
+        ? netErr.message
+        : `Could not reach the healthcare booking server at ${COGNISEC_API_BASE} to verify OTP. Please retry.`;
+      const wrapped = new Error(msg);
+      wrapped.isNetworkError = true;
+      throw wrapped;
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.detail || "Appointment OTP verification failed.");
+      if (this._detectPortalLockPayload(res, data)) {
+        const lockObj = await this.checkAndEnforcePortalLock({ application: 'healthcare', recordReentry: false }).catch(() => null);
+        const info = lockObj && lockObj.locked ? lockObj : {
+          locked: true,
+          portal: 'healthcare',
+          security_reference_id: res.headers?.get('X-Cognisec-Security-Ref') || 'SEC-LOCK-ACTIVE',
+          lock_reason: data.detail || 'Healthcare appointment Email OTP verification failed.',
+        };
+        const err = new Error(data.detail || 'Healthcare portal access suspended.');
+        err.portalLocked = true;
+        err.lockInfo = info;
+        throw err;
+      }
+      const err = new Error(this._formatHttpChallengeError(res.status, data, 'appointment OTP verification'));
+      err.status = res.status;
+      throw err;
     }
     return data;
   }
 
   async resendHealthcareAppointmentOtp({ challengeId, sessionId = null }) {
-    const sid = sessionId || this.sessionId;
-    if (!sid) throw new Error("No active session available.");
-    const res = await fetch(`${COGNISEC_API_BASE}/healthcare/appointment-otp/resend`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify({
-        session_id: sid,
-        challenge_id: challengeId
-      })
-    });
+    const sid = sessionId || this.sessionId || null;
+    let res;
+    try {
+      res = await this._fetchWithTimeout(`${COGNISEC_API_BASE}/healthcare/appointment-otp/resend`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          session_id: sid,
+          challenge_id: challengeId
+        })
+      }, 22000);
+    } catch (netErr) {
+      const msg = netErr && netErr.isTimeout
+        ? netErr.message
+        : `Could not reach the healthcare booking server at ${COGNISEC_API_BASE} to resend OTP. Please retry.`;
+      const wrapped = new Error(msg);
+      wrapped.isNetworkError = true;
+      throw wrapped;
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.detail || "Failed to resend appointment code.");
+      const err = new Error(this._formatHttpChallengeError(res.status, data, 'appointment OTP resend'));
+      err.status = res.status;
+      throw err;
     }
     return data;
   }
@@ -1850,10 +2171,30 @@ class CognisecClient {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      // Immediate termination on failed OTP according to zero-trust security policy
-      this.clearAuth();
-      const err = new Error(data.detail || "Verification failed. Pending session terminated.");
-      err.terminated = true;
+      if (this._detectSessionTerminatedPayload(res, data)) {
+        const msg = (typeof data.detail === 'string' && data.detail) || this._SESSION_TERMINATED_EXCEEDED_MSG;
+        this.handleSessionTerminatedRedirect(msg, this._detectPortalApplication());
+        const err = new Error(msg);
+        err.terminated = true;
+        throw err;
+      }
+      if (this._detectPortalLockPayload(res, data)) {
+        const portalScope = this._detectPortalApplication();
+        const lockObj = await this.checkAndEnforcePortalLock({ application: portalScope, recordReentry: false }).catch(() => null);
+        const info = lockObj && lockObj.locked ? lockObj : {
+          locked: true,
+          portal: portalScope,
+          security_reference_id: res.headers?.get('X-Cognisec-Security-Ref') || 'SEC-LOCK-ACTIVE',
+          lock_reason: data.detail || 'Initial Login Email OTP verification failed.',
+        };
+        const err = new Error(data.detail || 'Portal access suspended after unsuccessful Email OTP verification.');
+        err.portalLocked = true;
+        err.lockInfo = info;
+        throw err;
+      }
+      const err = new Error(data.detail || "Verification failed.");
+      err.terminated = false;
+      err.attemptsRemaining = res.headers?.get('X-Cognisec-Attempts-Remaining');
       throw err;
     }
 
@@ -1892,6 +2233,13 @@ class CognisecClient {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      if (this._detectSessionTerminatedPayload(res, data)) {
+        const msg = (typeof data.detail === 'string' && data.detail) || this._SESSION_TERMINATED_EXCEEDED_MSG;
+        this.handleSessionTerminatedRedirect(msg, this._detectPortalApplication());
+        const err = new Error(msg);
+        err.terminated = true;
+        throw err;
+      }
       throw new Error(data.detail || "Failed to resend verification code.");
     }
     if (reqSeq === this._challengeReqSeq && data.challenge_id) {
@@ -2449,13 +2797,14 @@ class CognisecClient {
       return;
     }
 
-    if (status === 'PENDING_OTP' || remaining <= 0) {
-      console.log(`[COGNISEC-AI] [DIAGNOSTIC] Observation complete for session ${sid}. Triggering OTP issuance...`);
-      this.executeObservationOtpTransition(sid);
+    if (status === 'PENDING_OTP' || remaining <= 0 || loginData.is_completed === true) {
+      console.log(`[COGNISEC-AI] [DIAGNOSTIC] Observation window elapsed for session ${sid}. Confirming authoritative status with backend...`);
+      this.confirmAndExecuteObservationOtp(sid);
       return;
     }
 
     this.observationSecondsRemaining = remaining;
+    const obsTargetEndMs = Date.now() + remaining * 1000;
     console.log(`[COGNISEC-AI] [DIAGNOSTIC] Silent background observation active for session ${sid} (${remaining}s duration). Normal browsing permitted.`);
 
     const updateCountdownDisplays = (secs) => {
@@ -2476,7 +2825,7 @@ class CognisecClient {
     updateCountdownDisplays(remaining);
 
     this._obsCountdownInterval = setInterval(async () => {
-      this.observationSecondsRemaining = Math.max(0, (this.observationSecondsRemaining || remaining) - 1);
+      this.observationSecondsRemaining = Math.max(0, Math.ceil((obsTargetEndMs - Date.now()) / 1000));
       updateCountdownDisplays(this.observationSecondsRemaining);
       if (this.observationSecondsRemaining <= 0) {
         clearInterval(this._obsCountdownInterval);
@@ -2486,13 +2835,72 @@ class CognisecClient {
           this._obsTimer = null;
         }
         const obsEl = document.getElementById('cv-observation-state');
-        if (obsEl) obsEl.textContent = 'Observation Complete — Requesting OTP';
+        if (obsEl) obsEl.textContent = 'Confirming Observation with Backend...';
         const badgeEl = document.getElementById('cv-status-badge');
-        if (badgeEl) badgeEl.textContent = 'OTP PENDING';
-        console.log(`[COGNISEC-AI] [DIAGNOSTIC] Background observation timer reached 0 for session ${sid}. Enforcing server transition...`);
-        await this.executeObservationOtpTransition(sid);
+        if (badgeEl) badgeEl.textContent = 'CONFIRMING OBSERVATION';
+        console.log(`[COGNISEC-AI] [DIAGNOSTIC] Client countdown reached 0 for session ${sid}. Querying backend to confirm completion before OTP...`);
+        await this.confirmAndExecuteObservationOtp(sid);
       }
     }, 1000);
+  }
+
+  async confirmAndExecuteObservationOtp(sessionId = null) {
+    const sid = sessionId || this.sessionId;
+    if (!sid) return;
+
+    // Never declare observation complete via client timer alone: always confirm with backend first
+    const authState = await this.refreshAuthoritativeSessionStatus(sid).catch(() => null);
+    if (!authState || !authState.authenticated || authState.terminated) {
+      return;
+    }
+
+    if (authState.network_error) {
+      // Transient network hiccup: retry confirmation cleanly without jumping to wrong factor
+      if (this._obsTimer) clearTimeout(this._obsTimer);
+      this._obsTimer = setTimeout(() => {
+        this._obsTimer = null;
+        this.confirmAndExecuteObservationOtp(sid);
+      }, 2000);
+      return;
+    }
+
+    if (authState.session_status === 'ACTIVE') {
+      this.observationSecondsRemaining = 0;
+      this.closeObservationOtpModal();
+      this._syncLocalSessionState('ACTIVE', { forceDispatch: true });
+      return;
+    }
+
+    if (authState.session_status === 'RESTRICTED' || authState.risk_level === 'HIGH') {
+      this.observationSecondsRemaining = 0;
+      this._syncLocalSessionState('RESTRICTED', { forceDispatch: true });
+      if (typeof this.openStepUpModal === 'function') {
+        this.openStepUpModal({
+          preferredFactor: 'HIGH_RISK_DUAL',
+          reason: authState.message || 'Elevated HIGH risk detected. Complete sequential cognitive verification to proceed.'
+        });
+      }
+      return;
+    }
+
+    if (
+      authState.session_status === 'PENDING_OBSERVATION'
+      && !authState.is_observation_completed
+      && typeof authState.observation_seconds_remaining === 'number'
+      && authState.observation_seconds_remaining > 0
+    ) {
+      // Server clock says observation is still running — resume accurate wait cleanly
+      this.scheduleBackgroundOtpPrompt({
+        session_id: sid,
+        status: 'PENDING_OBSERVATION',
+        observation_seconds_remaining: authState.observation_seconds_remaining,
+        is_completed: false
+      });
+      return;
+    }
+
+    // Backend confirmed observation completion (is_observation_completed === true or PENDING_OTP) -> strictly trigger EMAIL OTP
+    await this.executeObservationOtpTransition(sid);
   }
 
   async executeObservationOtpTransition(sessionId = null) {
@@ -2536,6 +2944,10 @@ class CognisecClient {
       const challenge = await this.requestLoginOtp(sid);
       console.log(`[COGNISEC-AI] [DIAGNOSTIC] Backend confirmed OTP challenge issued (ID: ${challenge.challenge_id}). Delivered to ${challenge.masked_email}.`);
 
+      // Synchronize local session state with backend PENDING_OTP transition immediately
+      this.observationSecondsRemaining = 0;
+      this._syncLocalSessionState('PENDING_OTP', { forceDispatch: true });
+
       // Open the modal ONLY after backend confirms challenge was created
       this.openObservationOtpModal(challenge);
     } catch (err) {
@@ -2543,16 +2955,9 @@ class CognisecClient {
 
       // If backend reports session is already active, synchronize auth state immediately without error
       if (err.message && err.message.toLowerCase().includes('already authenticated and active')) {
-        this.sessionStatus = 'ACTIVE';
-        localStorage.setItem('cognisec_session_status', 'ACTIVE');
-        if (this.user) {
-          this.user.account_status = 'ACTIVE';
-          localStorage.setItem('cognisec_user', JSON.stringify(this.user));
-        }
+        this.observationSecondsRemaining = 0;
         this.closeObservationOtpModal();
-        window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
-          detail: { isAuthenticated: true, user: this.user, isFullyVerified: true }
-        }));
+        this._syncLocalSessionState('ACTIVE', { forceDispatch: true });
         return;
       }
 
@@ -2560,6 +2965,7 @@ class CognisecClient {
       if (err.message && err.message.toLowerCase().includes('observation period incomplete')) {
         const match = err.message.match(/(\d+)\s*second/i);
         const waitSec = match ? parseInt(match[1], 10) : 1;
+        this.observationSecondsRemaining = waitSec;
         console.log(`[COGNISEC-AI] [DIAGNOSTIC] Server clock reports ${waitSec}s remaining. Retrying after delay...`);
         this._obsTimer = setTimeout(() => {
           this._obsTimer = null;
@@ -2573,15 +2979,15 @@ class CognisecClient {
       const msgLower = msg.toLowerCase();
 
       if (msgLower.includes('neuraltrace verification required') || msgLower.includes('step_up_required') || msgLower.includes('step-up required')) {
-        this.sessionStatus = 'STEP_UP_REQUIRED';
-        localStorage.setItem('cognisec_session_status', 'STEP_UP_REQUIRED');
+        this.observationSecondsRemaining = 0;
+        this._syncLocalSessionState('STEP_UP_REQUIRED', { forceDispatch: true });
         this.closeObservationOtpModal();
         window.dispatchEvent(new CustomEvent('cognisec:step_up_required', {
           detail: { reason: msg, session_status: 'STEP_UP_REQUIRED' }
         }));
         if (typeof this.openStepUpModal === 'function') {
           this.openStepUpModal({
-            preferredFactor: 'GESTURE_PATTERN',
+            preferredFactor: msgLower.includes('neuraltrace verification required') ? 'GESTURE_PATTERN' : null,
             reason: msg
           });
         }
@@ -2589,8 +2995,8 @@ class CognisecClient {
       }
 
       if (msgLower.includes('high risk') || msgLower.includes('access restricted') || msgLower.includes('multi-factor authorization required')) {
-        this.sessionStatus = 'RESTRICTED';
-        localStorage.setItem('cognisec_session_status', 'RESTRICTED');
+        this.observationSecondsRemaining = 0;
+        this._syncLocalSessionState('RESTRICTED', { forceDispatch: true });
         this.closeObservationOtpModal();
         window.dispatchEvent(new CustomEvent('cognisec:step_up_required', {
           detail: { reason: msg, session_status: 'RESTRICTED', riskLevel: 'HIGH' }
@@ -2618,11 +3024,11 @@ class CognisecClient {
           'Session terminated due to critical security risk policy.',
           '🚨'
         );
-        window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
-          detail: { isAuthenticated: false, user: null, isFullyVerified: false }
-        }));
         return;
       }
+
+      // Sync authoritative state in case backend transitioned to PENDING_OTP before delivery error
+      await this.refreshAuthoritativeSessionStatus(sid).catch(() => null);
 
       // Genuine OTP delivery error (e.g. SMTP failure) — show in OTP modal error banner
       this.showOtpDeliveryError(msg || 'Verification code delivery failed. Access remains restricted.');
@@ -2673,15 +3079,33 @@ class CognisecClient {
       errBanner.textContent = '';
       errBanner.classList.add('hidden');
     }
-    // Display confirmed OTP status banner after SMTP acceptance
+    // Display accurate mail server submission status banner
     if (successBanner) {
       const masked = (challenge && challenge.masked_email) || (this.user && this.maskEmail(this.user.email)) || 'registered email';
-      successBanner.textContent = (challenge && challenge.message) || `Verification code accepted by Gmail SMTP for transmission to ${masked}. Check your inbox and spam folder.`;
-      successBanner.classList.remove('hidden');
+      const ds = (challenge && challenge.delivery_status) || 'SMTP_ACCEPTED';
+      if (ds === 'FAILED') {
+        successBanner.classList.add('hidden');
+        if (errBanner) {
+          errBanner.textContent = (challenge && challenge.message) || 'Email delivery could not be initiated. Please retry.';
+          errBanner.classList.remove('hidden');
+        }
+      } else if (ds === 'PENDING' || ds === 'SENDING' || ds === 'RETRY_PENDING') {
+        successBanner.textContent = 'Sending verification email...';
+        successBanner.classList.remove('hidden');
+      } else {
+        successBanner.textContent = (challenge && challenge.message) || `Email submitted to the mail server for ${masked}. Check your inbox and spam folder.`;
+        successBanner.classList.remove('hidden');
+      }
     }
     if (codeInput) {
       codeInput.value = '';
       codeInput.disabled = false;
+    }
+    const attemptsEl = document.getElementById('login-otp-attempts-info');
+    if (attemptsEl) {
+      const rem = (challenge && typeof challenge.attempts_remaining === 'number') ? challenge.attempts_remaining : 1;
+      attemptsEl.textContent = `${rem} attempt${rem === 1 ? '' : 's'} remaining`;
+      attemptsEl.className = rem <= 1 ? 'text-[11px] font-bold text-red-400' : 'text-[11px] font-bold text-amber-400';
     }
 
     modal.classList.remove('hidden');
@@ -2698,23 +3122,58 @@ class CognisecClient {
 
   async triggerLoginOtpModal(sessionId = null) {
     const sid = sessionId || this.sessionId;
-    if (!sid) return;
+    if (!sid) return null;
 
-    if (this.sessionStatus === 'ACTIVE') return;
+    const authState = await this.refreshAuthoritativeSessionStatus(sid);
+    if (!authState || !authState.authenticated || authState.terminated) {
+      return authState;
+    }
 
-    console.log(`[COGNISEC-AI] [DIAGNOSTIC] Protected action invoked. Checking observation status for session ${sid}...`);
-    const obsStatus = await this.getObservationStatus(sid);
-    if (obsStatus && obsStatus.observation_seconds_remaining > 0 && obsStatus.status === 'PENDING_OBSERVATION') {
-      const rem = obsStatus.observation_seconds_remaining;
+    if (authState.session_status === 'ACTIVE') {
+      return { active: true, status: 'ACTIVE' };
+    }
+
+    if (authState.session_status === 'PENDING_OTP' || (authState.session_status === 'PENDING_OBSERVATION' && authState.is_observation_completed)) {
+      await this.executeObservationOtpTransition(sid);
+      return { status: this.sessionStatus };
+    }
+
+    if (authState.session_status === 'RESTRICTED' || authState.risk_level === 'HIGH') {
+      if (typeof this.openStepUpModal === 'function') {
+        this.openStepUpModal({
+          preferredFactor: 'HIGH_RISK_DUAL',
+          targetResource: null,
+          reason: authState.message || 'Elevated risk verification is required for this session.'
+        });
+      }
+      return { stepUpRequired: true, status: authState.session_status };
+    }
+
+    if (authState.session_status === 'STEP_UP_REQUIRED') {
+      if (typeof this.openStepUpModal === 'function') {
+        const pref = authState.risk_level === 'LOW' ? 'OTP' : (authState.risk_level === 'MEDIUM' ? 'GESTURE_PATTERN' : null);
+        this.openStepUpModal({
+          preferredFactor: pref,
+          targetResource: null,
+          challengePurpose: 'SESSION_STEP_UP',
+          reason: authState.message || 'Additional Zero Trust verification is required for this session.'
+        });
+      }
+      return { stepUpRequired: true, status: authState.session_status };
+    }
+
+    if (authState.session_status === 'PENDING_OBSERVATION' && !authState.is_observation_completed && authState.observation_seconds_remaining > 0) {
+      const rem = authState.observation_seconds_remaining;
       this.showToastNotification(
         "Observation In Progress",
         `Zero-Trust behavioral observation active in background (${rem}s remaining). Complete OTP verification to unlock sensitive actions.`,
         "🔒"
       );
-      return;
+      return { pendingObservation: true, remaining: rem, status: 'PENDING_OBSERVATION' };
     }
 
     await this.executeObservationOtpTransition(sid);
+    return { status: this.sessionStatus };
   }
 
   showToastNotification(title, message, icon = "🔒") {
@@ -2823,24 +3282,42 @@ class CognisecClient {
         }
       }, 1200);
     } catch (err) {
-      if (verifyBtn) {
-        verifyBtn.disabled = true;
-        verifyBtn.innerHTML = '<span>Session Terminated</span>';
+      if (err && err.terminated) {
+        if (verifyBtn) {
+          verifyBtn.disabled = true;
+          verifyBtn.innerHTML = '<span>Session Terminated</span>';
+        }
+        if (codeInput) codeInput.disabled = true;
+        this.closeObservationOtpModal();
+        return;
       }
-      if (codeInput) codeInput.disabled = true;
-      if (errBanner) {
-        errBanner.textContent = err.message || 'Verification failed. Pending session terminated. Please sign in again.';
-        errBanner.classList.remove('hidden');
-      }
-      setTimeout(() => {
+      if (err && err.portalLocked) {
         this.closeObservationOtpModal();
         if (verifyBtn) {
           verifyBtn.disabled = false;
           verifyBtn.innerHTML = '<span>Verify &amp; Activate →</span>';
         }
         if (codeInput) codeInput.disabled = false;
-        window.location.reload();
-      }, 2500);
+        this.handlePortalEjection(err.lockInfo || {}, this._detectPortalApplication(), { redirectToDashboard: true });
+        return;
+      }
+      if (verifyBtn) {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = '<span>Verify &amp; Activate →</span>';
+      }
+      if (codeInput) codeInput.disabled = false;
+      const errText = err.message || 'Verification failed. Please check code or request a new OTP.';
+      const remMatch = errText.match(/(\d+)\s+attempt/i);
+      const remCount = remMatch ? Number(remMatch[1]) : (err.attemptsRemaining != null ? Number(err.attemptsRemaining) : null);
+      const attemptsEl = document.getElementById('login-otp-attempts-info');
+      if (attemptsEl && remCount !== null && !Number.isNaN(remCount)) {
+        attemptsEl.textContent = `${remCount} attempt${remCount === 1 ? '' : 's'} remaining`;
+        attemptsEl.className = remCount <= 1 ? 'text-[11px] font-bold text-red-400' : 'text-[11px] font-bold text-amber-400';
+      }
+      if (errBanner) {
+        errBanner.textContent = errText;
+        errBanner.classList.remove('hidden');
+      }
     }
   }
 
@@ -2871,8 +3348,20 @@ class CognisecClient {
       }
       if (successBanner) {
         const masked = challenge?.masked_email || (this.user && this.maskEmail(this.user.email)) || 'registered email';
-        successBanner.textContent = (challenge && challenge.message) || `Verification code accepted by Gmail SMTP for transmission to ${masked}. Check your inbox and spam folder.`;
-        successBanner.classList.remove('hidden');
+        const ds = (challenge && challenge.delivery_status) || 'SMTP_ACCEPTED';
+        if (ds === 'FAILED') {
+          successBanner.classList.add('hidden');
+          if (errBanner) {
+            errBanner.textContent = (challenge && challenge.message) || 'Email delivery could not be initiated. Please retry.';
+            errBanner.classList.remove('hidden');
+          }
+        } else if (ds === 'PENDING' || ds === 'SENDING' || ds === 'RETRY_PENDING') {
+          successBanner.textContent = 'Sending verification email...';
+          successBanner.classList.remove('hidden');
+        } else {
+          successBanner.textContent = (challenge && challenge.message) || `Email submitted to the mail server for ${masked}. Check your inbox and spam folder.`;
+          successBanner.classList.remove('hidden');
+        }
       }
 
       // Debounce resend requests with 15s cooldown to prevent rapid duplicate emails
@@ -2894,6 +3383,10 @@ class CognisecClient {
         }, 1000);
       }
     } catch (err) {
+      if (err && err.terminated) {
+        this.closeObservationOtpModal();
+        return;
+      }
       if (errBanner) {
         errBanner.textContent = err.message || 'Failed to dispatch verification code. Please retry.';
         errBanner.classList.remove('hidden');
@@ -2964,11 +3457,24 @@ class CognisecClient {
         course_name: courseName
       })
     });
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Examination OTP verification failed.');
+      if (this._detectPortalLockPayload(res, data)) {
+        const lockObj = await this.checkAndEnforcePortalLock({ application: 'college', recordReentry: false }).catch(() => null);
+        const info = lockObj && lockObj.locked ? lockObj : {
+          locked: true,
+          portal: 'college',
+          security_reference_id: res.headers?.get('X-Cognisec-Security-Ref') || 'SEC-LOCK-ACTIVE',
+          lock_reason: data.detail || 'College examination Email OTP verification failed.',
+        };
+        const err = new Error(data.detail || 'College portal access suspended.');
+        err.portalLocked = true;
+        err.lockInfo = info;
+        throw err;
+      }
+      throw new Error(data.detail || 'Examination OTP verification failed.');
     }
-    return await res.json();
+    return data;
   }
 
   async fetchAuthorizedExamSession(courseName = 'CS F301 • End-Semester Proctored Assessment') {
@@ -3088,18 +3594,30 @@ class CognisecClient {
       if (cancelBtn) cancelBtn.textContent = 'Cancel and return to checkout';
     }
 
+    const ds = challenge.delivery_status;
+    const deliveryOk = !ds || ds === 'SMTP_ACCEPTED' || ds === 'DELIVERY_CONFIRMED' || ds === 'SENT';
+    const isPending = ds === 'PENDING' || ds === 'SENDING' || ds === 'RETRY_PENDING';
     if (errBanner) {
-      errBanner.textContent = '';
-      errBanner.classList.add('hidden');
+      if (!deliveryOk && !isPending) {
+        errBanner.textContent = challenge.message || 'Email delivery could not be initiated. Please retry.';
+        errBanner.classList.remove('hidden');
+      } else {
+        errBanner.textContent = '';
+        errBanner.classList.add('hidden');
+      }
     }
     if (successBanner) {
-      const masked = challenge.masked_email || 'b***5@gmail.com';
-      successBanner.textContent = challenge.message || (isExam
-        ? `✓ Examination OTP dispatched via Gmail SMTP to ${masked}.`
-        : isApt
-          ? `✓ Appointment OTP dispatched via Gmail SMTP to ${masked}.`
-          : `✓ Payment OTP dispatched via Gmail SMTP to ${masked}.`);
-      successBanner.classList.remove('hidden');
+      if (isPending) {
+        successBanner.textContent = 'Sending verification email...';
+        successBanner.classList.remove('hidden');
+      } else if (deliveryOk) {
+        const masked = challenge.masked_email || 'registered email';
+        successBanner.textContent = challenge.message || `Email submitted to the mail server for ${masked}. Check your inbox and spam folder.`;
+        successBanner.classList.remove('hidden');
+      } else {
+        successBanner.textContent = '';
+        successBanner.classList.add('hidden');
+      }
     }
     if (codeInput) {
       codeInput.value = '';
@@ -3209,8 +3727,8 @@ class CognisecClient {
       return;
     }
 
-    const isApt = this._activePaymentChallenge.challenge_type === 'HEALTHCARE_APPOINTMENT';
-    const isExam = this._activePaymentChallenge.challenge_type === 'COLLEGE_EXAM_OTP';
+    const isApt = this._activePaymentChallenge.challenge_type === 'HEALTHCARE_APPOINTMENT' || Boolean(this._paymentOtpOptions && this._paymentOtpOptions.isAppointment);
+    const isExam = this._activePaymentChallenge.challenge_type === 'COLLEGE_EXAM_OTP' || Boolean(this._paymentOtpOptions && this._paymentOtpOptions.isExam);
 
     if (verifyBtn) {
       verifyBtn.disabled = true;
@@ -3271,6 +3789,15 @@ class CognisecClient {
 
     } catch (err) {
       console.warn('[COGNISEC-AI] OTP verification failed:', err);
+      if (err && err.portalLocked) {
+        const modal = document.getElementById('modal-payment-otp');
+        if (modal) modal.classList.add('hidden');
+        if (this._paymentExpiryTimer) clearInterval(this._paymentExpiryTimer);
+        if (this._paymentResendCooldownTimer) clearInterval(this._paymentResendCooldownTimer);
+        const appScope = isExam ? 'college' : (isApt ? 'healthcare' : 'shopping');
+        this.handlePortalEjection(err.lockInfo || {}, appScope, { redirectToDashboard: true });
+        return;
+      }
       if (verifyBtn) {
         verifyBtn.disabled = false;
         verifyBtn.innerHTML = isExam
@@ -3299,8 +3826,8 @@ class CognisecClient {
   async resendPaymentOtpFromModal() {
     if (!this._activePaymentChallenge || this._isResendingPaymentOtp) return;
     this._isResendingPaymentOtp = true;
-    const isApt = this._activePaymentChallenge.challenge_type === 'HEALTHCARE_APPOINTMENT';
-    const isExam = this._activePaymentChallenge.challenge_type === 'COLLEGE_EXAM_OTP';
+    const isApt = this._activePaymentChallenge.challenge_type === 'HEALTHCARE_APPOINTMENT' || Boolean(this._paymentOtpOptions && this._paymentOtpOptions.isAppointment);
+    const isExam = this._activePaymentChallenge.challenge_type === 'COLLEGE_EXAM_OTP' || Boolean(this._paymentOtpOptions && this._paymentOtpOptions.isExam);
     const resendBtn = document.getElementById('btn-payment-otp-resend');
     const errBanner = document.getElementById('payment-otp-error-banner');
     const successBanner = document.getElementById('payment-otp-success-banner');
@@ -3407,6 +3934,83 @@ class CognisecClient {
     }
   }
 
+  async verifyEmail(email, verificationCode) {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/auth/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: (email || '').trim(),
+          verification_code: (verificationCode || '').trim()
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = typeof data.detail === 'string' ? data.detail : `Email verification failed (${res.status})`;
+        return { success: false, error: msg };
+      }
+      if (data.access_token) {
+        this.token = data.access_token;
+        this.sessionId = data.session_id || null;
+        this.sessionStatus = 'ACTIVE';
+        this.user = {
+          id: data.user_id,
+          name: data.name,
+          email: data.email,
+          role: data.role || 'USER',
+          account_status: 'ACTIVE',
+          security_enrollment_completed: Boolean(data.security_enrollment_completed),
+          missing_factors: Array.isArray(data.missing_factors) ? data.missing_factors : []
+        };
+        localStorage.setItem('cognisec_token', this.token);
+        if (this.sessionId) localStorage.setItem('cognisec_session_id', this.sessionId);
+        localStorage.setItem('cognisec_user', JSON.stringify(this.user));
+        localStorage.setItem('cognisec_session_status', this.sessionStatus);
+      }
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: error.message || 'Network error during email verification.' };
+    }
+  }
+
+  async resendVerificationEmail(email) {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: (email || '').trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { success: false, error: typeof data.detail === 'string' ? data.detail : 'Unable to resend verification code.' };
+      }
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: error.message || 'Network error resending verification code.' };
+    }
+  }
+
+  async completeAdaptiveEnrollment() {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/security/adaptive/complete-enrollment`, {
+        method: 'POST',
+        headers: this.getHeaders()
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { success: false, error: typeof data.detail === 'string' ? data.detail : 'Unable to complete security enrollment.' };
+      }
+      if (this.user) {
+        this.user.security_enrollment_completed = true;
+        this.user.missing_factors = [];
+        localStorage.setItem('cognisec_user', JSON.stringify(this.user));
+      }
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: error.message || 'Network error completing enrollment.' };
+    }
+  }
+
   async logout() {
     if (this.sessionId && this.token) {
       try {
@@ -3490,6 +4094,18 @@ class CognisecClient {
       if (document.hidden) {
         this.activeKeyDowns.clear();
         lastKeyTime = 0;
+      } else if (this.token && this.sessionId && this.sessionStatus !== 'ACTIVE') {
+        const obsModal = document.getElementById('modal-login-observation');
+        const obsVisible = Boolean(obsModal && !obsModal.classList.contains('hidden'));
+        if (!obsVisible && !this._isRequestingOtp) {
+          this.refreshAuthoritativeSessionStatus(this.sessionId).then(authState => {
+            if (authState && authState.authenticated && !authState.terminated && !authState.network_error) {
+              if (authState.session_status === 'PENDING_OTP' || (authState.session_status === 'PENDING_OBSERVATION' && authState.is_observation_completed)) {
+                this.confirmAndExecuteObservationOtp(this.sessionId);
+              }
+            }
+          }).catch(() => {});
+        }
       }
     });
 
@@ -3866,11 +4482,29 @@ class CognisecClient {
     const nowEpoch = Date.now();
     const intervalSec = this.lastTelemetryDispatchTime ? Math.max(1, (nowEpoch - this.lastTelemetryDispatchTime) / 1000) : 6.0;
     this.lastTelemetryDispatchTime = nowEpoch;
-    const clickFreq = Math.min(100.0, this.clickCount / intervalSec);
-    this.clickCount = 0;
+    const windowClicks = this.clickCount || 0;
+    const clickFreq = Math.min(100.0, windowClicks / intervalSec);
 
     // 6. Idle Duration in seconds
     const idleSeconds = (this.hasRealInteraction && this.lastInteractionTime) ? Math.max(0, (Date.now() - this.lastInteractionTime) / 1000) : 0.0;
+
+    const snapshotSampleCounts = {
+      keystrokes: (this.dwellTimings || []).length,
+      mouse_points: (this.mousePoints || []).length,
+      clicks: windowClicks,
+      scrolls: (this.scrollSpeeds || []).length,
+      navigations: (this.navigationHistory || []).length
+    };
+    const snapshotObservedModalities = {
+      keyboard: (this.dwellTimings || []).length >= 3 && (this.keyPressTimings || []).length >= 3,
+      mouse: (this.mousePoints || []).length >= 4 || windowClicks > 0,
+      scroll: (this.scrollSpeeds || []).length > 0,
+      navigation: (this.navigationHistory || []).length >= 2,
+      inactivity: Boolean(this.hasRealInteraction)
+    };
+
+    // Reset window click counter only after snapshot metadata is captured
+    this.clickCount = 0;
 
     return {
       session_id: this.sessionId || '',
@@ -3885,7 +4519,13 @@ class CognisecClient {
       scroll_speed_avg: Number(avgScrollSpeed.toFixed(1)),
       idle_duration_sec: Number((Math.round(idleSeconds * 10) / 10).toFixed(1)),
       navigation_entropy: Number(navEntropy.toFixed(2)),
-      context_signals: { is_new_device: false },
+      context_signals: {
+        is_new_device: false,
+        sample_counts: { ...snapshotSampleCounts },
+        observed_modalities: { ...snapshotObservedModalities }
+      },
+      observed_modalities: { ...snapshotObservedModalities },
+      sample_counts: { ...snapshotSampleCounts },
       timestamp: Date.now() / 1000,
       sequence_number: (() => {
         const seq = ++this.sequenceNumber;
@@ -3900,6 +4540,30 @@ class CognisecClient {
 
   // --- TELEMETRY DISPATCH TO FASTAPI ---
   async sendBehaviorTelemetry() {
+    if (!this._telemetryInFlight) {
+      const current = this._sendBehaviorTelemetrySerialized();
+      this._telemetryInFlight = current;
+      try {
+        return await current;
+      } finally {
+        if (this._telemetryInFlight === current) {
+          this._telemetryInFlight = null;
+        }
+      }
+    }
+    const prev = this._telemetryQueueTail || this._telemetryInFlight;
+    const queued = prev.catch(() => {}).then(() => this._sendBehaviorTelemetrySerialized());
+    this._telemetryQueueTail = queued;
+    try {
+      return await queued;
+    } finally {
+      if (this._telemetryQueueTail === queued) {
+        this._telemetryQueueTail = null;
+      }
+    }
+  }
+
+  async _sendBehaviorTelemetrySerialized() {
     if (!this.token || !this.sessionId) {
       await this.ensureActiveSession();
     }
@@ -3925,8 +4589,7 @@ class CognisecClient {
       const result = await res.json();
       console.log('[COGNISEC-AI] Telemetry POST /api/behavior/events SUCCESS:', result);
 
-      // Reset short-term event buffers
-      this.clickCount = 0;
+      // Reset short-term event buffers (clickCount is atomically captured and reset in computeTelemetrySnapshot)
       this.scrollDeltaSum = 0;
 
       // Record dynamic risk state from telemetry evaluation
@@ -3954,6 +4617,22 @@ class CognisecClient {
         window.dispatchEvent(new CustomEvent('cognisec:step_up_required', { detail: result }));
       }
 
+      // If backend telemetry confirms 20s observation completed on server clock, synchronize and trigger OTP transition
+      if (
+        result
+        && result.session_status === 'PENDING_OBSERVATION'
+        && result.observation_completed === true
+        && !this._isRequestingOtp
+      ) {
+        const obsModal = document.getElementById('modal-login-observation');
+        const obsHidden = !obsModal || obsModal.classList.contains('hidden');
+        if (obsHidden) {
+          setTimeout(() => {
+            this.confirmAndExecuteObservationOtp(this.sessionId);
+          }, 0);
+        }
+      }
+
       window.dispatchEvent(new CustomEvent('cognisec:telemetry_dispatched', { detail: result }));
       return { success: true, data: result };
     } catch (e) {
@@ -3978,9 +4657,11 @@ class CognisecClient {
   }
 
   // --- SOC ADMIN ENDPOINTS ---
-  async fetchSocMetrics() {
+  async fetchSocMetrics(scope = 'genuine') {
     try {
-      const res = await fetch(`${COGNISEC_API_BASE}/admin/metrics`, {
+      const params = new URLSearchParams();
+      if (scope) params.set('scope', scope);
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/metrics?${params.toString()}`, {
         headers: this.getHeaders()
       });
       if (res.ok) return await res.json();
@@ -3990,9 +4671,11 @@ class CognisecClient {
     return null;
   }
 
-  async fetchSocRiskDistribution() {
+  async fetchSocRiskDistribution(scope = 'genuine') {
     try {
-      const res = await fetch(`${COGNISEC_API_BASE}/admin/risk-distribution`, {
+      const params = new URLSearchParams();
+      if (scope) params.set('scope', scope);
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/risk-distribution?${params.toString()}`, {
         headers: this.getHeaders()
       });
       if (res.ok) return await res.json();
@@ -4033,11 +4716,12 @@ class CognisecClient {
     return [];
   }
 
-  async fetchSocSessions(limit = 100, status = '', riskLevel = '', search = '', scope = 'all') {
+  async fetchSocSessions(limit = 100, status = '', riskLevel = '', search = '', scope = 'all', application = '') {
     try {
       const params = new URLSearchParams({ limit: String(limit) });
       if (status && status !== 'ALL') params.set('status', status);
       if (riskLevel && riskLevel !== 'ALL') params.set('risk_level', riskLevel);
+      if (application && application !== 'ALL') params.set('application', application);
       if (search) params.set('search', search);
       if (scope && scope !== 'all') params.set('scope', scope);
       const res = await fetch(`${COGNISEC_API_BASE}/admin/sessions?${params.toString()}`, {
@@ -4062,6 +4746,41 @@ class CognisecClient {
       console.warn('[COGNISEC-AI] Failed to fetch users:', e);
     }
     return [];
+  }
+
+  async fetchSocUsersDirectory(opts = {}) {
+    const params = new URLSearchParams();
+    params.set('activity_scope', opts.activity_scope || 'user');
+    if (opts.search) params.set('search', opts.search);
+    if (opts.role && opts.role !== 'ALL') params.set('role', opts.role);
+    if (opts.account_status && opts.account_status !== 'ALL') params.set('account_status', opts.account_status);
+    if (opts.portal && opts.portal !== 'ALL') params.set('portal', opts.portal);
+    if (opts.date_from) params.set('date_from', opts.date_from);
+    if (opts.date_to) params.set('date_to', opts.date_to);
+    params.set('scope', opts.scope || 'genuine');
+    if (opts.sort_by) params.set('sort_by', opts.sort_by);
+    if (opts.sort_dir) params.set('sort_dir', opts.sort_dir);
+    params.set('page', String(opts.page || 1));
+    params.set('page_size', String(opts.page_size || 12));
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/users/directory?${params.toString()}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Failed to load registered users (${res.status})`);
+    }
+    return await res.json();
+  }
+
+  async fetchSocUserDetails(userId) {
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/users/${encodeURIComponent(userId)}/details`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Failed to load user details (${res.status})`);
+    }
+    return await res.json();
   }
 
   async fetchSocDevices(scope = 'all') {
@@ -4127,6 +4846,75 @@ class CognisecClient {
     }
   }
 
+  async fetchSocPortalLocks(lockStatus = null, application = null) {
+    try {
+      const params = new URLSearchParams();
+      if (lockStatus && lockStatus !== 'ALL') params.set('lock_status', lockStatus);
+      if (application && application !== 'ALL') params.set('application', application);
+      const q = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/portal-locks${q}`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch SOC portal locks:', e);
+    }
+    return [];
+  }
+
+  async fetchSocPortalLockDetail(securityReferenceId) {
+    try {
+      const res = await fetch(
+        `${COGNISEC_API_BASE}/admin/portal-locks/${encodeURIComponent(securityReferenceId)}`,
+        { headers: this.getHeaders() }
+      );
+      if (res.ok) return await res.json();
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Failed to fetch recovery details for ${securityReferenceId}`);
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch portal lock details:', e);
+      throw e;
+    }
+  }
+
+  async approveSocPortalRecovery(securityReferenceId, notes = '') {
+    try {
+      const res = await fetch(
+        `${COGNISEC_API_BASE}/admin/portal-locks/${encodeURIComponent(securityReferenceId)}/recover`,
+        {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify({ notes: notes || null })
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) return data;
+      throw new Error(data.detail || `Failed to approve recovery for ${securityReferenceId}`);
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to approve portal recovery:', e);
+      throw e;
+    }
+  }
+
+  async rejectSocPortalRecovery(securityReferenceId, notes = '') {
+    try {
+      const res = await fetch(
+        `${COGNISEC_API_BASE}/admin/portal-locks/${encodeURIComponent(securityReferenceId)}/reject`,
+        {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify({ notes: notes || null })
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) return data;
+      throw new Error(data.detail || `Failed to reject recovery for ${securityReferenceId}`);
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to reject portal recovery:', e);
+      throw e;
+    }
+  }
+
   async fetchSocAuditLogs(action = '', limit = 100) {
     try {
       const params = new URLSearchParams({ limit: String(limit) });
@@ -4139,6 +4927,103 @@ class CognisecClient {
       console.warn('[COGNISEC-AI] Failed to fetch audit logs:', e);
     }
     return [];
+  }
+
+  async fetchSocAuditTrail(opts = {}) {
+    const params = new URLSearchParams();
+    params.set('activity_scope', opts.activity_scope || 'user');
+    if (opts.search) params.set('search', opts.search);
+    if (opts.actor_type && opts.actor_type !== 'ALL') params.set('actor_type', opts.actor_type);
+    if (opts.category && opts.category !== 'ALL') params.set('category', opts.category);
+    if (opts.application && opts.application !== 'ALL') params.set('application', opts.application);
+    if (opts.action && opts.action !== 'ALL') params.set('action', opts.action);
+    if (opts.result && opts.result !== 'ALL') params.set('result', opts.result);
+    if (opts.risk_level && opts.risk_level !== 'ALL') params.set('risk_level', opts.risk_level);
+    if (opts.operator) params.set('operator', opts.operator);
+    if (opts.user_id) params.set('user_id', String(opts.user_id));
+    if (opts.date_from) params.set('date_from', opts.date_from);
+    if (opts.date_to) params.set('date_to', opts.date_to);
+    params.set('page', String(opts.page || 1));
+    params.set('page_size', String(opts.page_size || 15));
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/audit-trail?${params.toString()}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Failed to load audit trail (${res.status})`);
+    }
+    return await res.json();
+  }
+
+  async fetchSecurityIntelligenceOverview(opts = {}) {
+    const params = new URLSearchParams();
+    params.set('activity_scope', opts.activity_scope || 'user');
+    if (opts.user_id) params.set('user_id', String(opts.user_id));
+    if (opts.application && opts.application !== 'ALL') params.set('application', opts.application);
+    if (opts.risk_level && opts.risk_level !== 'ALL') params.set('risk_level', opts.risk_level);
+    params.set('activity_scope', opts.activity_scope || 'user');
+    if (opts.search) params.set('search', opts.search);
+    if (opts.date_from) params.set('date_from', opts.date_from);
+    if (opts.date_to) params.set('date_to', opts.date_to);
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/security-intelligence/overview?${params.toString()}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Failed to load security overview (${res.status})`);
+    }
+    return await res.json();
+  }
+
+  async fetchSecurityEventDetail(eventId) {
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/security-intelligence/events/${eventId}/detail`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Failed to load event detail (${res.status})`);
+    }
+    return await res.json();
+  }
+
+  async fetchAdaptiveAuthHistory(opts = {}) {
+    const params = new URLSearchParams();
+    params.set('activity_scope', opts.activity_scope || 'user');
+    if (opts.user_id) params.set('user_id', String(opts.user_id));
+    if (opts.application && opts.application !== 'ALL') params.set('application', opts.application);
+    if (opts.risk_level && opts.risk_level !== 'ALL') params.set('risk_level', opts.risk_level);
+    params.set('activity_scope', opts.activity_scope || 'user');
+    if (opts.search) params.set('search', opts.search);
+    if (opts.date_from) params.set('date_from', opts.date_from);
+    if (opts.date_to) params.set('date_to', opts.date_to);
+    params.set('limit', String(opts.limit || 50));
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/security-intelligence/adaptive-history?${params.toString()}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Failed to load adaptive auth history (${res.status})`);
+    }
+    return await res.json();
+  }
+
+  async fetchAgenticIntelligence(opts = {}) {
+    const params = new URLSearchParams();
+    if (opts.application && opts.application !== 'ALL') params.set('application', opts.application);
+    if (opts.risk_level && opts.risk_level !== 'ALL') params.set('risk_level', opts.risk_level);
+    params.set('activity_scope', opts.activity_scope || 'user');
+    if (opts.search) params.set('search', opts.search);
+    if (opts.date_from) params.set('date_from', opts.date_from);
+    if (opts.date_to) params.set('date_to', opts.date_to);
+    params.set('limit', String(opts.limit || 25));
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/security-intelligence/agentic-intelligence?${params.toString()}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Failed to load agentic intelligence (${res.status})`);
+    }
+    return await res.json();
   }
 
   async fetchSocAnalytics(timeWindow = '24h') {
@@ -4165,6 +5050,109 @@ class CognisecClient {
     return null;
   }
 
+  async fetchAgenticStatus() {
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/agents/status`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  }
+
+  async verifyAgenticProvider() {
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/agents/verify-provider`, {
+      method: 'POST',
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  }
+
+  async runAgenticDemoAnalysis(scenario = 'medium') {
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/agents/demo-analysis`, {
+      method: 'POST',
+      headers: { ...this.getHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  }
+
+  async fetchAgenticInvestigation(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.search) qs.set('search', params.search);
+    if (params.agent && params.agent !== 'ALL') qs.set('agent', params.agent);
+    if (params.status && params.status !== 'ALL') qs.set('status', params.status);
+    if (params.date_from) qs.set('date_from', params.date_from);
+    if (params.date_to) qs.set('date_to', params.date_to);
+    if (params.page) qs.set('page', String(params.page));
+    if (params.page_size) qs.set('page_size', String(params.page_size));
+    const qStr = qs.toString();
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/agents/investigation${qStr ? '?' + qStr : ''}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  }
+
+  async fetchAgenticExecutionDetail(executionId) {
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/agents/executions/${encodeURIComponent(executionId)}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  }
+
+  async fetchSocPosture() {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/soc/posture`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch SOC posture:', e);
+    }
+    return null;
+  }
+
+  async fetchSocIncidents(limit = 5) {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/soc/incidents?limit=${limit}`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch SOC incidents:', e);
+    }
+    return [];
+  }
+
+  async fetchSocContainmentActions(limit = 5) {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/soc/containment-actions?limit=${limit}`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch SOC containment actions:', e);
+    }
+    return null;
+  }
+
   async triggerSocRescan() {
     try {
       const res = await fetch(`${COGNISEC_API_BASE}/admin/rescan`, {
@@ -4178,6 +5166,42 @@ class CognisecClient {
       console.warn('[COGNISEC-AI] Failed to trigger rescan:', e);
       throw e;
     }
+  }
+
+  async fetchSocSummary(timeWindowMinutes = 60) {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/soc/summary?time_window_minutes=${timeWindowMinutes}`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch SOC summary:', e);
+    }
+    return null;
+  }
+
+  async fetchSocPosture() {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/soc/posture`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch SOC posture:', e);
+    }
+    return null;
+  }
+
+  async fetchSocRecommendations() {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/soc/recommendations`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch SOC recommendations:', e);
+    }
+    return null;
   }
 
 
@@ -4205,8 +5229,10 @@ class CognisecClient {
       });
       if (res.ok) {
         const data = await res.json();
-        this.sessionStatus = data.session_status || this.sessionStatus;
-        return data;
+        if (data && data.session_status && data.session_status !== 'TERMINATED') {
+          this._syncLocalSessionState(data.session_status);
+        }
+        return { ...data, success: true };
       }
     } catch (e) {
       console.warn('[COGNISEC-AI] Failed to fetch session security status:', e.message);
@@ -4216,7 +5242,8 @@ class CognisecClient {
 
   async requestStepUpChallenge(preferredFactor = null, sessionId = null) {
     const sid = sessionId || this.sessionId;
-    if (!sid) return { success: false, error: 'No active session token available' };
+    if (!sid) return { success: false, status: 401, error: 'No active session token available. Please sign in again.' };
+    this.currentChallenge = null;
     try {
       let app = this.application || 'platform';
       if (this.currentTargetResource === 'academic_vault' || (typeof window !== 'undefined' && window.location.pathname.includes('college'))) {
@@ -4228,27 +5255,39 @@ class CognisecClient {
       }
       this.application = app;
 
+      const VAULT_RES = ['academic_vault', 'financial_vault', 'ehr_vault'];
+      const targetRes = this.currentTargetResource || null;
+      const derivedPurpose = this.currentStepUpPurpose
+        || (targetRes && VAULT_RES.includes(targetRes) ? 'CONFIDENTIAL_RESOURCE' : 'SESSION_STEP_UP');
       const body = {
         session_id: sid,
         application: app,
-        resource: this.currentTargetResource || null
+        resource: targetRes,
+        challenge_purpose: derivedPurpose
       };
       if (preferredFactor) body.preferred_factor = preferredFactor;
-      const res = await fetch(`${COGNISEC_API_BASE}/security/step-up/challenge`, {
+      const url = `${COGNISEC_API_BASE}/security/step-up/challenge`;
+      const res = await this._fetchWithTimeout(url, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify(body)
-      });
+      }, 22000);
       let data = {};
       try { data = await res.json(); } catch (_) {}
       if (!res.ok) {
-        const detail = typeof data.detail === 'string' ? data.detail : (Array.isArray(data.detail) ? data.detail.map(d => d.msg).join('; ') : '');
-        return { success: false, status: res.status, error: detail || `Failed to generate step-up challenge (HTTP ${res.status}).` };
+        const isTerminated = this._detectSessionTerminatedPayload(res, data);
+        const formattedErr = this._formatHttpChallengeError(res.status, data, 'step-up verification challenge');
+        console.warn(`[COGNISEC-AI] [StepUpChallenge] HTTP ${res.status} on ${url}: ${formattedErr}`);
+        return { success: false, status: res.status, terminated: isTerminated, error: isTerminated ? (data.detail || this._SESSION_TERMINATED_EXCEEDED_MSG) : formattedErr };
       }
       this.currentChallenge = data;
       return { success: true, data };
     } catch (err) {
-      return { success: false, error: 'Could not reach the security server to create the NeuralTrace challenge. Please retry.' };
+      const msg = (err && err.isTimeout)
+        ? err.message
+        : `Could not reach the security server at ${COGNISEC_API_BASE} to create the verification challenge. Ensure the backend service on port 8000 is running and retry.`;
+      console.warn(`[COGNISEC-AI] [StepUpChallenge] Network/transport error:`, err && err.message ? err.message : err);
+      return { success: false, status: 0, isTimeout: Boolean(err && err.isTimeout), error: msg };
     }
   }
 
@@ -4294,6 +5333,52 @@ class CognisecClient {
       console.warn('[COGNISEC-AI] Failed to fetch adaptive status:', e.message);
     }
     return null;
+  }
+
+  async getUserBehaviorSummary() {
+    try {
+      const sid = this.sessionId || localStorage.getItem('cognisec_session_id') || '';
+      const q = sid ? `?session_id=${encodeURIComponent(sid)}` : '';
+      const res = await fetch(`${COGNISEC_API_BASE}/behavior/user-summary${q}`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, data };
+      }
+      const data = await res.json().catch(() => ({}));
+      return { success: false, error: data.detail || 'Failed to fetch user security summary' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  async fetchAdminUserBehaviorProfile(userId) {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/admin/users/${encodeURIComponent(userId)}/profile`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('[COGNISEC-AI] Failed to fetch admin user behavior profile:', e);
+    }
+    return null;
+  }
+
+  async fetchAdminUserLiveActivity(userId, params = {}) {
+    const qs = new URLSearchParams();
+    if (params.session_id && params.session_id !== 'ALL') qs.set('session_id', params.session_id);
+    if (params.application && params.application !== 'ALL') qs.set('application', params.application);
+    if (params.limit) qs.set('limit', String(params.limit));
+    const qStr = qs.toString();
+    const res = await fetch(`${COGNISEC_API_BASE}/admin/users/${encodeURIComponent(userId)}/live-activity${qStr ? '?' + qStr : ''}`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
   }
 
   async getBehaviorProfile() {
@@ -4447,10 +5532,15 @@ class CognisecClient {
       }
       this.application = app;
 
+      const VAULT_RES = ['academic_vault', 'financial_vault', 'ehr_vault'];
+      const targetRes = this.currentTargetResource || null;
+      const derivedPurpose = this.currentStepUpPurpose
+        || (targetRes && VAULT_RES.includes(targetRes) ? 'CONFIDENTIAL_RESOURCE' : 'SESSION_STEP_UP');
       const body = {
         session_id: sid,
         application: app,
-        resource: this.currentTargetResource || null,
+        resource: targetRes,
+        challenge_purpose: derivedPurpose,
         ...payload
       };
       const res = await fetch(`${COGNISEC_API_BASE}/security/step-up/verify`, {
@@ -4459,7 +5549,19 @@ class CognisecClient {
         body: JSON.stringify(body)
       });
       const data = await res.json();
-      if (!res.ok) return { success: false, error: data.detail || 'Verification failed' };
+      if (!res.ok) {
+        const isPortalLocked = this._detectPortalLockPayload(res, data);
+        const isTerminated = this._detectSessionTerminatedPayload(res, data);
+        return {
+          success: false,
+          error: data.detail || 'Verification failed',
+          portalLocked: isPortalLocked,
+          terminated: isTerminated,
+          attemptsRemaining: res.headers?.get('X-Cognisec-Attempts-Remaining') ?? null,
+          lockRef: res.headers?.get('X-Cognisec-Security-Ref') || null,
+          status: res.status
+        };
+      }
       if (data.decision === 'ALLOW') {
         this.sessionStatus = data.session_status || 'ACTIVE';
       }
@@ -4549,9 +5651,12 @@ class CognisecClient {
 
         <!-- LIVE FACTOR INVENTORY & STATUS BAR -->
         <div class="px-5 py-3 bg-black/60 border-b border-slate-800/80 flex-shrink-0 space-y-2">
-          <div class="flex items-center justify-between text-xs">
+          <div class="flex items-center justify-between text-xs gap-2 flex-wrap">
             <span class="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Your Enrolled Factor Inventory:</span>
-            <button type="button" onclick="window.cognisec && window.cognisec.refreshFactorEnrollmentStatus()" class="text-[10px] text-amber-400 hover:text-amber-300 font-bold cursor-pointer">🔄 Refresh Status</button>
+            <div class="flex items-center gap-3">
+              <button type="button" onclick="window.cognisec && (window.cognisec.closeFactorEnrollmentModal(), window.cognisec.openChangePasswordModal())" class="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold cursor-pointer">🔑 Change Password →</button>
+              <button type="button" onclick="window.cognisec && window.cognisec.refreshFactorEnrollmentStatus()" class="text-[10px] text-amber-400 hover:text-amber-300 font-bold cursor-pointer">🔄 Refresh Status</button>
+            </div>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
             <div class="p-2 rounded-lg bg-slate-950/80 border border-slate-800 flex items-center justify-between">
@@ -5135,12 +6240,13 @@ class CognisecClient {
             <h4 class="font-heading font-bold text-xl text-white">Mandatory Identity Verification</h4>
             <p class="text-xs font-mono text-slate-300 leading-relaxed">Behavioral observation complete. Enter the 6-digit verification code dispatched via Gmail SMTP to your registered email.</p>
           </div>
-          <div class="p-3 rounded-xl bg-black/70 border border-red-950 flex items-center justify-between text-xs font-mono">
+          <div class="p-3 rounded-xl bg-black/70 border border-red-950 flex items-center justify-between text-xs font-mono flex-wrap gap-2">
             <div class="flex items-center gap-2">
               <span class="text-slate-400">Sent to:</span>
               <span id="login-otp-dest-email" class="text-white font-bold">registered email</span>
             </div>
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-3">
+              <span id="login-otp-attempts-info" class="text-[11px] font-bold text-red-400">1 attempt remaining</span>
               <span class="text-slate-400">Expires:</span>
               <span id="login-otp-expiry-timer" class="text-amber-400 font-bold">05:00</span>
             </div>
@@ -5417,15 +6523,11 @@ class CognisecClient {
 
   handleStepUpSecondaryAction() {
     const challenge = this.currentChallenge || {};
-    const cType = challenge.challenge_type || this.currentStepUpFactor || 'OTP';
-    if (cType === 'GESTURE_PATTERN') {
-      if (!this.currentChallenge) {
-        this.triggerNewStepUpChallenge(this.currentStepUpFactor || 'GESTURE_PATTERN');
-      } else {
-        this.clearChallengeGesture();
-      }
+    const cType = challenge.challenge_type || this.currentStepUpFactor || null;
+    if (cType === 'GESTURE_PATTERN' && this.currentChallenge) {
+      this.clearChallengeGesture();
     } else {
-      this.triggerNewStepUpChallenge(this.currentStepUpFactor);
+      this.triggerNewStepUpChallenge(this.currentStepUpFactor || null);
     }
   }
 
@@ -5441,6 +6543,11 @@ class CognisecClient {
     this.isStepUpSubmitting = false;
 
     this.currentTargetResource = options.targetResource || null;
+    this.currentStepUpPurpose = options.challengePurpose || (
+      ['academic_vault', 'financial_vault', 'ehr_vault'].includes(this.currentTargetResource)
+        ? 'CONFIDENTIAL_RESOURCE'
+        : 'SESSION_STEP_UP'
+    );
     if (this.currentTargetResource === 'academic_vault' || (typeof window !== 'undefined' && window.location.pathname.includes('college'))) {
       this.application = 'college';
     } else if (this.currentTargetResource === 'financial_vault' || (typeof window !== 'undefined' && window.location.pathname.includes('shopping'))) {
@@ -5485,6 +6592,11 @@ class CognisecClient {
       sessionBadge.textContent = `Session: ${sRef} | Ref: Requesting...`;
     }
 
+    const factorBadge = document.getElementById('stepup-factor-badge');
+    if (factorBadge) {
+      factorBadge.textContent = 'AUTHORIZING FACTOR...';
+    }
+
     if (feedback) feedback.className = 'hidden';
     if (submitBtn) {
       submitBtn.disabled = true;
@@ -5496,21 +6608,15 @@ class CognisecClient {
     }
     if (attemptsInfo) attemptsInfo.textContent = '3 attempts remaining';
 
-    // Immediately reveal and initialize the requested challenge factor pane
+    // Hide all panes until the authoritative backend challenge responds in renderChallengeUi()
     const paneOtp = document.getElementById('stepup-pane-otp');
     const paneGesture = document.getElementById('stepup-pane-gesture');
     const paneImage = document.getElementById('stepup-pane-image');
     const panePrivate = document.getElementById('stepup-pane-private');
     if (paneOtp) paneOtp.classList.add('hidden');
+    if (paneGesture) paneGesture.classList.add('hidden');
     if (paneImage) paneImage.classList.add('hidden');
     if (panePrivate) panePrivate.classList.add('hidden');
-
-    if (isGesture) {
-      if (paneGesture) paneGesture.classList.remove('hidden');
-      const factorBadge = document.getElementById('stepup-factor-badge');
-      if (factorBadge) factorBadge.textContent = 'FACTOR: GESTURE PATTERN';
-      this.initStepUpGestureGrid();
-    }
 
     this.currentChallengePromise = this.triggerNewStepUpChallenge(options.preferredFactor || null);
     await this.currentChallengePromise;
@@ -5518,6 +6624,7 @@ class CognisecClient {
 
   closeStepUpModal() {
     this.isStepUpModalOpen = false;
+    this._isRequestingStepUpChallenge = false;
     this.currentChallengePromise = null;
     this.currentStepUpFactor = null;
     const modal = document.getElementById('modal-stepup');
@@ -5546,16 +6653,22 @@ class CognisecClient {
     this.stepUpSuccessCallback = null;
     this.stepUpCancelCallback = null;
     this.currentTargetResource = null;
+    this.currentStepUpPurpose = null;
   }
 
   async triggerNewStepUpChallenge(preferredFactor = null) {
+    if (this._isRequestingStepUpChallenge) {
+      return;
+    }
+    this._isRequestingStepUpChallenge = true;
+
     const feedback = document.getElementById('stepup-feedback-banner');
     const demoOtpSpan = document.getElementById('stepup-demo-otp');
     const otpInput = document.getElementById('stepup-otp-input');
     const privInput = document.getElementById('stepup-private-input');
     const submitBtn = document.getElementById('stepup-btn-submit');
     const reqBtn = document.getElementById('stepup-btn-request-new');
-    const sessionBadge = document.getElementById('stepup-session-badge');
+    const factorBadge = document.getElementById('stepup-factor-badge');
 
     this.currentChallenge = null;
     this.currentChallengeExpiresAt = null;
@@ -5573,19 +6686,38 @@ class CognisecClient {
       submitBtn.disabled = true;
       submitBtn.innerHTML = preferredFactor === 'GESTURE_PATTERN' ? `<span>Loading Route...</span>` : `<span>Loading Challenge...</span>`;
     }
-    if (reqBtn && preferredFactor === 'GESTURE_PATTERN') {
-      reqBtn.textContent = 'Clear / Reset';
+    if (reqBtn) {
+      reqBtn.disabled = true;
+      reqBtn.textContent = preferredFactor === 'GESTURE_PATTERN' ? 'Clear / Reset' : 'Requesting...';
     }
     if (demoOtpSpan) demoOtpSpan.textContent = 'Generating...';
 
-    // Request fresh challenge from backend API
-    const res = await this.requestStepUpChallenge(preferredFactor);
+    let res;
+    try {
+      // Request fresh challenge from backend API
+      res = await this.requestStepUpChallenge(preferredFactor);
+    } finally {
+      this._isRequestingStepUpChallenge = false;
+    }
+
     if (!this.isStepUpModalOpen) return;
-    if (!res.success) {
+    if (!res || !res.success) {
       this.currentChallenge = null;
+      if (res && res.terminated) {
+        this.closeStepUpModal();
+        this.handleSessionTerminatedRedirect(res.error, this.application || this._detectPortalApplication());
+        return;
+      }
+      const errStatus = res ? res.status : 0;
+      const errText = (res && res.error) ? res.error : 'Failed to generate challenge. Please click Retry.';
+      if (factorBadge) {
+        factorBadge.textContent = errStatus === 401
+          ? 'SESSION EXPIRED'
+          : (errStatus === 403 ? 'ACCESS RESTRICTED' : 'CHALLENGE UNAVAILABLE');
+      }
       if (feedback) {
         feedback.className = 'p-3 rounded-xl bg-red-950/60 border border-red-800 text-red-300 font-mono text-xs block';
-        feedback.textContent = `Challenge Issuance Error: ${res.error || 'Failed to generate challenge. Please click Retry.'}`;
+        feedback.textContent = `Challenge Issuance Error: ${errText}`;
       }
       if (demoOtpSpan) demoOtpSpan.textContent = 'Unavailable';
       if (reqBtn) {
@@ -5594,6 +6726,7 @@ class CognisecClient {
       }
       if (submitBtn) {
         submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>Unavailable — Click Retry</span>';
       }
       return;
     }
@@ -5604,13 +6737,62 @@ class CognisecClient {
     this.currentChallengeExpiresAt = Date.now() + (ttlSecs * 1000);
 
     this.renderChallengeUi(challenge);
+
+    if (challenge && challenge.challenge_type === 'OTP' && challenge.delivery_status && !['SMTP_ACCEPTED', 'DELIVERY_CONFIRMED', 'SENT'].includes(challenge.delivery_status)) {
+      if (feedback) {
+        const isPending = ['PENDING', 'SENDING', 'RETRY_PENDING'].includes(challenge.delivery_status);
+        feedback.className = isPending
+          ? 'p-3 rounded-xl bg-amber-950/60 border border-amber-800 text-amber-300 font-mono text-xs block'
+          : 'p-3 rounded-xl bg-red-950/60 border border-red-800 text-red-300 font-mono text-xs block';
+        feedback.textContent = isPending
+          ? 'Sending verification email...'
+          : (challenge.message || 'Email delivery could not be initiated. Please retry.');
+      }
+      if (reqBtn) {
+        reqBtn.disabled = false;
+        reqBtn.textContent = '🔄 Retry';
+      }
+    }
   }
 
   renderChallengeUi(challenge) {
     if (!challenge) return;
     if (!this.isStepUpModalOpen) return;
-    const cType = challenge.challenge_type || 'OTP';
+
+    const ALLOWED_FACTORS = ['OTP', 'GESTURE_PATTERN', 'COGNITIVE_IMAGE_SEQUENCE', 'PRIVATE_RESPONSE', 'HIGH_RISK_DUAL'];
+    const rawType = typeof challenge.challenge_type === 'string' ? challenge.challenge_type.trim().toUpperCase() : '';
     const factorBadge = document.getElementById('stepup-factor-badge');
+    const submitBtn = document.getElementById('stepup-btn-submit');
+    const reqBtn = document.getElementById('stepup-btn-request-new');
+    const feedback = document.getElementById('stepup-feedback-banner');
+    const paneOtp = document.getElementById('stepup-pane-otp');
+    const paneGesture = document.getElementById('stepup-pane-gesture');
+    const paneImage = document.getElementById('stepup-pane-image');
+    const panePrivate = document.getElementById('stepup-pane-private');
+
+    // Hide all panes first
+    if (paneOtp) paneOtp.classList.add('hidden');
+    if (paneGesture) paneGesture.classList.add('hidden');
+    if (paneImage) paneImage.classList.add('hidden');
+    if (panePrivate) panePrivate.classList.add('hidden');
+
+    if (!rawType || !ALLOWED_FACTORS.includes(rawType)) {
+      this.currentChallenge = null;
+      if (factorBadge) factorBadge.textContent = 'FACTOR: INVALID (FAIL CLOSED)';
+      if (submitBtn) submitBtn.disabled = true;
+      if (reqBtn) {
+        reqBtn.disabled = false;
+        reqBtn.textContent = '🔄 Retry';
+      }
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-red-950/60 border border-red-800 text-red-300 font-mono text-xs block';
+        feedback.textContent = `Security policy error: Unsupported or missing verification factor '${rawType || 'NONE'}'. Access remains locked.`;
+      }
+      return;
+    }
+
+    const cType = rawType;
+    this.currentStepUpFactor = cType;
     if (factorBadge) {
       factorBadge.textContent = `FACTOR: ${cType.replace(/_/g, ' ')}`;
     }
@@ -5620,6 +6802,12 @@ class CognisecClient {
       const sRef = this.sessionId ? this.sessionId.substring(0, 10) : 'Active';
       const cRef = challenge.challenge_id ? challenge.challenge_id.substring(0, 10) : 'chal_...';
       sessionBadge.textContent = `Session: ${sRef} | Ref: ${cRef}`;
+    }
+
+    const attemptsInfo = document.getElementById('stepup-attempts-info');
+    if (attemptsInfo) {
+      const rem = (typeof challenge.attempts_remaining === 'number') ? challenge.attempts_remaining : 3;
+      attemptsInfo.textContent = `${rem} attempt${rem === 1 ? '' : 's'} remaining`;
     }
 
     const emailSpan = document.getElementById('stepup-recipient-email');
@@ -5638,9 +6826,8 @@ class CognisecClient {
       }
     }
 
-    const submitBtn = document.getElementById('stepup-btn-submit');
-    const reqBtn = document.getElementById('stepup-btn-request-new');
     if (submitBtn) submitBtn.disabled = false;
+    if (reqBtn) reqBtn.disabled = false;
     if (cType === 'GESTURE_PATTERN') {
       if (submitBtn) submitBtn.innerHTML = `<span>Verify Route →</span>`;
       if (reqBtn) reqBtn.textContent = 'Clear / Reset';
@@ -5649,19 +6836,9 @@ class CognisecClient {
       if (reqBtn) reqBtn.textContent = '🔄 Fresh Code';
     }
 
-    const paneOtp = document.getElementById('stepup-pane-otp');
-    const paneGesture = document.getElementById('stepup-pane-gesture');
-    const paneImage = document.getElementById('stepup-pane-image');
-    const panePrivate = document.getElementById('stepup-pane-private');
     const otpInput = document.getElementById('stepup-otp-input');
     const privInput = document.getElementById('stepup-private-input');
     const promptEl = document.getElementById('stepup-private-prompt');
-
-    // Hide all panes first
-    if (paneOtp) paneOtp.classList.add('hidden');
-    if (paneGesture) paneGesture.classList.add('hidden');
-    if (paneImage) paneImage.classList.add('hidden');
-    if (panePrivate) panePrivate.classList.add('hidden');
 
     if (cType === 'OTP') {
       if (paneOtp) paneOtp.classList.remove('hidden');
@@ -5939,7 +7116,17 @@ class CognisecClient {
       return;
     }
 
-    let cType = this.currentChallenge.challenge_type || this.currentStepUpFactor || 'GESTURE_PATTERN';
+    const ALLOWED_FACTORS = ['OTP', 'GESTURE_PATTERN', 'COGNITIVE_IMAGE_SEQUENCE', 'PRIVATE_RESPONSE', 'HIGH_RISK_DUAL'];
+    const cType = this.currentChallenge && typeof this.currentChallenge.challenge_type === 'string'
+      ? this.currentChallenge.challenge_type.trim().toUpperCase()
+      : '';
+    if (!cType || !ALLOWED_FACTORS.includes(cType)) {
+      if (feedback) {
+        feedback.className = 'p-3 rounded-xl bg-red-950/60 border border-red-800 text-red-300 font-mono text-xs block';
+        feedback.textContent = 'Unsupported or missing challenge type. Verification blocked (fail closed).';
+      }
+      return;
+    }
 
     let payload = {
       challenge_type: cType,
@@ -6068,18 +7255,37 @@ class CognisecClient {
           return;
         }
 
-        // Enforce authoritative server-side access decision check before unlocking
-        const authDecision = await this.checkResourceAccess(this.currentTargetResource || 'confidential_records');
-        if (authDecision.access_granted) {
+        const VAULT_RESOURCES = ['academic_vault', 'financial_vault', 'ehr_vault'];
+        const targetRes = this.currentTargetResource ? String(this.currentTargetResource).toLowerCase() : null;
+        const isVaultResource = Boolean(targetRes && VAULT_RESOURCES.includes(targetRes));
+
+        // For confidential vaults, enforce authoritative vault grant decision; for non-vault session step-up (e.g. booking),
+        // confirm the authoritative ACTIVE session status returned by /step-up/verify + /security/status.
+        let authDecision = null;
+        if (isVaultResource) {
+          authDecision = await this.checkResourceAccess(targetRes);
+        } else {
+          const verifiedState = await this.refreshAuthoritativeSessionStatus().catch(() => null);
+          const sessionAllowed = Boolean(
+            (res.data && res.data.decision === 'ALLOW' && (res.data.session_status === 'ACTIVE' || !res.data.session_status))
+            || (verifiedState && verifiedState.is_verified)
+          );
+          authDecision = {
+            access_granted: sessionAllowed,
+            message: res.data?.message || verifiedState?.message || 'Session step-up denied.'
+          };
+        }
+
+        if (authDecision && authDecision.access_granted) {
           this.wasLastStepUpSuccessful = true;
           this.lastStepUpVerifiedAt = Date.now();
           this.lastStepUpVerifiedSessionId = this.sessionId;
-          this.sessionStatus = 'ACTIVE';
+          this._syncLocalSessionState('ACTIVE');
           this.currentChallenge = null;
           this.currentChallengeExpiresAt = null;
 
           const authorizedResource = this.currentTargetResource;
-          if (authorizedResource && this.sessionId) {
+          if (isVaultResource && authorizedResource && this.sessionId) {
             this.grantResourceClearance(authorizedResource);
           }
 
@@ -6153,13 +7359,30 @@ class CognisecClient {
         }
 
         const errMsg = res.error || 'Verification failed. Invalid route.';
-        const isLockout = errMsg.toLowerCase().includes('maximum') || errMsg.toLowerCase().includes('restricted') || errMsg.toLowerCase().includes('locked');
+        const isTerminated = Boolean(res.terminated) || errMsg.toLowerCase().includes('session has been terminated');
+        const isPortalLock = !isTerminated && (Boolean(res.portalLocked) || errMsg.toLowerCase().includes('portal access suspended') || errMsg.toLowerCase().includes('security access suspended'));
+        const isLockout = isTerminated || isPortalLock || errMsg.toLowerCase().includes('maximum') || errMsg.toLowerCase().includes('restricted') || errMsg.toLowerCase().includes('locked');
 
         if (feedback) {
           feedback.className = isLockout
             ? 'p-3 rounded-xl bg-red-950/80 border-2 border-red-600 text-red-200 font-mono text-xs block animate-pulse'
             : 'p-3 rounded-xl bg-red-950/60 border border-red-800 text-red-300 font-mono text-xs block';
           feedback.textContent = errMsg;
+        }
+
+        if (isTerminated) {
+          const otpInput = document.getElementById('stepup-otp-input');
+          const privInput = document.getElementById('stepup-private-input');
+          if (otpInput) otpInput.disabled = true;
+          if (privInput) privInput.disabled = true;
+          if (submitBtn) submitBtn.disabled = true;
+          if (reqBtn) reqBtn.disabled = true;
+          if (attemptsInfo) attemptsInfo.textContent = '0 attempts remaining (TERMINATED)';
+          if (this.stepUpTimerInterval) clearInterval(this.stepUpTimerInterval);
+          const appScope = this.application || this._detectPortalApplication();
+          this.closeStepUpModal();
+          this.handleSessionTerminatedRedirect(errMsg, appScope);
+          return;
         }
 
         if (isLockout) {
@@ -6176,10 +7399,24 @@ class CognisecClient {
           window.dispatchEvent(new CustomEvent('cognisec:session_locked', {
             detail: { session_id: this.sessionId, reason: errMsg }
           }));
+          const lockStatus = await this.checkAndEnforcePortalLock({ application: this.application || this._detectPortalApplication(), recordReentry: false }).catch(() => null);
+          if (lockStatus && lockStatus.locked) {
+            this.closeStepUpModal();
+            this.handlePortalEjection(lockStatus, this.application || this._detectPortalApplication(), { redirectToDashboard: true });
+          } else if (isPortalLock) {
+            this.closeStepUpModal();
+            this.handlePortalEjection({
+              locked: true,
+              portal: this.application || this._detectPortalApplication(),
+              security_reference_id: res.lockRef || 'SEC-LOCK-ACTIVE',
+              lock_reason: errMsg,
+            }, this.application || this._detectPortalApplication(), { redirectToDashboard: true });
+          }
         } else {
           const match = errMsg.match(/(\d+)\s+attempt/i);
-          if (match && attemptsInfo) {
-            attemptsInfo.textContent = `${match[1]} attempt${match[1] === '1' ? '' : 's'} remaining`;
+          const remVal = match ? match[1] : res.attemptsRemaining;
+          if (remVal != null && attemptsInfo) {
+            attemptsInfo.textContent = `${remVal} attempt${String(remVal) === '1' ? '' : 's'} remaining`;
           }
         }
       }
@@ -6396,10 +7633,1651 @@ class CognisecClient {
       return { status: 'error', message: e.message };
     }
   }
+
+  // ============================================================================
+  // COGNITIVE-VERIFIED CHANGE PASSWORD CONTROLLER (ALL PORTALS)
+  // ============================================================================
+
+  _detectPortalApplication() {
+    const path = (typeof window !== 'undefined' && window.location && window.location.pathname ? window.location.pathname : '').toLowerCase();
+    if (path.includes('shopping')) return 'shopping';
+    if (path.includes('college')) return 'college';
+    if (path.includes('healthcare')) return 'healthcare';
+    return 'platform';
+  }
+
+  _escapeHtml(str) {
+    if (typeof str !== 'string') return '';
+    return str.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
+  ensureChangePasswordModalInDom() {
+    if (document.getElementById('modal-change-password')) return;
+    if (!document.getElementById('fem-symbol-styles')) {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'fem-symbol-styles';
+      styleEl.textContent = `
+        .fem-symbol-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .fem-symbol-card { background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 12px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; position: relative; transition: all 0.2s; }
+        .fem-symbol-card:hover { border-color: rgba(245, 158, 11, 0.85); transform: translateY(-2px); }
+        .fem-symbol-card.selected { border-color: #f59e0b; background: rgba(245, 158, 11, 0.2); }
+        .fem-symbol-order-badge { position: absolute; top: 5px; right: 6px; background: #f59e0b; color: #000; font-size: 10px; font-weight: 800; width: 18px; height: 18px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }
+      `;
+      document.head.appendChild(styleEl);
+    }
+
+    const modalDiv = document.createElement('div');
+    modalDiv.id = 'modal-change-password';
+    modalDiv.className = 'fixed inset-0 z-[115] hidden bg-black/85 backdrop-blur-xl flex items-center justify-center p-3 sm:p-4 font-mono animate-fade-in overflow-y-auto overscroll-contain';
+    modalDiv.innerHTML = `
+      <div id="cp-modal-container" class="relative w-full max-w-lg max-h-[calc(100vh-2rem)] max-h-[calc(100dvh-2rem)] bg-[#08050e] border border-slate-700 rounded-2xl shadow-[0_0_80px_rgba(15,23,42,0.85)] overflow-hidden flex flex-col my-auto box-border">
+        <!-- HEADER -->
+        <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-slate-950 via-black to-slate-900 flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div id="cp-header-icon" class="p-2 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-400">🔑</div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="font-heading font-extrabold text-sm sm:text-base text-white tracking-wide">CHANGE ACCOUNT PASSWORD</h3>
+                <span id="cp-portal-badge" class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-950 text-amber-300 border border-amber-700/60">PORTAL</span>
+              </div>
+              <p class="text-[11px] font-mono text-slate-400">Two-Part Cognitive Verification Required</p>
+            </div>
+          </div>
+          <button id="cp-btn-close" type="button" onclick="window.closeChangePasswordModal()" class="p-2 rounded-xl bg-red-950/60 hover:bg-red-900/80 border border-red-800/50 text-slate-400 hover:text-white transition-colors cursor-pointer" title="Close">✕</button>
+        </div>
+
+        <!-- STEP PROGRESS BAR -->
+        <div class="px-5 py-2.5 bg-black/70 border-b border-slate-800 grid grid-cols-4 gap-1.5 text-[10px] font-bold text-center flex-shrink-0">
+          <div id="cp-step-pill-1" class="py-1.5 px-1 rounded-lg bg-amber-500/20 border border-amber-500/60 text-amber-300">1. Password</div>
+          <div id="cp-step-pill-2" class="py-1.5 px-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-500">2. Image Seq</div>
+          <div id="cp-step-pill-3" class="py-1.5 px-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-500">3. Security Q</div>
+          <div id="cp-step-pill-4" class="py-1.5 px-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-500">4. Update</div>
+        </div>
+
+        <!-- BODY -->
+        <div class="p-4 sm:p-5 space-y-4 text-xs text-slate-300 overflow-y-auto flex-1 min-h-0 overscroll-contain">
+          <div id="cp-policy-status" class="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between text-[11px] flex-wrap gap-2">
+            <span class="text-slate-400">Zero Trust Risk Tier: <strong id="cp-risk-badge" class="text-emerald-400">LOW</strong></span>
+            <span id="cp-attempts-info" class="text-amber-400 font-bold font-mono">3 attempts remaining per step</span>
+          </div>
+
+          <div id="cp-error-banner" class="hidden p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-200 text-xs font-mono leading-relaxed"></div>
+
+          <div id="cp-enroll-cta" class="hidden p-3 rounded-xl bg-amber-950/50 border border-amber-700/70 space-y-2 text-[11px] text-amber-200">
+            <p id="cp-enroll-cta-text">Enroll both Cognitive Image Sequence and Private Security Response before changing your password.</p>
+            <button type="button" onclick="window.cognisec && (window.cognisec.closeChangePasswordModal(), window.cognisec.openFactorEnrollmentModal('image'))" class="w-full py-2 px-3 rounded-lg bg-amber-600 hover:bg-amber-500 text-black font-bold text-xs cursor-pointer">Open Cognitive Factor Enrollment →</button>
+          </div>
+
+          <div id="cp-stepup-cta" class="hidden p-3 rounded-xl bg-amber-950/50 border border-amber-700/70 space-y-2 text-[11px] text-amber-200">
+            <p id="cp-stepup-cta-text">Behavioral verification required before password change.</p>
+            <button id="cp-btn-behavioral-stepup" type="button" onclick="window.cognisec && window.cognisec.launchBehavioralStepUpForPasswordChange()" class="w-full py-2 px-3 rounded-lg bg-amber-600 hover:bg-amber-500 text-black font-bold text-xs cursor-pointer">Complete Behavioral Verification →</button>
+          </div>
+
+          <!-- PANE 1: CURRENT PASSWORD -->
+          <form id="cp-pane-1" onsubmit="window.cognisec && window.cognisec.submitChangePasswordInitiate(event)" class="space-y-3.5">
+            <p class="text-[11px] text-slate-400 leading-relaxed font-sans">Verify your current account password first. Cognitive image-sequence and private-question checks will follow before updating.</p>
+            <div class="space-y-1.5">
+              <label for="cp-current-password" class="font-bold text-slate-300 uppercase text-[10px]">Current Password *</label>
+              <div class="relative flex items-center">
+                <input id="cp-current-password" type="password" required autocomplete="current-password" placeholder="Enter your current password" class="w-full pl-3 pr-11 py-2.5 rounded-xl bg-black/80 border border-slate-700 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 font-mono" />
+                <button type="button" onclick="window.togglePasswordVisibility('cp-current-password', this)" aria-label="Show current password" class="absolute right-3 p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer">${EYE_ON_SVG}</button>
+              </div>
+            </div>
+            <button id="cp-btn-step1" type="submit" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-md">Verify Current Password →</button>
+          </form>
+
+          <!-- PANE 2: COGNITIVE STEP 1 — IMAGE SEQUENCE -->
+          <div id="cp-pane-2" class="hidden space-y-3.5">
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="text-slate-200 font-bold">Cognitive Step 1: Select Image Sequence</span>
+              <span class="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px]">3–5 Symbols</span>
+            </div>
+            <div class="p-2.5 rounded-lg bg-black border border-slate-800 flex items-center justify-between text-xs min-h-[40px]">
+              <span class="text-slate-400 text-[11px]">Selected Order:</span>
+              <div id="cp-image-strip" class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-slate-500 text-[11px]">(Click symbols below)</span>
+              </div>
+            </div>
+            <div id="cp-image-grid" class="fem-symbol-grid py-1"></div>
+            <div class="flex items-center gap-2.5 pt-1">
+              <button id="cp-btn-clear-image" type="button" onclick="window.cognisec && window.cognisec.clearChangePasswordImageSequence()" class="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold cursor-pointer">✕ Clear</button>
+              <button id="cp-btn-step2" type="button" onclick="window.cognisec && window.cognisec.submitChangePasswordImageVerify()" class="flex-[2] py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-md">Verify Image Sequence →</button>
+            </div>
+          </div>
+
+          <!-- PANE 3: COGNITIVE STEP 2 — PRIVATE SECURITY RESPONSE -->
+          <form id="cp-pane-3" onsubmit="window.cognisec && window.cognisec.submitChangePasswordPrivateVerify(event)" class="hidden space-y-3.5">
+            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+              <span class="text-[10px] uppercase tracking-wider text-amber-400 font-bold block">Enrolled Security Question:</span>
+              <p id="cp-private-prompt" class="text-xs text-white font-semibold leading-relaxed">Answer your enrolled private security question:</p>
+            </div>
+            <div class="space-y-1.5">
+              <label for="cp-private-response" class="font-bold text-slate-300 uppercase text-[10px]">Private Security Response *</label>
+              <div class="relative flex items-center">
+                <input id="cp-private-response" type="password" required autocomplete="off" placeholder="Enter your private security answer" class="w-full pl-3 pr-11 py-2.5 rounded-xl bg-black/80 border border-slate-700 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 font-mono" />
+                <button type="button" onclick="window.togglePasswordVisibility('cp-private-response', this)" aria-label="Show security response" class="absolute right-3 p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer">${EYE_ON_SVG}</button>
+              </div>
+            </div>
+            <button id="cp-btn-step3" type="submit" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-md">Verify Private Response →</button>
+          </form>
+
+          <!-- PANE 4: NEW PASSWORD + CONFIRMATION -->
+          <form id="cp-pane-4" onsubmit="window.cognisec && window.cognisec.submitChangePasswordConfirm(event)" class="hidden space-y-3.5">
+            <div class="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-800/70 text-[11px] text-emerald-300 font-semibold">
+              ✓ Both cognitive factors verified. Choose a strong new password below.
+            </div>
+            <div class="space-y-1.5">
+              <label for="cp-new-password" class="font-bold text-slate-300 uppercase text-[10px]">New Password *</label>
+              <div class="relative flex items-center">
+                <input id="cp-new-password" type="password" required autocomplete="new-password" oninput="window.cognisec && window.cognisec.updateChangePasswordStrengthUI()" placeholder="Min 8 chars, upper, lower, digit, symbol" class="w-full pl-3 pr-11 py-2.5 rounded-xl bg-black/80 border border-slate-700 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono" />
+                <button type="button" onclick="window.togglePasswordVisibility('cp-new-password', this)" aria-label="Show new password" class="absolute right-3 p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer">${EYE_ON_SVG}</button>
+              </div>
+            </div>
+            <div class="space-y-1.5">
+              <label for="cp-confirm-password" class="font-bold text-slate-300 uppercase text-[10px]">Confirm New Password *</label>
+              <div class="relative flex items-center">
+                <input id="cp-confirm-password" type="password" required autocomplete="new-password" oninput="window.cognisec && window.cognisec.updateChangePasswordStrengthUI()" placeholder="Re-enter new password" class="w-full pl-3 pr-11 py-2.5 rounded-xl bg-black/80 border border-slate-700 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono" />
+                <button type="button" onclick="window.togglePasswordVisibility('cp-confirm-password', this)" aria-label="Show confirm password" class="absolute right-3 p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer">${EYE_ON_SVG}</button>
+              </div>
+            </div>
+            <div id="cp-strength-checklist" class="grid grid-cols-2 gap-1 text-[10px] font-mono text-slate-500 bg-black/60 p-2.5 rounded-xl border border-slate-800">
+              <span id="cp-chk-len">• 8+ characters</span>
+              <span id="cp-chk-upper">• Uppercase letter</span>
+              <span id="cp-chk-lower">• Lowercase letter</span>
+              <span id="cp-chk-num">• Digit &amp; symbol</span>
+              <span id="cp-chk-match" class="col-span-2">• Passwords match</span>
+            </div>
+            <button id="cp-btn-step4" type="submit" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-md">Update Account Password →</button>
+          </form>
+
+          <!-- PANE SUCCESS -->
+          <div id="cp-pane-success" class="hidden space-y-4 text-center py-2">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 text-2xl flex items-center justify-center mx-auto">✓</div>
+            <div class="space-y-1">
+              <h4 class="text-base font-extrabold text-white font-sans">Password Updated Successfully</h4>
+              <p id="cp-success-summary" class="text-xs text-slate-300 font-mono leading-relaxed">All prior active sessions have been invalidated. Sign in with your new password.</p>
+            </div>
+            <button id="cp-btn-signin-new" type="button" onclick="window.cognisec && window.cognisec.handlePasswordChangedReSignIn()" class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-md">Sign In With New Password →</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalDiv);
+  }
+
+  _resetChangePasswordState() {
+    this._cpState = {
+      application: this._detectPortalApplication(),
+      transactionId: null,
+      imageChallengeId: null,
+      privateChallengeId: null,
+      imageSequence: [],
+      catalogue: [],
+      privateQuestion: '',
+      step: 1,
+      requiredBehavioralFactor: null,
+      boundHighRiskChallengeId: null,
+      inFlight: false,
+    };
+    const idsToClear = ['cp-current-password', 'cp-private-response', 'cp-new-password', 'cp-confirm-password'];
+    idsToClear.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    const errEl = document.getElementById('cp-error-banner');
+    if (errEl) {
+      errEl.classList.add('hidden');
+      errEl.textContent = '';
+    }
+    document.getElementById('cp-enroll-cta')?.classList.add('hidden');
+    document.getElementById('cp-stepup-cta')?.classList.add('hidden');
+  }
+
+  _setChangePasswordStepUI(stepNum) {
+    if (this._cpState) this._cpState.step = stepNum;
+    const panes = ['cp-pane-1', 'cp-pane-2', 'cp-pane-3', 'cp-pane-4', 'cp-pane-success'];
+    panes.forEach((pid, idx) => {
+      const el = document.getElementById(pid);
+      if (!el) return;
+      if ((stepNum === 'success' && pid === 'cp-pane-success') || stepNum === idx + 1) {
+        el.classList.remove('hidden');
+      } else {
+        el.classList.add('hidden');
+      }
+    });
+    for (let i = 1; i <= 4; i++) {
+      const pill = document.getElementById(`cp-step-pill-${i}`);
+      if (!pill) continue;
+      if (stepNum === 'success' || i < Number(stepNum)) {
+        pill.className = 'py-1.5 px-1 rounded-lg bg-emerald-950/60 border border-emerald-700 text-emerald-300';
+      } else if (i === Number(stepNum)) {
+        pill.className = 'py-1.5 px-1 rounded-lg bg-amber-500/20 border border-amber-500/60 text-amber-300';
+      } else {
+        pill.className = 'py-1.5 px-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-500';
+      }
+    }
+  }
+
+  _showChangePasswordError(msg) {
+    const errEl = document.getElementById('cp-error-banner');
+    if (!errEl) return;
+    if (!msg) {
+      errEl.classList.add('hidden');
+      errEl.textContent = '';
+    } else {
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+    }
+  }
+
+  async openChangePasswordModal(applicationOverride = null) {
+    if (!this.isAuthenticated()) {
+      window.dispatchEvent(new CustomEvent('cognisec:auth_required', { detail: { action: 'change_password' } }));
+      return;
+    }
+    this.ensureChangePasswordModalInDom();
+    this._resetChangePasswordState();
+
+    const app = (applicationOverride || this._detectPortalApplication() || 'platform').toLowerCase();
+    this._cpState.application = app;
+
+    const portalBadge = document.getElementById('cp-portal-badge');
+    const step1Btn = document.getElementById('cp-btn-step1');
+    const step2Btn = document.getElementById('cp-btn-step2');
+    const step3Btn = document.getElementById('cp-btn-step3');
+    const iconBox = document.getElementById('cp-header-icon');
+    const accentClasses = {
+      shopping: { badge: 'SHOPPING PORTAL', btn: 'from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500', icon: 'bg-orange-500/15 border-orange-500/40 text-orange-300' },
+      college: { badge: 'COLLEGE PORTAL', btn: 'from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600', icon: 'bg-sky-500/15 border-sky-500/40 text-sky-300' },
+      healthcare: { badge: 'HEALTHCARE PORTAL', btn: 'from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500', icon: 'bg-teal-500/15 border-teal-500/40 text-teal-300' },
+      platform: { badge: 'COGNISEC ACCOUNT', btn: 'from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500', icon: 'bg-amber-500/15 border-amber-500/40 text-amber-300' },
+    };
+    const theme = accentClasses[app] || accentClasses.platform;
+    if (portalBadge) portalBadge.textContent = theme.badge;
+    if (iconBox) iconBox.className = `p-2 rounded-xl border ${theme.icon}`;
+    [step1Btn, step3Btn].forEach((b) => {
+      if (b) b.className = `w-full py-2.5 px-4 rounded-xl bg-gradient-to-r ${theme.btn} text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-md`;
+    });
+    if (step2Btn) step2Btn.className = `flex-[2] py-2.5 px-4 rounded-xl bg-gradient-to-r ${theme.btn} text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-md`;
+
+    this._setChangePasswordStepUI(1);
+    document.getElementById('modal-change-password')?.classList.remove('hidden');
+
+    // Fetch authoritative risk policy & cognitive factor readiness
+    try {
+      const url = `${COGNISEC_API_BASE}/auth/password-change/policy?application=${encodeURIComponent(app)}${this.sessionId ? `&session_id=${encodeURIComponent(this.sessionId)}` : ''}`;
+      const res = await this._fetchWithTimeout(url, { method: 'GET', headers: this.getHeaders() }, 15000);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        this._showChangePasswordError(this._formatHttpChallengeError(res.status, data, 'password change policy'));
+        if (res.status === 401 || (data.detail && data.detail.toLowerCase().includes('terminated'))) {
+          await this.refreshAuthoritativeSessionStatus().catch(() => null);
+        }
+        return;
+      }
+
+      this._cpState.catalogue = data.catalogue || [];
+      this._cpState.privateQuestion = data.private_question || '';
+      const riskBadge = document.getElementById('cp-risk-badge');
+      if (riskBadge) {
+        riskBadge.textContent = data.risk_level || 'LOW';
+        riskBadge.className = data.risk_level === 'HIGH' ? 'text-rose-400' : (data.risk_level === 'MEDIUM' ? 'text-amber-400' : 'text-emerald-400');
+      }
+
+      if (data.requires_behavioral_step_up && data.required_behavioral_factor) {
+        this._cpState.requiredBehavioralFactor = data.required_behavioral_factor;
+        const stepupCta = document.getElementById('cp-stepup-cta');
+        const stepupTxt = document.getElementById('cp-stepup-cta-text');
+        if (stepupTxt) stepupTxt.textContent = data.message || 'Additional behavioral verification required first.';
+        if (stepupCta) stepupCta.classList.remove('hidden');
+      } else if (!data.can_proceed) {
+        const enrollCta = document.getElementById('cp-enroll-cta');
+        const enrollTxt = document.getElementById('cp-enroll-cta-text');
+        if (enrollTxt) enrollTxt.textContent = data.message;
+        if (enrollCta) enrollCta.classList.remove('hidden');
+      }
+    } catch (err) {
+      this._showChangePasswordError(err.message || 'Unable to verify password change security policy.');
+    }
+  }
+
+  closeChangePasswordModal() {
+    document.getElementById('modal-change-password')?.classList.add('hidden');
+    this._resetChangePasswordState();
+  }
+
+  launchBehavioralStepUpForPasswordChange() {
+    const app = this._cpState?.application || this._detectPortalApplication();
+    const factor = this._cpState?.requiredBehavioralFactor || null;
+    this.closeChangePasswordModal();
+    this.openStepUpModal({
+      application: app,
+      resource: 'password_change',
+      preferredFactor: factor,
+      reason: 'Complete behavioral verification before initiating password change.',
+    });
+  }
+
+  async submitChangePasswordInitiate(event) {
+    if (event) event.preventDefault();
+    if (!this._cpState || this._cpState.inFlight) return;
+
+    const curInput = document.getElementById('cp-current-password');
+    const curPwd = curInput ? curInput.value : '';
+    if (!curPwd) {
+      this._showChangePasswordError('Please enter your current password.');
+      return;
+    }
+
+    const btn = document.getElementById('cp-btn-step1');
+    const origText = btn ? btn.textContent : 'Verify Current Password →';
+    this._cpState.inFlight = true;
+    this._showChangePasswordError('');
+    if (btn) { btn.disabled = true; btn.textContent = 'Verifying Password...'; }
+
+    try {
+      const res = await this._fetchWithTimeout(`${COGNISEC_API_BASE}/auth/password-change/initiate`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          current_password: curPwd,
+          session_id: this.sessionId,
+          application: this._cpState.application,
+          bound_high_risk_challenge_id: this._cpState.boundHighRiskChallengeId || null,
+        }),
+      }, 20000);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (this._detectSessionTerminatedPayload(res, data)) {
+          const appScope = this._cpState.application;
+          this.closeChangePasswordModal();
+          this.handleSessionTerminatedRedirect(data.detail, appScope);
+          return;
+        }
+        if (this._detectPortalLockPayload(res, data)) {
+          this.closeChangePasswordModal();
+          const info = await this.checkAndEnforcePortalLock({ application: this._cpState.application, recordReentry: false }).catch(() => null);
+          this.handlePortalEjection(info || { locked: true, portal: this._cpState.application, lock_reason: data.detail }, this._cpState.application);
+          return;
+        }
+        const reqFactor = res.headers.get('X-Cognisec-Required-Factor');
+        if (reqFactor) {
+          this._cpState.requiredBehavioralFactor = reqFactor;
+          document.getElementById('cp-stepup-cta')?.classList.remove('hidden');
+          const txt = document.getElementById('cp-stepup-cta-text');
+          if (txt) txt.textContent = data.detail || `Behavioral verification (${reqFactor}) required first.`;
+        } else if (res.status === 409) {
+          document.getElementById('cp-enroll-cta')?.classList.remove('hidden');
+        }
+        this._showChangePasswordError(this._formatHttpChallengeError(res.status, data, 'password change initiation'));
+        if (res.status === 401 && data.detail && data.detail.toLowerCase().includes('terminated')) {
+          await this.refreshAuthoritativeSessionStatus().catch(() => null);
+        }
+        return;
+      }
+
+      if (curInput) curInput.value = '';
+      this._cpState.transactionId = data.transaction_id;
+      this._cpState.imageChallengeId = data.image_challenge_id;
+      this._cpState.privateChallengeId = data.private_challenge_id;
+      this._cpState.privateQuestion = data.private_question || '';
+      this._cpState.catalogue = data.catalogue || this._cpState.catalogue;
+      this._cpState.imageAttemptsRemaining = typeof data.image_attempts_remaining === 'number' ? data.image_attempts_remaining : 2;
+      this._cpState.privateAttemptsRemaining = typeof data.private_attempts_remaining === 'number' ? data.private_attempts_remaining : 2;
+      const cpAttemptsEl = document.getElementById('cp-attempts-info');
+      if (cpAttemptsEl) {
+        const rem = this._cpState.imageAttemptsRemaining;
+        cpAttemptsEl.textContent = `${rem} attempt${rem === 1 ? '' : 's'} remaining`;
+      }
+
+      if (data.already_completed_high_risk_dual) {
+        this._setChangePasswordStepUI(4);
+      } else {
+        this.clearChangePasswordImageSequence();
+        this._renderChangePasswordImageGrid(this._cpState.catalogue);
+        this._setChangePasswordStepUI(2);
+      }
+    } catch (err) {
+      this._showChangePasswordError(err.message || 'Network error while verifying current password.');
+    } finally {
+      this._cpState.inFlight = false;
+      if (btn) { btn.disabled = false; btn.textContent = origText; }
+    }
+  }
+
+  _renderChangePasswordImageGrid(catalogue) {
+    const grid = document.getElementById('cp-image-grid');
+    if (!grid) return;
+    const items = (catalogue && catalogue.length) ? catalogue : [
+      { id: 'img_shield', label: 'Security Shield', icon: '🛡️' },
+      { id: 'img_key', label: 'Cryptographic Key', icon: '🔑' },
+      { id: 'img_lock', label: 'Security Padlock', icon: '🔒' },
+      { id: 'img_radar', label: 'Threat Radar', icon: '📡' },
+      { id: 'img_vault', label: 'Secure Vault', icon: '🏛️' },
+      { id: 'img_biometric', label: 'Biometric Scanner', icon: '🧬' },
+      { id: 'img_firewall', label: 'Perimeter Firewall', icon: '🧱' },
+      { id: 'img_token', label: 'Hardware Token', icon: '🪙' },
+      { id: 'img_chip', label: 'Secure Enclave', icon: '💾' },
+    ];
+    grid.innerHTML = items.map((item) => `
+      <div class="fem-symbol-card" data-cp-symbol="${item.id}" onclick="window.cognisec && window.cognisec.handleChangePasswordImageClick('${item.id}')">
+        <span class="text-2xl">${item.icon}</span>
+        <span class="text-[10px] text-slate-300 font-bold text-center">${this._escapeHtml(item.label)}</span>
+      </div>
+    `).join('');
+  }
+
+  handleChangePasswordImageClick(symbolId) {
+    if (!this._cpState) return;
+    if (this._cpState.imageSequence.includes(symbolId) || this._cpState.imageSequence.length >= 5) return;
+    this._cpState.imageSequence.push(symbolId);
+    this._updateChangePasswordImageStrip();
+  }
+
+  clearChangePasswordImageSequence() {
+    if (!this._cpState) return;
+    this._cpState.imageSequence = [];
+    this._updateChangePasswordImageStrip();
+  }
+
+  _updateChangePasswordImageStrip() {
+    const strip = document.getElementById('cp-image-strip');
+    const cards = document.querySelectorAll('#cp-image-grid .fem-symbol-card');
+    const seq = this._cpState ? this._cpState.imageSequence : [];
+
+    cards.forEach((card) => {
+      const sym = card.getAttribute('data-cp-symbol');
+      const idx = seq.indexOf(sym);
+      const badge = card.querySelector('.fem-symbol-order-badge');
+      if (idx !== -1) {
+        card.classList.add('selected');
+        if (badge) {
+          badge.textContent = String(idx + 1);
+        } else {
+          const sp = document.createElement('span');
+          sp.className = 'fem-symbol-order-badge';
+          sp.textContent = String(idx + 1);
+          card.appendChild(sp);
+        }
+      } else {
+        card.classList.remove('selected');
+        if (badge) badge.remove();
+      }
+    });
+
+    if (strip) {
+      strip.innerHTML = seq.length === 0
+        ? '<span class="text-slate-500 text-[11px]">(Click 3–5 symbols in order)</span>'
+        : seq.map((id, i) => `<span class="px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-700 text-[10px] font-bold">${i + 1}. ${this._escapeHtml(id.replace('img_', ''))}</span>`).join('');
+    }
+  }
+
+  async submitChangePasswordImageVerify() {
+    if (!this._cpState || this._cpState.inFlight) return;
+    if (!this._cpState.imageSequence || this._cpState.imageSequence.length < 3) {
+      this._showChangePasswordError('Please select at least 3 cognitive symbols in exact sequence.');
+      return;
+    }
+
+    const btn = document.getElementById('cp-btn-step2');
+    const origText = btn ? btn.textContent : 'Verify Image Sequence →';
+    this._cpState.inFlight = true;
+    this._showChangePasswordError('');
+    if (btn) { btn.disabled = true; btn.textContent = 'Verifying Image Sequence...'; }
+
+    try {
+      const res = await this._fetchWithTimeout(`${COGNISEC_API_BASE}/auth/password-change/verify-image`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          transaction_id: this._cpState.transactionId,
+          image_challenge_id: this._cpState.imageChallengeId,
+          image_sequence: this._cpState.imageSequence,
+          session_id: this.sessionId,
+          application: this._cpState.application,
+        }),
+      }, 20000);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (this._detectSessionTerminatedPayload(res, data)) {
+          const appScope = this._cpState.application;
+          this.closeChangePasswordModal();
+          this.handleSessionTerminatedRedirect(data.detail, appScope);
+          return;
+        }
+        if (this._detectPortalLockPayload(res, data)) {
+          this.closeChangePasswordModal();
+          const info = await this.checkAndEnforcePortalLock({ application: this._cpState.application, recordReentry: false }).catch(() => null);
+          this.handlePortalEjection(info || {
+            locked: true,
+            portal: this._cpState.application,
+            security_reference_id: res.headers?.get('X-Cognisec-Security-Ref') || 'SEC-LOCK-ACTIVE',
+            lock_reason: data.detail || 'Cognitive image sequence verification failed.',
+          }, this._cpState.application, { redirectToDashboard: true });
+          return;
+        }
+        const formatted = this._formatHttpChallengeError(res.status, data, 'cognitive image sequence');
+        const remHdr = res.headers?.get('X-Cognisec-Attempts-Remaining');
+        const m = formatted.match(/(\d+)\s+attempt/i);
+        const remVal = m ? Number(m[1]) : (remHdr != null ? Number(remHdr) : null);
+        const cpAttemptsEl = document.getElementById('cp-attempts-info');
+        if (cpAttemptsEl && remVal !== null && !Number.isNaN(remVal)) {
+          cpAttemptsEl.textContent = `${remVal} attempt${remVal === 1 ? '' : 's'} remaining`;
+        }
+        this._showChangePasswordError(formatted);
+        this.clearChangePasswordImageSequence();
+        return;
+      }
+
+      const cpAttemptsEl = document.getElementById('cp-attempts-info');
+      if (cpAttemptsEl) {
+        const privRem = typeof this._cpState.privateAttemptsRemaining === 'number' ? this._cpState.privateAttemptsRemaining : 2;
+        cpAttemptsEl.textContent = `${privRem} attempt${privRem === 1 ? '' : 's'} remaining`;
+      }
+
+      const promptEl = document.getElementById('cp-private-prompt');
+      if (promptEl) promptEl.textContent = data.private_question || this._cpState.privateQuestion || 'Answer your registered security question:';
+      const privInp = document.getElementById('cp-private-response');
+      if (privInp) privInp.value = '';
+      this._setChangePasswordStepUI(3);
+      if (privInp) privInp.focus();
+    } catch (err) {
+      this._showChangePasswordError(err.message || 'Network error verifying image sequence.');
+    } finally {
+      this._cpState.inFlight = false;
+      if (btn) { btn.disabled = false; btn.textContent = origText; }
+    }
+  }
+
+  async submitChangePasswordPrivateVerify(event) {
+    if (event) event.preventDefault();
+    if (!this._cpState || this._cpState.inFlight) return;
+
+    const privInp = document.getElementById('cp-private-response');
+    const respVal = privInp ? privInp.value.trim() : '';
+    if (!respVal) {
+      this._showChangePasswordError('Please enter your private security response.');
+      return;
+    }
+
+    const btn = document.getElementById('cp-btn-step3');
+    const origText = btn ? btn.textContent : 'Verify Private Response →';
+    this._cpState.inFlight = true;
+    this._showChangePasswordError('');
+    if (btn) { btn.disabled = true; btn.textContent = 'Verifying Response...'; }
+
+    try {
+      const res = await this._fetchWithTimeout(`${COGNISEC_API_BASE}/auth/password-change/verify-private`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          transaction_id: this._cpState.transactionId,
+          private_challenge_id: this._cpState.privateChallengeId,
+          private_response: respVal,
+          session_id: this.sessionId,
+          application: this._cpState.application,
+        }),
+      }, 20000);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (this._detectSessionTerminatedPayload(res, data)) {
+          const appScope = this._cpState.application;
+          this.closeChangePasswordModal();
+          this.handleSessionTerminatedRedirect(data.detail, appScope);
+          return;
+        }
+        if (this._detectPortalLockPayload(res, data)) {
+          this.closeChangePasswordModal();
+          const info = await this.checkAndEnforcePortalLock({ application: this._cpState.application, recordReentry: false }).catch(() => null);
+          this.handlePortalEjection(info || {
+            locked: true,
+            portal: this._cpState.application,
+            security_reference_id: res.headers?.get('X-Cognisec-Security-Ref') || 'SEC-LOCK-ACTIVE',
+            lock_reason: data.detail || 'Private security response verification failed.',
+          }, this._cpState.application, { redirectToDashboard: true });
+          return;
+        }
+        const formatted = this._formatHttpChallengeError(res.status, data, 'private security response');
+        const remHdr = res.headers?.get('X-Cognisec-Attempts-Remaining');
+        const m = formatted.match(/(\d+)\s+attempt/i);
+        const remVal = m ? Number(m[1]) : (remHdr != null ? Number(remHdr) : null);
+        const cpAttemptsEl = document.getElementById('cp-attempts-info');
+        if (cpAttemptsEl && remVal !== null && !Number.isNaN(remVal)) {
+          cpAttemptsEl.textContent = `${remVal} attempt${remVal === 1 ? '' : 's'} remaining`;
+        }
+        this._showChangePasswordError(formatted);
+        return;
+      }
+
+      if (privInp) privInp.value = '';
+      this._setChangePasswordStepUI(4);
+      this.updateChangePasswordStrengthUI();
+      document.getElementById('cp-new-password')?.focus();
+    } catch (err) {
+      this._showChangePasswordError(err.message || 'Network error verifying private security response.');
+    } finally {
+      this._cpState.inFlight = false;
+      if (btn) { btn.disabled = false; btn.textContent = origText; }
+    }
+  }
+
+  updateChangePasswordStrengthUI() {
+    const p1 = document.getElementById('cp-new-password')?.value || '';
+    const p2 = document.getElementById('cp-confirm-password')?.value || '';
+    const mark = (id, ok, text) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = `${ok ? '✓' : '•'} ${text}`;
+      el.className = id === 'cp-chk-match'
+        ? `col-span-2 ${ok ? 'text-emerald-400 font-bold' : 'text-slate-500'}`
+        : (ok ? 'text-emerald-400 font-bold' : 'text-slate-500');
+    };
+    mark('cp-chk-len', p1.length >= 8, '8+ characters');
+    mark('cp-chk-upper', /[A-Z]/.test(p1), 'Uppercase letter');
+    mark('cp-chk-lower', /[a-z]/.test(p1), 'Lowercase letter');
+    mark('cp-chk-num', /\d/.test(p1) && /[!@#$%^&*(),.?":{}|<>\-_=+[\]\\/;~`']/.test(p1), 'Digit & symbol');
+    mark('cp-chk-match', Boolean(p1 && p1 === p2), 'Passwords match');
+  }
+
+  async submitChangePasswordConfirm(event) {
+    if (event) event.preventDefault();
+    if (!this._cpState || this._cpState.inFlight) return;
+
+    const newInp = document.getElementById('cp-new-password');
+    const confInp = document.getElementById('cp-confirm-password');
+    const newPwd = newInp ? newInp.value : '';
+    const confPwd = confInp ? confInp.value : '';
+
+    if (newPwd !== confPwd) {
+      this._showChangePasswordError('New password and confirmation do not match.');
+      return;
+    }
+
+    const btn = document.getElementById('cp-btn-step4');
+    const origText = btn ? btn.textContent : 'Update Account Password →';
+    this._cpState.inFlight = true;
+    this._showChangePasswordError('');
+    if (btn) { btn.disabled = true; btn.textContent = 'Updating Password...'; }
+    const wasTelemetryActive = Boolean(this._telemetryTimer || this.telemetryInterval);
+    this.stopTelemetryLoop();
+
+    try {
+      const res = await this._fetchWithTimeout(`${COGNISEC_API_BASE}/auth/password-change/confirm`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          transaction_id: this._cpState.transactionId,
+          new_password: newPwd,
+          confirm_password: confPwd,
+          session_id: this.sessionId,
+          application: this._cpState.application,
+          bound_high_risk_challenge_id: this._cpState.boundHighRiskChallengeId || null,
+        }),
+      }, 20000);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (this._detectPortalLockPayload(res, data)) {
+          this.closeChangePasswordModal();
+          const info = await this.checkAndEnforcePortalLock({ application: this._cpState.application, recordReentry: false }).catch(() => null);
+          this.handlePortalEjection(info || { locked: true, portal: this._cpState.application, lock_reason: data.detail }, this._cpState.application);
+          return;
+        }
+        this._showChangePasswordError(this._formatHttpChallengeError(res.status, data, 'password update'));
+        if (wasTelemetryActive && this.isAuthenticated() && res.status !== 401) {
+          this.startTelemetryLoop();
+        }
+        return;
+      }
+
+      if (newInp) newInp.value = '';
+      if (confInp) confInp.value = '';
+
+      const summaryEl = document.getElementById('cp-success-summary');
+      if (summaryEl) {
+        const portal = this._escapeHtml((data.application || this._cpState.application || 'portal').toUpperCase());
+        const notifyNote = data.email_notification_sent ? 'A security confirmation email was dispatched.' : 'Security audit event recorded.';
+        summaryEl.textContent = `Password updated from ${portal}. ${data.sessions_revoked || 1} active session(s) invalidated. ${notifyNote}`;
+      }
+
+      this._setChangePasswordStepUI('success');
+
+      // Apply local session invalidation after confirmed backend update
+      this.clearAuth();
+      window.dispatchEvent(new CustomEvent('cognisec:password_changed', { detail: { application: data.application || this._cpState.application } }));
+    } catch (err) {
+      this._showChangePasswordError(err.message || 'Network error while updating password.');
+      if (wasTelemetryActive && this.isAuthenticated()) {
+        this.startTelemetryLoop();
+      }
+    } finally {
+      if (this._cpState) this._cpState.inFlight = false;
+      if (btn) { btn.disabled = false; btn.textContent = origText; }
+    }
+  }
+
+  handlePasswordChangedReSignIn() {
+    const app = this._cpState?.application || this._detectPortalApplication();
+    this.closeChangePasswordModal();
+    if (app === 'college' && typeof window.openStudentSignInModal === 'function') {
+      window.openStudentSignInModal();
+    } else if (app === 'healthcare' && typeof window.openSignInModal === 'function') {
+      window.openSignInModal('patient');
+    } else if (typeof window.openSignInModal === 'function') {
+      window.openSignInModal();
+    }
+  }
+
+  // ============================================================================
+  // SHARED ACCOUNT PROFILE BAR, DROPDOWN & MODAL CONTROLLER (ALL PORTALS)
+  // ============================================================================
+
+  _getPortalThemeConfig(app) {
+    const map = {
+      shopping: {
+        badge: 'SHOPPING ACCOUNT',
+        accentBorder: 'border-orange-500/50',
+        headerBg: 'from-orange-950/60 via-stone-950 to-amber-950/30',
+        pillActive: 'bg-orange-600 text-white border-orange-500',
+        btnPrimary: 'from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500',
+        portalLabel: 'Nyraa Luxury Retail Customer Account'
+      },
+      college: {
+        badge: 'ACADEMIC ACCOUNT',
+        accentBorder: 'border-sky-500/50',
+        headerBg: 'from-sky-950/60 via-slate-950 to-blue-950/30',
+        pillActive: 'bg-sky-600 text-white border-sky-500',
+        btnPrimary: 'from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600',
+        portalLabel: 'BITS Pilani ERP Student Account'
+      },
+      healthcare: {
+        badge: 'HEALTHCARE ACCOUNT',
+        accentBorder: 'border-teal-500/50',
+        headerBg: 'from-teal-950/60 via-slate-950 to-emerald-950/30',
+        pillActive: 'bg-teal-600 text-white border-teal-500',
+        btnPrimary: 'from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500',
+        portalLabel: 'AyuSync MedCare Clinical / Patient Account'
+      }
+    };
+    return map[app] || {
+      badge: 'COGNISEC ACCOUNT',
+      accentBorder: 'border-red-500/50',
+      headerBg: 'from-red-950/60 via-black to-slate-950',
+      pillActive: 'bg-red-600 text-white border-red-500',
+      btnPrimary: 'from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500',
+      portalLabel: 'Cognisec Zero-Trust Account'
+    };
+  }
+
+  ensureProfileModalInDom() {
+    if (document.getElementById('modal-account-profile')) return;
+    const modalDiv = document.createElement('div');
+    modalDiv.id = 'modal-account-profile';
+    modalDiv.className = 'fixed inset-0 z-[115] hidden bg-black/85 backdrop-blur-xl flex items-center justify-center p-3 sm:p-4 font-mono overflow-y-auto';
+    modalDiv.innerHTML = `
+      <div id="ap-modal-card" class="relative w-full max-w-lg bg-[#0b0d14] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto">
+        <div id="ap-modal-header" class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-slate-900 via-black to-slate-900">
+          <div class="flex items-center gap-3 min-w-0">
+            <div id="ap-avatar-circle" class="w-10 h-10 rounded-xl bg-slate-800 border border-slate-600 flex items-center justify-center text-white font-extrabold text-sm shrink-0">U</div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 class="font-heading font-extrabold text-sm sm:text-base text-white tracking-wide">ACCOUNT &amp; SECURITY PROFILE</h3>
+                <span id="ap-portal-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-200 border border-slate-700 uppercase">ACCOUNT</span>
+              </div>
+              <p id="ap-header-sub" class="text-[11px] text-slate-400 truncate">Shared Cognisec Identity</p>
+            </div>
+          </div>
+          <button id="ap-btn-close" type="button" onclick="window.closeAccountProfileModal && window.closeAccountProfileModal()" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer" title="Close">✕</button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="px-5 pt-3 pb-2 bg-black/50 border-b border-slate-800/80 flex items-center gap-1.5 overflow-x-auto text-[11px]">
+          <button id="ap-tab-account" type="button" onclick="window.cognisec && window.cognisec.switchAccountProfileTab('account')" class="px-2.5 py-1.5 rounded-lg border font-bold cursor-pointer whitespace-nowrap">👤 My Account</button>
+          <button id="ap-tab-edit" type="button" onclick="window.cognisec && window.cognisec.switchAccountProfileTab('edit')" class="px-2.5 py-1.5 rounded-lg border font-bold cursor-pointer whitespace-nowrap">✏️ Edit Profile</button>
+          <button id="ap-tab-password" type="button" onclick="window.cognisec && (window.cognisec.closeAccountProfileModal(), window.cognisec.openChangePasswordModal(window.cognisec._apApp || null))" class="px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-300 hover:text-white font-bold cursor-pointer whitespace-nowrap">🔑 Change Password</button>
+          <button id="ap-tab-security" type="button" onclick="window.cognisec && window.cognisec.switchAccountProfileTab('security')" class="px-2.5 py-1.5 rounded-lg border font-bold cursor-pointer whitespace-nowrap">🛡️ Security Settings</button>
+        </div>
+
+        <div class="p-5 space-y-4 text-xs text-slate-200 max-h-[72vh] overflow-y-auto">
+          <div id="ap-banner-err" class="hidden p-3 rounded-xl bg-red-950/80 border border-red-700 text-red-200 text-xs"></div>
+          <div id="ap-banner-ok" class="hidden p-3 rounded-xl bg-emerald-950/80 border border-emerald-700 text-emerald-200 text-xs"></div>
+
+          <!-- TAB 1: MY ACCOUNT -->
+          <div id="ap-pane-account" class="space-y-3">
+            <div class="p-3.5 rounded-xl bg-black/50 border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between"><span class="text-slate-400">Full Name:</span><strong id="ap-acc-name" class="text-white">-</strong></div>
+              <div class="flex items-center justify-between"><span class="text-slate-400">Registered Email:</span><strong id="ap-acc-email" class="text-white">-</strong></div>
+              <div class="flex items-center justify-between"><span class="text-slate-400">Role:</span><strong id="ap-acc-role" class="text-slate-200">-</strong></div>
+              <div class="flex items-center justify-between"><span class="text-slate-400">Account Status:</span><strong id="ap-acc-status" class="text-emerald-400">-</strong></div>
+              <div class="flex items-center justify-between"><span class="text-slate-400">Portal Context:</span><strong id="ap-acc-portal" class="text-slate-200">-</strong></div>
+              <div class="flex items-center justify-between"><span class="text-slate-400">Member Since:</span><strong id="ap-acc-created" class="text-slate-400">-</strong></div>
+            </div>
+            <div id="ap-portal-specific-box" class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-300 space-y-1">
+              <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Portal Membership</div>
+              <div id="ap-portal-specific-detail">Authenticated via Zero-Trust Identity</div>
+            </div>
+            <div class="flex flex-wrap gap-2 pt-1">
+              <button type="button" onclick="window.cognisec && window.cognisec.switchAccountProfileTab('edit')" class="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer">✏️ Edit Profile</button>
+              <button type="button" onclick="window.cognisec && (window.cognisec.closeAccountProfileModal(), window.cognisec.openChangePasswordModal(window.cognisec._apApp || null))" class="flex-1 py-2 px-3 rounded-xl bg-amber-950/70 hover:bg-amber-900/80 border border-amber-700/60 text-amber-200 font-bold text-xs cursor-pointer">🔑 Change Password</button>
+            </div>
+          </div>
+
+          <!-- TAB 2: EDIT PROFILE -->
+          <form id="ap-pane-edit" onsubmit="window.cognisec && window.cognisec.submitAccountProfileEdit(event)" class="hidden space-y-3.5">
+            <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+              Only permitted profile metadata may be edited here. Password, registered email, and security role changes are blocked on this form.
+            </div>
+            <div class="space-y-1">
+              <label class="text-[11px] uppercase tracking-wider text-slate-400 block">Registered Email (Locked)</label>
+              <input id="ap-edit-email" type="email" readonly disabled class="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-slate-800 text-slate-400 cursor-not-allowed">
+            </div>
+            <div class="space-y-1">
+              <label for="ap-edit-name" class="text-[11px] uppercase tracking-wider text-slate-300 block">Full Display Name</label>
+              <input id="ap-edit-name" type="text" minlength="2" maxlength="100" required placeholder="Enter display name" class="w-full px-3.5 py-2.5 rounded-xl bg-black/70 border border-slate-700 text-white focus:outline-none focus:border-sky-500">
+            </div>
+            <div class="flex items-center gap-2 pt-1">
+              <button type="button" onclick="window.cognisec && window.cognisec.switchAccountProfileTab('account')" class="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold text-xs cursor-pointer">Cancel</button>
+              <button id="ap-btn-save-profile" type="submit" class="flex-[2] py-2.5 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-md">Save Changes →</button>
+            </div>
+          </form>
+
+          <!-- TAB 3: SECURITY SETTINGS -->
+          <div id="ap-pane-security" class="hidden space-y-3">
+            <div class="p-3.5 rounded-xl bg-black/50 border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between"><span class="text-slate-400">Session Verification:</span><strong id="ap-sec-sess-status" class="text-white">-</strong></div>
+              <div class="flex items-center justify-between"><span class="text-slate-400">Current Risk Level:</span><strong id="ap-sec-risk-level" class="text-emerald-400">-</strong></div>
+              <div class="flex items-center justify-between"><span class="text-slate-400">Behavioral Baseline:</span><strong id="ap-sec-baseline" class="text-slate-200">-</strong></div>
+              <div class="flex items-center justify-between"><span class="text-slate-400">Registered Devices:</span><strong id="ap-sec-devices" class="text-slate-200">-</strong></div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-black/50 border border-slate-800 space-y-2.5">
+              <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Enrolled Authenticators (Secrets Masked)</div>
+              <div class="flex items-center justify-between">
+                <span>1. Cognitive Image Sequence</span>
+                <span id="ap-sec-mfa-img" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">Checking...</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span>2. Private Security Response</span>
+                <span id="ap-sec-mfa-priv" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">Checking...</span>
+              </div>
+              <div id="ap-sec-question-row" class="hidden text-[11px] text-slate-400 pl-3 border-l border-slate-700"></div>
+              <div class="flex items-center justify-between">
+                <span>3. NeuralTrace Confidential Vault Route</span>
+                <span id="ap-sec-mfa-gesture" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">Checking...</span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" onclick="window.cognisec && (window.cognisec.closeAccountProfileModal(), window.cognisec.openFactorEnrollmentModal('image'))" class="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-700/50 font-bold text-xs cursor-pointer">🛡️ Configure MFA Factors</button>
+              <button type="button" onclick="window.cognisec && (window.cognisec.closeAccountProfileModal(), window.cognisec.openChangePasswordModal(window.cognisec._apApp || null))" class="flex-1 py-2.5 px-3 rounded-xl bg-sky-950/80 hover:bg-sky-900 text-sky-200 border border-sky-700/60 font-bold text-xs cursor-pointer">🔑 Change Password</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalDiv);
+  }
+
+  toggleProfileDropdown(event) {
+    if (event && event.stopPropagation) event.stopPropagation();
+    const menu = document.getElementById('profile-dropdown-menu');
+    const btn = document.getElementById('btn-header-profile');
+    if (!menu) return;
+    const isHidden = menu.classList.contains('hidden');
+    if (isHidden) {
+      menu.classList.remove('hidden');
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+    } else {
+      menu.classList.add('hidden');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  closeProfileDropdown() {
+    const menu = document.getElementById('profile-dropdown-menu');
+    const btn = document.getElementById('btn-header-profile');
+    if (menu) menu.classList.add('hidden');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+
+  async openAccountProfileModal(tab = 'account', applicationOverride = null) {
+    this.closeProfileDropdown();
+    const app = applicationOverride || this._detectPortalApplication();
+    this._apApp = app;
+    if (!this.isAuthenticated()) {
+      if (app === 'college' && typeof window.openStudentSignInModal === 'function') {
+        window.openStudentSignInModal();
+      } else if (app === 'healthcare' && typeof window.openSignInModal === 'function') {
+        window.openSignInModal('patient');
+      } else if (typeof window.openSignInModal === 'function') {
+        window.openSignInModal();
+      }
+      return;
+    }
+
+    this.ensureProfileModalInDom();
+    const theme = this._getPortalThemeConfig(app);
+    const card = document.getElementById('ap-modal-card');
+    const hdr = document.getElementById('ap-modal-header');
+    const badge = document.getElementById('ap-portal-badge');
+    const sub = document.getElementById('ap-header-sub');
+    const circle = document.getElementById('ap-avatar-circle');
+    const saveBtn = document.getElementById('ap-btn-save-profile');
+
+    if (card) card.className = `relative w-full max-w-lg bg-[#0b0d14] border ${theme.accentBorder} rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto`;
+    if (hdr) hdr.className = `px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r ${theme.headerBg}`;
+    if (badge) badge.textContent = theme.badge;
+    if (sub) sub.textContent = theme.portalLabel;
+    if (saveBtn) saveBtn.className = `flex-[2] py-2.5 px-4 rounded-xl bg-gradient-to-r ${theme.btnPrimary} text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-md`;
+
+    const name = this.user?.name || 'User';
+    if (circle) circle.textContent = name.trim().charAt(0).toUpperCase() || 'U';
+
+    const modal = document.getElementById('modal-account-profile');
+    if (modal) modal.classList.remove('hidden');
+
+    this._setAccountProfileBanner('', '');
+    await this.switchAccountProfileTab(tab);
+  }
+
+  closeAccountProfileModal() {
+    const modal = document.getElementById('modal-account-profile');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  _setAccountProfileBanner(errMsg = '', okMsg = '') {
+    const errEl = document.getElementById('ap-banner-err');
+    const okEl = document.getElementById('ap-banner-ok');
+    if (errEl) {
+      if (errMsg) { errEl.textContent = errMsg; errEl.classList.remove('hidden'); }
+      else { errEl.textContent = ''; errEl.classList.add('hidden'); }
+    }
+    if (okEl) {
+      if (okMsg) { okEl.textContent = okMsg; okEl.classList.remove('hidden'); }
+      else { okEl.textContent = ''; okEl.classList.add('hidden'); }
+    }
+  }
+
+  async switchAccountProfileTab(tab = 'account') {
+    const safeTab = ['account', 'edit', 'security'].includes(tab) ? tab : 'account';
+    const app = this._apApp || this._detectPortalApplication();
+    const theme = this._getPortalThemeConfig(app);
+    this._setAccountProfileBanner('', '');
+
+    ['account', 'edit', 'security'].forEach(t => {
+      const pane = document.getElementById(`ap-pane-${t}`);
+      const btn = document.getElementById(`ap-tab-${t}`);
+      if (pane) pane.classList.toggle('hidden', t !== safeTab);
+      if (btn) {
+        btn.className = t === safeTab
+          ? `px-2.5 py-1.5 rounded-lg border ${theme.pillActive} font-bold cursor-pointer whitespace-nowrap`
+          : 'px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-300 hover:text-white font-bold cursor-pointer whitespace-nowrap';
+      }
+    });
+
+    if (safeTab === 'account' || safeTab === 'edit') {
+      await this._hydrateAccountTab(app);
+    } else if (safeTab === 'security') {
+      await this._hydrateSecuritySettingsTab();
+    }
+  }
+
+  async _hydrateAccountTab(app) {
+    const hydrateSeq = (this._profileHydrateSeq = (this._profileHydrateSeq || 0) + 1);
+    let profile = this.user ? { ...this.user } : {};
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/auth/me`, { headers: this.getHeaders(), cache: 'no-store' });
+      if (res.ok && hydrateSeq === this._profileHydrateSeq) {
+        const me = await res.json();
+        if (hydrateSeq !== this._profileHydrateSeq) return;
+        profile = { ...profile, ...me };
+        this.user = {
+          ...(this.user || {}),
+          id: me.id,
+          name: me.name,
+          email: me.email,
+          role: me.role,
+          account_status: this.sessionStatus || me.account_status
+        };
+        try { localStorage.setItem('cognisec_user', JSON.stringify(this.user)); } catch (_) {}
+      }
+    } catch (_) {}
+
+    if (hydrateSeq !== this._profileHydrateSeq) return;
+
+    const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setTxt('ap-acc-name', profile.name || '-');
+    setTxt('ap-acc-email', profile.email || '-');
+    setTxt('ap-acc-role', (profile.role || 'USER').toUpperCase());
+    setTxt('ap-acc-status', this.sessionStatus || profile.account_status || 'ACTIVE');
+    setTxt('ap-acc-portal', app.toUpperCase());
+    setTxt('ap-acc-created', profile.created_at ? new Date(profile.created_at).toLocaleDateString() : 'Verified Account');
+
+    const portalDetailEl = document.getElementById('ap-portal-specific-detail');
+    if (portalDetailEl) {
+      if (app === 'college') {
+        portalDetailEl.textContent = `BITS Pilani Student Portal • Session: ${this.sessionStatus || 'ACTIVE'} (Confidential Academic Vault requires NeuralTrace)`;
+      } else if (app === 'shopping') {
+        portalDetailEl.textContent = `Nyraa Commerce Customer • Session: ${this.sessionStatus || 'ACTIVE'} (Payment Vault requires NeuralTrace)`;
+      } else if (app === 'healthcare') {
+        const roleLabel = (profile.role || '').toUpperCase() === 'DOCTOR' ? 'Clinician' : 'Patient';
+        portalDetailEl.textContent = `AyuSync MedCare (${roleLabel}) • Session: ${this.sessionStatus || 'ACTIVE'} (Clinical EHR Vault requires NeuralTrace)`;
+      } else {
+        portalDetailEl.textContent = `Cognisec Platform Identity • Session: ${this.sessionStatus || 'ACTIVE'}`;
+      }
+    }
+
+    const editEmail = document.getElementById('ap-edit-email');
+    const editName = document.getElementById('ap-edit-name');
+    if (editEmail) editEmail.value = profile.email || '';
+    if (editName) editName.value = profile.name || '';
+  }
+
+  async submitAccountProfileEdit(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    this._profileHydrateSeq = (this._profileHydrateSeq || 0) + 1;
+    this._setAccountProfileBanner('', '');
+    const nameInput = document.getElementById('ap-edit-name');
+    const btn = document.getElementById('ap-btn-save-profile');
+    const newName = nameInput ? nameInput.value.trim() : '';
+
+    if (newName.length < 2 || newName.length > 100) {
+      this._setAccountProfileBanner('Display name must be between 2 and 100 characters.', '');
+      return;
+    }
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/users/profile`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ name: newName })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        this._setAccountProfileBanner(this._extractErrorDetail(data, `Could not update profile (HTTP ${res.status}).`), '');
+        return;
+      }
+
+      if (this.user) {
+        this.user.name = data.name || newName;
+        try { localStorage.setItem('cognisec_user', JSON.stringify(this.user)); } catch (_) {}
+      }
+      const circle = document.getElementById('ap-avatar-circle');
+      if (circle && this.user?.name) circle.textContent = this.user.name.trim().charAt(0).toUpperCase();
+      window.dispatchEvent(new CustomEvent('cognisec:auth_change', {
+        detail: { isAuthenticated: this.isAuthenticated(), isFullyVerified: this.isFullyVerified(), sessionStatus: this.sessionStatus, user: this.user }
+      }));
+      this._setAccountProfileBanner('', 'Profile display name updated cleanly.');
+    } catch (e) {
+      this._setAccountProfileBanner(e.message || 'Network error while updating profile.', '');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Save Changes →'; }
+    }
+  }
+
+  async _hydrateSecuritySettingsTab() {
+    const setBadge = (id, enrolled, detail = '') => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (enrolled === null) {
+        el.textContent = 'Unavailable';
+        el.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400';
+      } else if (enrolled) {
+        el.textContent = detail ? `Enrolled (${detail})` : 'Enrolled';
+        el.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-700';
+      } else {
+        el.textContent = 'Not Enrolled';
+        el.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-700';
+      }
+    };
+
+    const [mfaRes, secRes, devRes, behRes] = await Promise.allSettled([
+      this.getAdaptiveStatus(),
+      this.sessionId ? this.getSessionSecurityStatus(this.sessionId) : Promise.resolve(null),
+      this.getDevices().catch(() => null),
+      this.getBehaviorProfile().catch(() => null)
+    ]);
+
+    const mfa = mfaRes.status === 'fulfilled' ? mfaRes.value : null;
+    const sec = secRes.status === 'fulfilled' ? secRes.value : null;
+    const devs = devRes.status === 'fulfilled' ? devRes.value : null;
+    const beh = behRes.status === 'fulfilled' ? behRes.value : null;
+
+    const sessEl = document.getElementById('ap-sec-sess-status');
+    const riskEl = document.getElementById('ap-sec-risk-level');
+    const baseEl = document.getElementById('ap-sec-baseline');
+    const devEl = document.getElementById('ap-sec-devices');
+
+    const sessStatus = (sec && sec.session_status) || this.sessionStatus || 'UNKNOWN';
+    if (sessEl) sessEl.textContent = sessStatus;
+    const rLevel = (sec && sec.risk_level) || this.currentRiskLevel || 'UNAVAILABLE';
+    if (riskEl) {
+      riskEl.textContent = rLevel;
+      riskEl.className = rLevel === 'LOW' ? 'text-emerald-400' : (rLevel === 'MEDIUM' ? 'text-amber-400' : 'text-red-400');
+    }
+    if (baseEl) {
+      if (beh && beh.success && beh.data) {
+        baseEl.textContent = `${beh.data.baseline_status || 'COLD_START'} (${beh.data.sample_count || 0} samples)`;
+      } else {
+        baseEl.textContent = 'Unavailable until active';
+      }
+    }
+    if (devEl) {
+      devEl.textContent = Array.isArray(devs) ? `${devs.length} registered device(s)` : 'Unavailable';
+    }
+
+    if (mfa) {
+      setBadge('ap-sec-mfa-img', Boolean(mfa.has_cognitive_image_sequence));
+      setBadge('ap-sec-mfa-priv', Boolean(mfa.has_private_response));
+      setBadge('ap-sec-mfa-gesture', Boolean(mfa.has_gesture_pattern));
+      const qRow = document.getElementById('ap-sec-question-row');
+      if (qRow) {
+        if (mfa.has_private_response && mfa.private_question) {
+          qRow.textContent = `Question: "${mfa.private_question}" (secret response hidden)`;
+          qRow.classList.remove('hidden');
+        } else {
+          qRow.classList.add('hidden');
+        }
+      }
+    } else {
+      setBadge('ap-sec-mfa-img', null);
+      setBadge('ap-sec-mfa-priv', null);
+      setBadge('ap-sec-mfa-gesture', null);
+    }
+  }
+
+  // ============================================================================
+  // PORTAL SECURITY EJECTION, SUSPENSION SCREEN & RE-ENTRY MONITORING
+  // ============================================================================
+
+  get _SESSION_TERMINATED_EXCEEDED_MSG() {
+    return 'Your session has been terminated because the maximum number of verification attempts was exceeded. Please sign in again.';
+  }
+
+  _detectSessionTerminatedPayload(res, data) {
+    if (this._detectPortalLockPayload(res, data)) return false;
+    try {
+      if (res && res.headers && typeof res.headers.get === 'function' && res.headers.get('X-Cognisec-Session-Terminated') === 'true') {
+        return true;
+      }
+    } catch (_) {}
+    if (data && typeof data === 'object') {
+      if (data.session_terminated === true || data.terminated === true || data.session_status === 'TERMINATED') {
+        return true;
+      }
+      const msg = String(data.detail || data.message || '').toLowerCase();
+      if (
+        msg.includes('session has been terminated') ||
+        msg.includes('session terminated') ||
+        msg.includes('critical security risk')
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  handleSessionTerminatedRedirect(reason = null, appOverride = null) {
+    const app = (appOverride || this._detectPortalApplication() || 'platform').toLowerCase();
+    const msg = (reason && String(reason).includes('maximum number of verification attempts'))
+      ? String(reason)
+      : this._SESSION_TERMINATED_EXCEEDED_MSG;
+
+    this._clearPortalSensitiveUiAndTimers();
+    this.clearAuth();
+    this.sessionExpiredMessage = msg;
+
+    window.dispatchEvent(new CustomEvent('cognisec:session_terminated', {
+      detail: { message: msg, application: app }
+    }));
+
+    this.showToastNotification('Session Terminated', msg, '🚨');
+
+    // Redirect user to the portal's appropriate login modal/screen with clear termination message
+    let targetModal = null;
+    if (app === 'college' && typeof window.openStudentSignInModal === 'function') {
+      window.openStudentSignInModal();
+      targetModal = document.getElementById('student-signin-modal');
+    } else if (app === 'healthcare' && typeof window.openSignInModal === 'function') {
+      const isDoc = window.cognisecDoctorFlow || (document.getElementById('doctor-signin-tab-content') && !document.getElementById('doctor-signin-tab-content').classList.contains('hidden'));
+      window.openSignInModal(isDoc ? 'doctor' : 'patient');
+      targetModal = document.getElementById('doctor-signin-modal');
+    } else if (typeof window.openSignInModal === 'function') {
+      window.openSignInModal();
+      targetModal = document.getElementById('signin-modal');
+    }
+
+    if (targetModal) {
+      let banner = document.getElementById('cognisec-login-terminated-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'cognisec-login-terminated-banner';
+        banner.setAttribute('role', 'alert');
+        banner.className = 'p-3.5 rounded-xl bg-red-50 border border-red-300 text-red-900 text-xs font-mono font-bold leading-relaxed';
+        const formEl = targetModal.querySelector('form') || targetModal.querySelector('.space-y-4, .space-y-5, .space-y-3\\.5');
+        if (formEl && formEl.parentNode) {
+          formEl.parentNode.insertBefore(banner, formEl);
+        } else {
+          targetModal.firstElementChild?.appendChild(banner);
+        }
+      }
+      banner.textContent = msg;
+      banner.classList.remove('hidden');
+    }
+    return msg;
+  }
+
+  _detectPortalLockPayload(res, data) {
+    try {
+      if (res && res.status === 423) return true;
+      if (res && res.headers && typeof res.headers.get === 'function' && res.headers.get('X-Cognisec-Portal-Locked') === 'true') {
+        return true;
+      }
+    } catch (_) {}
+    if (!data || typeof data !== 'object') return false;
+    if (data.portal_locked === true || data.error === 'PORTAL_SECURITY_LOCKED') return true;
+    const msg = typeof data.detail === 'string' ? data.detail : (typeof data.message === 'string' ? data.message : '');
+    return msg.includes('SECURITY ACCESS SUSPENDED');
+  }
+
+  ensureSuspendedScreenInDom() {
+    if (document.getElementById('security-suspended-screen')) return;
+    const el = document.createElement('div');
+    el.id = 'security-suspended-screen';
+    el.setAttribute('role', 'alertdialog');
+    el.setAttribute('aria-modal', 'true');
+    el.className = 'fixed inset-0 z-[9999] hidden bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 font-mono overflow-y-auto';
+    el.innerHTML = `
+      <div id="susp-card" class="relative w-full max-w-xl bg-[#0b0710] border-2 border-red-600/80 rounded-2xl shadow-2xl overflow-hidden my-auto">
+        <div id="susp-header" class="px-6 py-5 border-b border-red-900/70 bg-gradient-to-r from-red-950/90 via-black to-rose-950/50 flex items-center justify-between gap-3">
+          <div>
+            <span id="susp-portal-badge" class="inline-block px-2.5 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-300 border border-red-700/70 uppercase tracking-widest">ZERO TRUST PORTAL LOCKOUT</span>
+            <h2 class="text-lg sm:text-xl font-extrabold text-white tracking-wide mt-2">SECURITY ACCESS SUSPENDED</h2>
+          </div>
+          <div class="w-12 h-12 rounded-2xl bg-red-950/80 border border-red-700 flex items-center justify-center text-2xl shrink-0">⛔</div>
+        </div>
+
+        <div class="p-6 space-y-4 text-xs text-slate-200">
+          <p class="text-sm text-red-100 leading-relaxed font-sans font-medium">
+            Your portal access has been temporarily suspended after repeated unsuccessful identity verification attempts.
+          </p>
+
+          <div class="p-4 rounded-xl bg-black/70 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between gap-3"><span class="text-slate-400">Portal:</span><strong id="susp-portal-name" class="text-white text-right">-</strong></div>
+            <div class="flex items-center justify-between gap-3"><span class="text-slate-400">Security Reference ID:</span><strong id="susp-sec-ref" class="text-red-300 font-bold text-right">-</strong></div>
+            <div class="flex items-center justify-between gap-3"><span class="text-slate-400">Suspension Reason:</span><strong id="susp-lock-reason" class="text-slate-100 text-right">-</strong></div>
+            <div class="flex items-center justify-between gap-3"><span class="text-slate-400">Recovery Status:</span><span id="susp-recovery-status" class="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-700 font-bold text-[10px]">PENDING ADMIN RECOVERY</span></div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Authorized Security Recovery Instructions</div>
+            <p id="susp-recovery-instructions" class="text-slate-300 leading-relaxed font-sans text-xs"></p>
+          </div>
+
+          <!-- Recovery Gate Step 2 (Registered Email OTP verification; never bypasses Admin clearance) -->
+          <div id="susp-recovery-otp-box" class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[11px] uppercase tracking-wider text-slate-300 font-bold">Identity Recovery Pre-Check (Email OTP)</span>
+              <button id="susp-btn-req-recovery-otp" type="button" onclick="window.cognisec && window.cognisec.requestRecoveryOtpFromSuspensionScreen()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-100 font-bold text-[11px] cursor-pointer">Send Recovery OTP</button>
+            </div>
+            <div class="flex items-center gap-2">
+              <input id="susp-recovery-otp-input" type="text" inputmode="numeric" maxlength="6" placeholder="6-digit Recovery OTP" class="flex-1 px-3 py-2 rounded-lg bg-black/70 border border-slate-700 text-white text-xs focus:outline-none focus:border-red-500">
+              <button id="susp-btn-verify-recovery-otp" type="button" onclick="window.cognisec && window.cognisec.verifyRecoveryOtpFromSuspensionScreen()" class="px-3.5 py-2 rounded-lg bg-amber-900/80 hover:bg-amber-800 border border-amber-700 text-amber-100 font-bold text-xs cursor-pointer">Verify Recovery OTP</button>
+            </div>
+            <div id="susp-recovery-banner" class="hidden text-[11px] p-2.5 rounded-lg"></div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+            <button id="susp-btn-check-status" type="button" onclick="window.cognisec && window.cognisec.checkSuspendedClearanceStatus()" class="flex-1 py-2.5 px-4 rounded-xl bg-red-900/80 hover:bg-red-800 border border-red-600 text-white font-bold text-xs uppercase tracking-wider cursor-pointer">
+              Check Clearance Status
+            </button>
+            <button id="susp-btn-switch-portal" type="button" onclick="window.location.href='index.html'" class="py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold text-xs cursor-pointer">
+              Return to Central Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(el);
+  }
+
+  _clearPortalSensitiveUiAndTimers() {
+    if (this._obsTimer) { clearTimeout(this._obsTimer); this._obsTimer = null; }
+    if (this._otpExpiryTimer) { clearInterval(this._otpExpiryTimer); this._otpExpiryTimer = null; }
+    if (this.stepUpTimerInterval) { clearInterval(this.stepUpTimerInterval); this.stepUpTimerInterval = null; }
+    if (this._resendCooldownTimer) { clearInterval(this._resendCooldownTimer); this._resendCooldownTimer = null; }
+    this.stopTelemetryLoop();
+    this.revokeResourceClearance();
+    this.currentChallenge = null;
+    this.currentChallengeExpiresAt = null;
+    this.lastStepUpVerifiedAt = 0;
+
+    ['modal-login-observation', 'modal-stepup', 'modal-change-password', 'modal-account-profile', 'modal-payment-otp', 'modal-factor-enrollment', 'modal-signin', 'modal-student-signin', 'modal-doctor-signin'].forEach((id) => {
+      document.getElementById(id)?.classList.add('hidden');
+    });
+    const privInp = document.getElementById('stepup-private-input');
+    if (privInp) privInp.value = '';
+    const otpInp = document.getElementById('login-otp-code-input');
+    if (otpInp) otpInp.value = '';
+    const cpNew = document.getElementById('cp-new-password');
+    const cpConf = document.getElementById('cp-confirm-password');
+    const cpCur = document.getElementById('cp-current-password');
+    if (cpNew) cpNew.value = '';
+    if (cpConf) cpConf.value = '';
+    if (cpCur) cpCur.value = '';
+  }
+
+  handlePortalEjection(lockInfo = {}, appOverride = null, options = {}) {
+    const app = (appOverride || lockInfo.portal || this._detectPortalApplication() || 'platform').toLowerCase();
+    const curPortal = this._detectPortalApplication();
+    this._activePortalLock = Object.assign({ locked: true, portal: app }, lockInfo || {});
+    this._clearPortalSensitiveUiAndTimers();
+    if (app === curPortal && curPortal !== 'platform') {
+      this.sessionStatus = 'RESTRICTED';
+      try { localStorage.setItem('cognisec_session_status', 'RESTRICTED'); } catch (_) {}
+    }
+
+    const portalLabel = lockInfo.portal_display_name || (this._getPortalThemeConfig(app).portalLabel) || app.toUpperCase();
+    const secRef = lockInfo.security_reference_id || 'SEC-LOCK-ACTIVE';
+    const ejectionNotice = {
+      portal: app,
+      portal_display_name: portalLabel,
+      security_reference_id: secRef,
+      lock_reason: lockInfo.lock_reason || 'Repeated unsuccessful verification attempts.',
+      recovery_status: lockInfo.recovery_status || 'PENDING_ADMIN_RECOVERY',
+      recovery_instructions: lockInfo.recovery_instructions ||
+        '1. Verify registered-email Recovery OTP if prompted. 2. Request Security Administrator / SOC clearance citing your Security Reference ID. 3. Re-enter portal and complete fresh 20-second behavioral observation and Email OTP.',
+      locked_at: lockInfo.locked_at || new Date().toISOString(),
+      message: `Access to ${portalLabel} has been suspended (${secRef}). Your global identity remains signed in on the COGNISEC-AI Central Dashboard.`,
+      lock: this._activePortalLock,
+    };
+    try {
+      sessionStorage.setItem('cognisec_portal_ejection', JSON.stringify(ejectionNotice));
+    } catch (_) {}
+
+    window.dispatchEvent(new CustomEvent('cognisec:portal_suspended', {
+      detail: this._activePortalLock
+    }));
+
+    const shouldRedirect = options.redirectToDashboard !== false && curPortal !== 'platform' && app !== 'platform';
+    if (shouldRedirect) {
+      this.showToastNotification(
+        'Portal Access Suspended',
+        ejectionNotice.message,
+        '⛔'
+      );
+      const targetUrl = `index.html?portal_ejected=${encodeURIComponent(app)}&sec_ref=${encodeURIComponent(secRef)}`;
+      window.location.href = targetUrl;
+      return targetUrl;
+    }
+
+    this.ensureSuspendedScreenInDom();
+
+    const theme = this._getPortalThemeConfig(app);
+    const card = document.getElementById('susp-card');
+    const hdr = document.getElementById('susp-header');
+    const portalBadge = document.getElementById('susp-portal-badge');
+    const portalNameEl = document.getElementById('susp-portal-name');
+    const secRefEl = document.getElementById('susp-sec-ref');
+    const reasonEl = document.getElementById('susp-lock-reason');
+    const recStatEl = document.getElementById('susp-recovery-status');
+    const recInstrEl = document.getElementById('susp-recovery-instructions');
+
+    if (card) card.className = `relative w-full max-w-xl bg-[#0b0710] border-2 ${theme.accentBorder} rounded-2xl shadow-2xl overflow-hidden my-auto`;
+    if (hdr) hdr.className = `px-6 py-5 border-b border-red-900/70 bg-gradient-to-r ${theme.headerBg} flex items-center justify-between gap-3`;
+    if (portalBadge) portalBadge.textContent = `${theme.badge} • SUSPENDED`;
+    if (portalNameEl) portalNameEl.textContent = portalLabel;
+    if (secRefEl) secRefEl.textContent = secRef;
+    if (reasonEl) reasonEl.textContent = ejectionNotice.lock_reason;
+    if (recStatEl) {
+      recStatEl.textContent = lockInfo.recovery_status === 'OTP_VERIFIED_AWAITING_ADMIN'
+        ? 'OTP VERIFIED — AWAITING ADMIN CLEARANCE'
+        : (lockInfo.recovery_status === 'REJECTED_BY_ADMIN'
+          ? 'RECOVERY REJECTED BY ADMIN — SUSPENDED'
+          : 'PENDING ADMIN RECOVERY');
+    }
+    if (recInstrEl) {
+      recInstrEl.textContent = ejectionNotice.recovery_instructions;
+    }
+
+    const screen = document.getElementById('security-suspended-screen');
+    if (screen) screen.classList.remove('hidden');
+    return null;
+  }
+
+  async getPortalLocksSummary() {
+    if (!this.token) return null;
+    try {
+      const qs = this.sessionId ? `?session_id=${encodeURIComponent(this.sessionId)}` : '';
+      const res = await fetch(`${COGNISEC_API_BASE}/security/portal-locks${qs}`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+        cache: 'no-store'
+      });
+      if (!res.ok) return null;
+      const summary = await res.json().catch(() => null);
+      if (summary) {
+        this._portalLocksSummary = summary;
+        window.dispatchEvent(new CustomEvent('cognisec:portal_locks_updated', {
+          detail: summary
+        }));
+      }
+      return summary;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async authenticateForPortalRecovery(email, password, application, securityReferenceId = null) {
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/security/portal-lock/recovery-auth`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: String(email || '').trim(),
+          password: password || '',
+          application: application || this._detectPortalApplication(),
+          security_reference_id: securityReferenceId || null
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { success: false, error: this._extractErrorDetail(data, `Recovery authentication failed (${res.status}).`) };
+      }
+      this._recoveryToken = data.access_token || null;
+      this._recoveryChallengeMap = this._recoveryChallengeMap || {};
+      if (data.portal_lock) {
+        this.handlePortalEjection(data.portal_lock, application || data.portal_lock.portal, { redirectToDashboard: false });
+      }
+      return { success: true, access_token: data.access_token, portal_lock: data.portal_lock, message: data.message };
+    } catch (e) {
+      return { success: false, error: e.message || 'Recovery authentication request failed.' };
+    }
+  }
+
+  async checkAndEnforcePortalLock({ application = null, recordReentry = true, source = 'PORTAL_REOPEN' } = {}) {
+    if (!this.token && !this._recoveryToken) return { locked: false };
+    const app = (application || this._detectPortalApplication() || 'platform').toLowerCase();
+    if (app === 'platform') {
+      return { locked: false, portal: 'platform' };
+    }
+    try {
+      const endpoint = recordReentry
+        ? `${COGNISEC_API_BASE}/security/portal-lock/reentry`
+        : `${COGNISEC_API_BASE}/security/portal-lock/status?application=${encodeURIComponent(app)}`;
+      const opts = recordReentry
+        ? {
+            method: 'POST',
+            headers: this.getHeaders(),
+            body: JSON.stringify({
+              application: app,
+              session_id: this.sessionId,
+              reentry_correlation_id: this._navReentryCorrId,
+              is_auto_poll: false,
+              source
+            })
+          }
+        : { method: 'GET', headers: this.getHeaders(), cache: 'no-store' };
+      const res = await fetch(endpoint, opts);
+      if (!res.ok) return { locked: false };
+      const data = await res.json().catch(() => ({ locked: false }));
+      if (data && data.locked && recordReentry) {
+        this.handlePortalEjection(data, app, { redirectToDashboard: false });
+      }
+      return data || { locked: false };
+    } catch (_) {
+      return { locked: false };
+    }
+  }
+
+  async requestRecoveryOtpFromSuspensionScreen() {
+    const app = this._activePortalLock?.portal || this._detectPortalApplication();
+    const secRef = this._activePortalLock?.security_reference_id || null;
+    const banner = document.getElementById('susp-recovery-banner');
+    const btn = document.getElementById('susp-btn-req-recovery-otp');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/security/portal-lock/recovery-otp/request`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          application: app,
+          security_reference_id: secRef
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (banner) {
+        banner.className = res.ok
+          ? 'text-[11px] p-2.5 rounded-lg bg-emerald-950/70 border border-emerald-700 text-emerald-200 block'
+          : 'text-[11px] p-2.5 rounded-lg bg-red-950/70 border border-red-700 text-red-200 block';
+        banner.textContent = this._extractErrorDetail(data, data.message || (res.ok ? 'Recovery OTP sent.' : 'Could not send Recovery OTP.'));
+      }
+      if (res.ok && data && data.challenge_id) {
+        this._recoveryChallengeMap = this._recoveryChallengeMap || {};
+        this._recoveryChallengeMap[app] = data.challenge_id;
+        this._activeRecoveryChallengeId = data.challenge_id;
+      }
+    } catch (e) {
+      if (banner) {
+        banner.className = 'text-[11px] p-2.5 rounded-lg bg-red-950/70 border border-red-700 text-red-200 block';
+        banner.textContent = e.message || 'Network error dispatching Recovery OTP.';
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Send Recovery OTP'; }
+    }
+  }
+
+  async verifyRecoveryOtpFromSuspensionScreen() {
+    const app = this._activePortalLock?.portal || this._detectPortalApplication();
+    const secRef = this._activePortalLock?.security_reference_id || null;
+    const otpInp = document.getElementById('susp-recovery-otp-input');
+    const banner = document.getElementById('susp-recovery-banner');
+    const btn = document.getElementById('susp-btn-verify-recovery-otp');
+    const code = otpInp ? otpInp.value.replace(/\s+/g, '').trim() : '';
+    if (!code) {
+      if (banner) {
+        banner.className = 'text-[11px] p-2.5 rounded-lg bg-red-950/70 border border-red-700 text-red-200 block';
+        banner.textContent = 'Please enter the 6-digit Recovery OTP sent to your registered email.';
+      }
+      if (otpInp) otpInp.focus();
+      return;
+    }
+    const chalId = (this._recoveryChallengeMap && this._recoveryChallengeMap[app]) || this._activeRecoveryChallengeId || null;
+    if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
+    try {
+      const res = await fetch(`${COGNISEC_API_BASE}/security/portal-lock/recovery-otp/verify`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          application: app,
+          otp_code: code,
+          challenge_id: chalId,
+          security_reference_id: secRef
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        if (this._recoveryChallengeMap) delete this._recoveryChallengeMap[app];
+        this._activeRecoveryChallengeId = null;
+        if (otpInp) otpInp.value = '';
+        this.handlePortalEjection(data, app, { redirectToDashboard: false });
+        if (banner) {
+          banner.className = 'text-[11px] p-2.5 rounded-lg bg-amber-950/80 border border-amber-600 text-amber-200 block';
+          banner.textContent = data.message || 'Recovery OTP verified. Portal remains suspended pending Security Administrator clearance.';
+        }
+        try { await this.getPortalLocksSummary(); } catch (_) {}
+      } else {
+        if (banner) {
+          banner.className = 'text-[11px] p-2.5 rounded-lg bg-red-950/70 border border-red-700 text-red-200 block';
+          banner.textContent = this._extractErrorDetail(data, data.message || 'Recovery OTP verification failed.');
+        }
+      }
+    } catch (e) {
+      if (banner) {
+        banner.className = 'text-[11px] p-2.5 rounded-lg bg-red-950/70 border border-red-700 text-red-200 block';
+        banner.textContent = e.message || 'Network error verifying Recovery OTP.';
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Verify Recovery OTP'; }
+    }
+  }
+
+  async checkSuspendedClearanceStatus() {
+    const app = this._activePortalLock?.portal || this._detectPortalApplication();
+    const banner = document.getElementById('susp-recovery-banner');
+    const statusData = await this.checkAndEnforcePortalLock({ application: app, recordReentry: false });
+    if (statusData && !statusData.locked) {
+      this._activePortalLock = null;
+      this._recoveryToken = null;
+      document.getElementById('security-suspended-screen')?.classList.add('hidden');
+      // After administrator recovery, clear prior restricted session so fresh login -> 20s observation -> OTP is enforced
+      this.clearAuth();
+      window.location.reload();
+      return;
+    }
+    if (banner) {
+      banner.className = 'text-[11px] p-2.5 rounded-lg bg-red-950/80 border border-red-700 text-red-200 block';
+      banner.textContent = `Portal lock ${statusData?.security_reference_id || ''} remains ACTIVE pending authorized Security Administrator clearance.`;
+    }
+  }
 }
+
+// Close shared profile dropdown on outside click or Escape key
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('click', (e) => {
+    const wrap = document.getElementById('header-profile-dropdown-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+      if (window.cognisec && typeof window.cognisec.closeProfileDropdown === 'function') {
+        window.cognisec.closeProfileDropdown();
+      }
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && window.cognisec && typeof window.cognisec.closeProfileDropdown === 'function') {
+      window.cognisec.closeProfileDropdown();
+    }
+  });
+}
+
+// Global account profile helpers for all portals
+window.toggleProfileDropdown = function(event) {
+  if (window.cognisec) window.cognisec.toggleProfileDropdown(event);
+};
+window.openAccountProfileModal = function(tab, application) {
+  if (window.cognisec) return window.cognisec.openAccountProfileModal(tab, application);
+};
+window.closeAccountProfileModal = function() {
+  if (window.cognisec) window.cognisec.closeAccountProfileModal();
+};
 
 // Global Singleton
 window.cognisec = new CognisecClient();
+
+// Expose global password change helpers for all portals
+window.openChangePasswordModal = function(application) {
+  if (window.cognisec) return window.cognisec.openChangePasswordModal(application);
+};
+window.closeChangePasswordModal = function() {
+  if (window.cognisec) window.cognisec.closeChangePasswordModal();
+};
 
 // Expose global password recovery helpers for direct HTML onclick compatibility
 window.openForgotPasswordModal = function(prefillEmail) {
@@ -6431,4 +9309,29 @@ window.closeFactorEnrollmentModal = function() {
 window.refreshFactorEnrollmentStatus = function() {
   if (window.cognisec) return window.cognisec.refreshFactorEnrollmentStatus();
 };
+
+// Portal-page mandatory enrollment guard: prevents direct URL bypass into shopping/college/healthcare
+(function enforcePortalEnrollmentGate() {
+  if (typeof window === 'undefined') return;
+  const path = (window.location.pathname || '').toLowerCase();
+  const isSubPortal = path.endsWith('shopping.html') || path.endsWith('college.html') || path.endsWith('healthcare.html');
+  if (!isSubPortal) return;
+  document.addEventListener('DOMContentLoaded', async () => {
+    const client = window.cognisec;
+    if (!client || !client.token) return;
+    try {
+      const meRes = await fetch(`${COGNISEC_API_BASE}/auth/me`, { headers: client.getHeaders() });
+      if (meRes.ok) {
+        const me = await meRes.json();
+        if (String(me.role || '').toUpperCase() !== 'ADMIN' && me.security_enrollment_completed === false) {
+          if (client.user) {
+            client.user.security_enrollment_completed = false;
+            localStorage.setItem('cognisec_user', JSON.stringify(client.user));
+          }
+          window.location.replace('index.html?enrollment_required=1');
+        }
+      }
+    } catch (_) {}
+  });
+})();
 

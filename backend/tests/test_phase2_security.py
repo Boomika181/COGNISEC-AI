@@ -133,14 +133,19 @@ def test_step_up_verify_invalid_code_decrements_attempts(client: TestClient, aut
     })
     session_id = sess_res.json()["id"]
 
+    client.post("/api/security/adaptive/enroll/gesture", headers=headers, json={
+        "pattern": [0, 4, 8, 12], "confirm_pattern": [0, 4, 8, 12]
+    })
     client.post("/api/security/step-up/challenge", headers=headers, json={
-        "session_id": session_id
+        "session_id": session_id,
+        "preferred_factor": "GESTURE_PATTERN"
     })
 
-    # Send wrong OTP
+    # Send wrong gesture (NeuralTrace allows 3 attempts -> 2 attempts remaining)
     res = client.post("/api/security/step-up/verify", headers=headers, json={
         "session_id": session_id,
-        "challenge_code": "000000"
+        "challenge_type": "GESTURE_PATTERN",
+        "gesture_pattern": [0, 1, 2, 3]
     })
     assert res.status_code == 400
     assert "2 attempts remaining" in res.json()["detail"].lower()
@@ -154,21 +159,27 @@ def test_step_up_max_attempts_lockout(client: TestClient, auth_user, db_session)
     })
     session_id = sess_res.json()["id"]
 
+    client.post("/api/security/adaptive/enroll/gesture", headers=headers, json={
+        "pattern": [0, 4, 8, 12], "confirm_pattern": [0, 4, 8, 12]
+    })
     client.post("/api/security/step-up/challenge", headers=headers, json={
-        "session_id": session_id
+        "session_id": session_id,
+        "preferred_factor": "GESTURE_PATTERN"
     })
 
-    # Fail 3 consecutive times
-    client.post("/api/security/step-up/verify", headers=headers, json={"session_id": session_id, "challenge_code": "111111"})
-    client.post("/api/security/step-up/verify", headers=headers, json={"session_id": session_id, "challenge_code": "222222"})
-    third_res = client.post("/api/security/step-up/verify", headers=headers, json={"session_id": session_id, "challenge_code": "333333"})
+    # Fail 3 consecutive times on GESTURE_PATTERN -> 3rd triggers 423 Portal Security Lock
+    client.post("/api/security/step-up/verify", headers=headers, json={"session_id": session_id, "challenge_type": "GESTURE_PATTERN", "gesture_pattern": [0, 1, 2, 3]})
+    client.post("/api/security/step-up/verify", headers=headers, json={"session_id": session_id, "challenge_type": "GESTURE_PATTERN", "gesture_pattern": [0, 1, 2, 3]})
+    third_res = client.post("/api/security/step-up/verify", headers=headers, json={"session_id": session_id, "challenge_type": "GESTURE_PATTERN", "gesture_pattern": [0, 1, 2, 3]})
 
-    assert third_res.status_code == 400
-    assert "maximum verification attempts exceeded" in third_res.json()["detail"].lower()
+    assert third_res.status_code == 423
+    assert third_res.headers.get("X-Cognisec-Portal-Locked") == "true"
 
-    # Session must now be locked to RESTRICTED in database
+    # Session must now be RESTRICTED (NOT TERMINATED) in database
+    db_session.expire_all()
     sess_record = db_session.query(Session).filter(Session.id == session_id).first()
     assert sess_record.status == "RESTRICTED"
+    assert sess_record.logout_time is None
 
 
 def test_step_up_challenge_single_use(client: TestClient, auth_user):
@@ -305,16 +316,16 @@ def test_step_up_failed_leaves_access_protected(client: TestClient, auth_user, d
         "session_id": session_id
     })
 
-    # Submit wrong OTP
+    # Submit wrong OTP -> 1 attempt limit locks portal (423) and keeps access protected (NOT ACTIVE)
     res = client.post("/api/security/step-up/verify", headers=headers, json={
         "session_id": session_id,
         "challenge_code": "000000"
     })
-    assert res.status_code == 400
+    assert res.status_code == 423
 
-    # Verify session remains locked/STEP_UP_REQUIRED (NOT unlocked)
+    # Verify session remains non-ACTIVE/restricted (NOT unlocked)
     db_session.refresh(sess_record)
-    assert sess_record.status == "STEP_UP_REQUIRED"
+    assert sess_record.status in ("STEP_UP_REQUIRED", "RESTRICTED")
 
 
 

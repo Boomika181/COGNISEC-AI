@@ -86,7 +86,7 @@ def test_1_smtp_success_response(monkeypatch):
     )
 
     assert success is True
-    assert "dispatched successfully" in msg.lower()
+    assert "submitted to the mail server" in msg.lower()
     mock_server.starttls.assert_called_once()
     mock_server.login.assert_called_once_with("testuser@cognisec.ai", "testpass")
     mock_server.sendmail.assert_called_once()
@@ -452,11 +452,12 @@ def test_14_incorrect_otp_terminates_session(client: TestClient, db_session: Ses
         "otp_code": "000000",
         "challenge_id": challenge_id
     })
-    assert ver_res.status_code == 400
+    assert ver_res.status_code == 423
 
     db_session.expire_all()
     sess = db_session.query(SessionModel).filter(SessionModel.id == session_id).first()
-    assert sess.status == "TERMINATED"
+    assert sess.status == "RESTRICTED"
+    assert sess.logout_time is None
 
 
 # ==============================================================================

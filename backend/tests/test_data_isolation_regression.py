@@ -60,10 +60,21 @@ def test_soc_metrics_strictly_exclude_simulated_sessions_and_historical_noise(cl
     headers = {"Authorization": f"Bearer {admin_token}"}
     now_utc = datetime.now(timezone.utc)
 
+    genuine_user = User(
+        email="genuine.metrics.user@company.net",
+        name="Genuine Metrics User",
+        password_hash="pw_hash",
+        role="USER",
+        account_status="ACTIVE",
+    )
+    db_session.add(genuine_user)
+    db_session.commit()
+    db_session.refresh(genuine_user)
+
     # 1. Create a genuine active session using SessionService
     genuine_sess = SessionService.create_session(
         db_session,
-        user_id=1,
+        user_id=genuine_user.id,
         application="college",
         status="ACTIVE"
     )
@@ -109,16 +120,27 @@ def test_soc_api_scope_isolation_filtering(client, db_session, admin_token):
     headers = {"Authorization": f"Bearer {admin_token}"}
     now_utc = datetime.now(timezone.utc)
 
+    genuine_user = User(
+        email="genuine.isolation.user@company.net",
+        name="Genuine Isolation User",
+        password_hash="pw_hash",
+        role="USER",
+        account_status="ACTIVE",
+    )
+    db_session.add(genuine_user)
+    db_session.commit()
+    db_session.refresh(genuine_user)
+
     # Seed genuine and simulated sessions using SessionService
     g_sess = SessionService.create_session(
         db_session,
-        user_id=1,
+        user_id=genuine_user.id,
         application="portal",
         status="ACTIVE"
     )
     s_sess = SessionService.create_session(
         db_session,
-        user_id=1,
+        user_id=genuine_user.id,
         application="portal",
         status="TERMINATED"
     )
@@ -131,7 +153,7 @@ def test_soc_api_scope_isolation_filtering(client, db_session, admin_token):
 
     # Seed genuine and simulated events
     g_event = SecurityEvent(
-        user_id=1,
+        user_id=genuine_user.id,
         session_id=g_sess.id,
         application="portal",
         event_type="LOGIN_SUCCESS",
@@ -143,7 +165,7 @@ def test_soc_api_scope_isolation_filtering(client, db_session, admin_token):
         timestamp=now_utc
     )
     s_event = SecurityEvent(
-        user_id=1,
+        user_id=genuine_user.id,
         session_id=sim_id,
         application="portal",
         event_type="ANOMALOUS_BEHAVIOR_DETECTED",
@@ -158,7 +180,7 @@ def test_soc_api_scope_isolation_filtering(client, db_session, admin_token):
 
     # Seed genuine and simulated alerts
     g_alert = Alert(
-        user_id=1,
+        user_id=genuine_user.id,
         application="portal",
         alert_type="NEW_DEVICE_DETECTED",
         message="Legitimate login from macOS device",
@@ -167,7 +189,7 @@ def test_soc_api_scope_isolation_filtering(client, db_session, admin_token):
         created_at=now_utc
     )
     s_alert = Alert(
-        user_id=1,
+        user_id=genuine_user.id,
         application="portal",
         alert_type="SIMULATED_ATTACK",
         message=f"[SIMULATED SCENARIO] {sim_id} high risk detected",
@@ -232,9 +254,20 @@ def test_devices_active_vs_persisted_and_hardware_evidence(client, db_session, a
     headers = {"Authorization": f"Bearer {admin_token}"}
     now_utc = datetime.now(timezone.utc)
 
+    live_user = User(
+        email="genuine.device.user@company.net",
+        name="Genuine Device User",
+        password_hash="pw_hash",
+        role="USER",
+        account_status="ACTIVE",
+    )
+    db_session.add(live_user)
+    db_session.commit()
+    db_session.refresh(live_user)
+
     # 1. Device with live active session
     dev_live = Device(
-        user_id=1,
+        user_id=live_user.id,
         device_id="dev_macbook_live",
         device_fingerprint="macbook_fingerprint_sha256_live",
         nickname="Admin MacBook Pro M2",
@@ -298,7 +331,7 @@ def test_devices_active_vs_persisted_and_hardware_evidence(client, db_session, a
     # Bind dev_live to an active session
     active_sess = SessionService.create_session(
         db_session,
-        user_id=1,
+        user_id=live_user.id,
         application="portal",
         status="ACTIVE"
     )

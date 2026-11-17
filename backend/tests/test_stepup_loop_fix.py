@@ -88,7 +88,7 @@ def test_case_01_first_otp_challenge_created_and_delivered(client: TestClient, a
     assert "challenge_id" in data
     assert data["challenge_type"] == "OTP"
     assert len(data["otp"]) == 6
-    assert data["delivery_status"] == "SENT"
+    assert data["delivery_status"] == "SMTP_ACCEPTED"
 
 
 # ==============================================================================
@@ -282,19 +282,19 @@ def test_case_06_invalid_otp_does_not_restore_access(client: TestClient, auth_us
             "session_id": session_id
         })
 
-    # Submit wrong OTP code
+    # Submit wrong OTP code -> 1-attempt OTP limit locks portal (423) and leaves session unverified
     bad_res = client.post("/api/security/step-up/verify", headers=headers, json={
         "session_id": session_id,
         "challenge_type": "OTP",
         "challenge_code": "000000"
     })
-    assert bad_res.status_code == 400
-    assert "Invalid verification" in bad_res.json()["detail"]
+    assert bad_res.status_code == 423
+    assert bad_res.headers.get("X-Cognisec-Portal-Locked") == "true"
 
-    # Verify session remains locked in STEP_UP_REQUIRED
+    # Verify session remains restricted/unverified (NEVER ACTIVE)
     db_session.expire_all()
     sess_check = db_session.query(Session).filter(Session.id == session_id).first()
-    assert sess_check.status == "STEP_UP_REQUIRED"
+    assert sess_check.status in ("STEP_UP_REQUIRED", "RESTRICTED")
 
 
 # ==============================================================================
@@ -394,7 +394,7 @@ def test_case_09_critical_risk_termination_remains_final(client: TestClient, aut
     chal_res = client.post("/api/security/step-up/challenge", headers=headers, json={
         "session_id": session_id
     })
-    assert chal_res.status_code == 400
+    assert chal_res.status_code in (400, 401)
     assert "terminated" in chal_res.json()["detail"].lower()
 
     # 3. Cannot verify terminated session
@@ -403,7 +403,7 @@ def test_case_09_critical_risk_termination_remains_final(client: TestClient, aut
         "challenge_type": "OTP",
         "challenge_code": "123456"
     })
-    assert ver_res.status_code == 400
+    assert ver_res.status_code in (400, 401)
     assert "terminated" in ver_res.json()["detail"].lower()
 
 

@@ -11,6 +11,23 @@ def sync_device_and_notification_schemas():
     """
     try:
         insp = inspect(engine)
+        if insp.has_table("users"):
+            user_cols = {col["name"] for col in insp.get_columns("users")}
+            user_cols_to_add = [
+                ("registration_source", "VARCHAR(40)"),
+                ("email_verified", "BOOLEAN DEFAULT FALSE NOT NULL" if engine.dialect.name != "sqlite" else "BOOLEAN DEFAULT 0 NOT NULL"),
+                ("email_verified_at", "TIMESTAMP"),
+                ("security_enrollment_completed", "BOOLEAN DEFAULT TRUE NOT NULL" if engine.dialect.name != "sqlite" else "BOOLEAN DEFAULT 1 NOT NULL"),
+            ]
+            with engine.begin() as conn:
+                for col_name, col_type in user_cols_to_add:
+                    if col_name not in user_cols:
+                        logger.info(f"[SchemaSync] Adding column {col_name} to users table")
+                        try:
+                            conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type};"))
+                        except Exception as err:
+                            logger.debug(f"[SchemaSync] Users column add notice: {err}")
+
         if not insp.has_table("devices"):
             return
 
@@ -332,20 +349,66 @@ def sync_user_schema():
 def sync_doctor_roles_and_identities():
     """
     Safely inspects and synchronizes doctor identities and ensures healthcare tables are created:
-    - Non-destructively provisions healthcare_appointments table if not present.
-    - Idempotently harmonizes role='DOCTOR' for verified medical staff accounts (e.g. dr.boomika@ayusync.med.in, dr.sarah@aetheriahealth.org).
-    - Provisions development-only doctor test account (doctor.test@ayusync.med.in) in dev/test mode.
+    - Non-destructively provisions healthcare_appointments and otp_challenges tables if not present.
+    - Adds newly introduced appointment & OTP columns idempotently across SQLite/Postgres.
+    - Idempotently harmonizes role='DOCTOR' for verified medical staff accounts.
     - Preserves all existing users, devices, sessions, and records untouched.
     """
     try:
         from app.models.appointment import HealthcareAppointment
+        from app.models.otp_challenge import OTPChallenge
         from app.models.user import User
         from app.database.connection import SessionLocal
         from app.core.config import settings
         from app.core.security import get_password_hash
 
-        # 1. Create table non-destructively if not exists
+        # 1. Create tables non-destructively if not exist
         HealthcareAppointment.__table__.create(bind=engine, checkfirst=True)
+        OTPChallenge.__table__.create(bind=engine, checkfirst=True)
+
+        # 1b. Idempotently add new appointment and OTP challenge columns
+        insp = inspect(engine)
+        ts_type = "TIMESTAMP WITH TIME ZONE" if engine.dialect.name != "sqlite" else "TIMESTAMP"
+        if insp.has_table("healthcare_appointments"):
+            apt_cols = {c["name"] for c in insp.get_columns("healthcare_appointments")}
+            apt_additions = [
+                ("patient_age", "INTEGER"),
+                ("patient_gender", "VARCHAR(20)"),
+                ("reason_for_visit", "VARCHAR(500)"),
+                ("consultation_fee", "VARCHAR(30)"),
+                ("otp_challenge_id", "VARCHAR(64)"),
+                ("verified_at", ts_type),
+            ]
+            with engine.begin() as conn:
+                for col_name, col_type in apt_additions:
+                    if col_name not in apt_cols:
+                        logger.info(f"[SchemaSync] Adding column {col_name} to healthcare_appointments")
+                        try:
+                            conn.execute(text(f"ALTER TABLE healthcare_appointments ADD COLUMN {col_name} {col_type};"))
+                        except Exception as col_err:
+                            logger.debug(f"[SchemaSync] healthcare_appointments column notice: {col_err}")
+                if engine.dialect.name != "sqlite":
+                    try:
+                        conn.execute(text("ALTER TABLE healthcare_appointments ALTER COLUMN status TYPE VARCHAR(30);"))
+                    except Exception as st_err:
+                        logger.debug(f"[SchemaSync] healthcare_appointments status type notice: {st_err}")
+
+        if insp.has_table("otp_challenges"):
+            otp_cols = {c["name"]: c for c in insp.get_columns("otp_challenges")}
+            with engine.begin() as conn:
+                if "appointment_id" not in otp_cols:
+                    logger.info("[SchemaSync] Adding column appointment_id to otp_challenges")
+                    try:
+                        conn.execute(text("ALTER TABLE otp_challenges ADD COLUMN appointment_id INTEGER;"))
+                    except Exception as col_err:
+                        logger.debug(f"[SchemaSync] otp_challenges appointment_id notice: {col_err}")
+                if engine.dialect.name != "sqlite":
+                    for nullable_col in ("session_id", "user_id"):
+                        if nullable_col in otp_cols and not otp_cols[nullable_col].get("nullable", True):
+                            try:
+                                conn.execute(text(f"ALTER TABLE otp_challenges ALTER COLUMN {nullable_col} DROP NOT NULL;"))
+                            except Exception as null_err:
+                                logger.debug(f"[SchemaSync] otp_challenges {nullable_col} nullable notice: {null_err}")
 
         # 2. Harmonize doctor roles for verified hospital medical officers
         db = SessionLocal()
@@ -386,6 +449,63 @@ def sync_doctor_roles_and_identities():
             db.close()
     except Exception as e:
         logger.warning(f"[SchemaSync] Doctor identity synchronization notice: {e}")
+
+
+def sync_portal_lock_and_counter_schemas():
+    """
+    Non-destructively ensures portal_security_locks, verification_attempt_counters,
+    and per-factor attempt columns on password_change_transactions exist across SQLite & PostgreSQL.
+    """
+    try:
+        from app.models.portal_lock import PortalSecurityLock, VerificationAttemptCounter
+        from app.models.password_change import PasswordChangeTransaction
+
+        PortalSecurityLock.__table__.create(bind=engine, checkfirst=True)
+        VerificationAttemptCounter.__table__.create(bind=engine, checkfirst=True)
+        PasswordChangeTransaction.__table__.create(bind=engine, checkfirst=True)
+
+        insp = inspect(engine)
+        if insp.has_table("verification_attempt_counters"):
+            cnt_cols = {c["name"] for c in insp.get_columns("verification_attempt_counters")}
+            with engine.begin() as conn:
+                if "session_id" not in cnt_cols:
+                    try:
+                        conn.execute(text("ALTER TABLE verification_attempt_counters ADD COLUMN session_id VARCHAR(64) DEFAULT '' NOT NULL;"))
+                    except Exception as col_err:
+                        logger.debug(f"[SchemaSync] verification_attempt_counters session_id notice: {col_err}")
+                try:
+                    if engine.dialect.name != "sqlite":
+                        conn.execute(text("ALTER TABLE verification_attempt_counters DROP CONSTRAINT IF EXISTS uq_verification_attempt_scope;"))
+                    else:
+                        conn.execute(text("DROP INDEX IF EXISTS uq_verification_attempt_scope;"))
+                except Exception as drop_err:
+                    logger.debug(f"[SchemaSync] uq_verification_attempt_scope drop notice: {drop_err}")
+                try:
+                    conn.execute(text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_verification_attempt_session_scope "
+                        "ON verification_attempt_counters (user_id, session_id, application, verification_purpose, factor_key);"
+                    ))
+                except Exception as idx_err:
+                    logger.debug(f"[SchemaSync] uq_verification_attempt_session_scope notice: {idx_err}")
+
+        if insp.has_table("password_change_transactions"):
+            existing_cols = {c["name"] for c in insp.get_columns("password_change_transactions")}
+            additions = [
+                ("image_attempts", "INTEGER DEFAULT 0 NOT NULL"),
+                ("image_max_attempts", "INTEGER DEFAULT 2 NOT NULL"),
+                ("private_attempts", "INTEGER DEFAULT 0 NOT NULL"),
+                ("private_max_attempts", "INTEGER DEFAULT 2 NOT NULL"),
+            ]
+            with engine.begin() as conn:
+                for col_name, col_type in additions:
+                    if col_name not in existing_cols:
+                        try:
+                            conn.execute(text(f"ALTER TABLE password_change_transactions ADD COLUMN {col_name} {col_type};"))
+                        except Exception as col_err:
+                            logger.debug(f"[SchemaSync] password_change_transactions {col_name} notice: {col_err}")
+    except Exception as e:
+        logger.warning(f"[SchemaSync] Portal lock & counter schema sync notice: {e}")
+
 
 
 

@@ -18,7 +18,7 @@ def reset_challenges_and_mock_smtp(monkeypatch):
     StepUpService.reset()
     dispatched_emails = []
 
-    def fake_send_otp_email(recipient_email, otp_code, expires_in_minutes=5, challenge_id=None):
+    def fake_send_otp_email(recipient_email, otp_code, expires_in_minutes=5, challenge_id=None, **kwargs):
         dispatched_emails.append({
             "recipient": recipient_email,
             "otp": otp_code,
@@ -26,7 +26,18 @@ def reset_challenges_and_mock_smtp(monkeypatch):
         })
         return True, f"Accepted by Gmail SMTP for {recipient_email}"
 
+    def fake_send_exam_otp_email(recipient_email, otp_code, course_name=None, assessment_name=None, expires_in_minutes=5, challenge_id=None, **kwargs):
+        dispatched_emails.append({
+            "recipient": recipient_email,
+            "otp": otp_code,
+            "course_name": course_name,
+            "assessment_name": assessment_name,
+            "challenge_id": challenge_id
+        })
+        return True, f"Accepted by Gmail SMTP for {recipient_email}"
+
     monkeypatch.setattr(EmailService, "send_otp_email", staticmethod(fake_send_otp_email))
+    monkeypatch.setattr(EmailService, "send_exam_otp_email", staticmethod(fake_send_exam_otp_email))
     return dispatched_emails
 
 
@@ -99,7 +110,7 @@ def _login_and_complete_20s_observation(
     assert otp_req.status_code == 200, otp_req.text
     otp_data = otp_req.json()
     assert otp_data["challenge_type"] == "LOGIN_OTP"
-    assert "accepted by gmail smtp" in otp_data["message"].lower() or "sent" in otp_data["message"].lower()
+    assert "submitted to the mail server" in otp_data["message"].lower()
 
     # Verify login OTP to activate session
     ver_res = client.post("/api/auth/login-otp/verify", json={
@@ -181,23 +192,6 @@ def test_scenario_4_5_6_7_8_9_college_online_exam_otp_flow(
     assert chal2["deduplicated"] is True
     assert len(reset_challenges_and_mock_smtp) == emails_before + 1
 
-    # Scenario 6: Incorrect exam OTP -> Exam remains locked
-    wrong_res = client.post("/api/security/exam-otp/verify", json={
-        "session_id": sid,
-        "challenge_id": chal1["challenge_id"],
-        "otp": "000000" if chal1["otp"] != "000000" else "999999",
-        "course_name": course
-    }, headers=headers)
-    assert wrong_res.status_code == 400
-    assert "Invalid verification code" in wrong_res.json()["detail"]
-
-    # Direct exam API access still locked after wrong OTP
-    still_locked = client.get(
-        f"/api/security/exam-session?session_id={sid}&course_name={course}",
-        headers=headers
-    )
-    assert still_locked.status_code == 403
-
     # Scenario 5: Correct exam OTP -> Exam launches and protected exam-session endpoint succeeds
     right_res = client.post("/api/security/exam-otp/verify", json={
         "session_id": sid,
@@ -226,7 +220,7 @@ def test_scenario_4_5_6_7_8_9_college_online_exam_otp_flow(
     assert exam_access.status_code == 200
     assert exam_access.json()["authorized"] is True
 
-    # Scenario 7: Expired exam OTP -> Exam remains locked
+    # Scenario 7: Expired exam OTP -> Exam remains locked (expiry checked before failure counting)
     from app.services.session_service import SessionService
     SessionService.revoke_application_grants(db, session_id=sid, application="college", resource="online_exam")
     req_exp = client.post("/api/security/exam-otp/request", json={
@@ -260,6 +254,34 @@ def test_scenario_4_5_6_7_8_9_college_online_exam_otp_flow(
         headers=headers
     )
     assert locked_after_exp.status_code == 403
+
+    # Scenario 6: Incorrect exam OTP -> 423 Portal Security Lock (1-attempt policy), exam remains locked
+    req_wrong = client.post("/api/security/exam-otp/request", json={
+        "session_id": sid,
+        "course_name": course
+    }, headers=headers)
+    assert req_wrong.status_code == 200
+    wrong_chal = req_wrong.json()
+    wrong_res = client.post("/api/security/exam-otp/verify", json={
+        "session_id": sid,
+        "challenge_id": wrong_chal["challenge_id"],
+        "otp": "000000" if wrong_chal["otp"] != "000000" else "999999",
+        "course_name": course
+    }, headers=headers)
+    assert wrong_res.status_code == 423
+    assert wrong_res.headers.get("X-Cognisec-Portal-Locked") == "true"
+
+    # Direct exam API access remains locked with 423 after portal lockout
+    still_locked = client.get(
+        f"/api/security/exam-session?session_id={sid}&course_name={course}",
+        headers=headers
+    )
+    assert still_locked.status_code == 423
+
+    # Clean up active portal lock on shared test user so subsequent tests can sign in to college cleanly
+    from app.models.portal_lock import PortalSecurityLock
+    db.query(PortalSecurityLock).filter(PortalSecurityLock.application == "college").update({"lock_status": "RECOVERED"})
+    db.commit()
 
 
 def test_scenario_10_critical_risk_terminates_session_and_denies_access(client: TestClient, db_session: Session):

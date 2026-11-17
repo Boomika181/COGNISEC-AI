@@ -1,7 +1,9 @@
+import json
 import datetime
 import logging
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Header, Query
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
@@ -184,6 +186,18 @@ def enroll_private_response(
     return MfaEnrollResponse(**result)
 
 
+@router.post("/adaptive/complete-enrollment")
+def complete_adaptive_enrollment(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Finalizes mandatory adaptive authentication enrollment after verifying all 3 factors
+    (GESTURE_PATTERN, COGNITIVE_IMAGE_SEQUENCE, PRIVATE_RESPONSE) are persisted in the database.
+    """
+    return AdaptiveAuthService.complete_enrollment(db=db, user_id=current_user.id)
+
+
 # ==============================================================================
 # ADAPTIVE STEP-UP CHALLENGE & VERIFICATION LIFECYCLE
 # ==============================================================================
@@ -211,12 +225,11 @@ def request_step_up_challenge(
 
     session = SessionService.get_session(db, request.session_id)
     verify_session_access(session, current_user)
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
 
     if session.status == "TERMINATED":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot issue challenge for a terminated session."
-        )
+        from app.services.portal_lock_service import PortalLockService
+        PortalLockService.raise_terminated_http_exception(status_code=status.HTTP_401_UNAUTHORIZED)
 
     if session.current_risk_level == "CRITICAL":
         raise HTTPException(
@@ -224,10 +237,40 @@ def request_step_up_challenge(
             detail="Cannot issue challenge: Session terminated due to critical security risk."
         )
 
-    # Brute-force lockout protection: do not issue challenges if session was locked
+    norm_app = SessionService.normalize_application(request.application or session.application)
+    explicit_resource = SessionService.normalize_resource(request.resource) if request.resource else None
+    req_purpose = (request.challenge_purpose or "").upper().strip()
+
+    from app.services.portal_lock_service import PortalLockService
+    PortalLockService.enforce_not_locked(db, current_user.id, norm_app or session.application)
+
+    if session.status == "PENDING_OTP" and (session.current_risk_level or "LOW").upper().strip() not in ("HIGH", "CRITICAL"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Initial Email OTP login verification (/api/auth/login-otp/verify) must complete before step-up or confidential vault challenges."
+        )
+
+    if (
+        session.status == "PENDING_OBSERVATION"
+        and (session.current_risk_level or "LOW").upper().strip() not in ("HIGH", "CRITICAL")
+        and req_purpose == "CONFIDENTIAL_RESOURCE"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Initial 20-second behavioral observation and Email OTP verification must complete before confidential vault challenges."
+        )
+
+    # Brute-force lockout protection: do not issue challenges if portal/session was locked
+    from sqlalchemy import or_, and_
     hard_lock = db.query(SecurityEvent).filter(
         SecurityEvent.session_id == session.id,
-        SecurityEvent.event_type.in_(["STEP_UP_LOCKED", "ADMIN_REVOCATION", "SESSION_TERMINATED"])
+        or_(
+            SecurityEvent.event_type.in_(["ADMIN_REVOCATION", "SESSION_TERMINATED"]),
+            and_(
+                SecurityEvent.event_type == "STEP_UP_LOCKED",
+                SecurityEvent.application == (norm_app or session.application),
+            ),
+        ),
     ).first()
     if hard_lock:
         raise HTTPException(
@@ -235,35 +278,48 @@ def request_step_up_challenge(
             detail="Session locked after exceeding maximum verification attempts. Please sign out and sign in again."
         )
 
-    # Resolve latest session risk score from security events
+    # Resolve authoritative session risk score and tier
     latest_event = db.query(SecurityEvent).filter(
         SecurityEvent.session_id == session.id
     ).order_by(SecurityEvent.id.desc()).first()
 
-    risk_score = 0.40
-    if session.current_risk_level == "LOW":
+    sess_level = (session.current_risk_level or "").upper().strip()
+    if sess_level == "LOW":
         risk_score = 0.15
-    elif session.current_risk_level == "MEDIUM":
+    elif sess_level == "MEDIUM":
         risk_score = 0.45
-    elif session.current_risk_level == "HIGH":
+    elif sess_level == "HIGH":
         risk_score = 0.75
+    elif sess_level == "CRITICAL":
+        risk_score = 0.90
     elif latest_event and latest_event.risk_score is not None:
         risk_score = float(latest_event.risk_score)
+        sess_level = RiskService.classify_risk_level(risk_score)
+    else:
+        risk_score = 0.15
+        sess_level = "LOW"
 
-    norm_app = SessionService.normalize_application(request.application or session.application)
-    norm_res = SessionService.normalize_resource(request.resource) if request.resource else SessionService.get_resource_for_application(norm_app)
+    # (norm_app, explicit_resource resolved above)
 
-    # Generate adaptive challenge bound to application and resource
+    # Generate adaptive challenge immediately via authoritative deterministic StepUpService
+    # (never wait for Gemini or agent execution on authentication-critical challenge creation)
     challenge_data = StepUpService.create_adaptive_challenge(
         session_id=session.id,
         user_id=current_user.id,
         db=db,
         risk_score=risk_score,
-        risk_level=session.current_risk_level or "MEDIUM",
+        risk_level=sess_level,
         preferred_factor=request.preferred_factor,
         ttl_seconds=300,
         application=norm_app,
-        resource=norm_res
+        resource=explicit_resource,
+        challenge_purpose=request.challenge_purpose,
+    )
+
+    logger.info(
+        f"[StepUpChallenge] session_id={session.id} risk_level={sess_level} risk_score={risk_score:.2f} "
+        f"app={norm_app or session.application} resource={explicit_resource} "
+        f"preferred={request.preferred_factor} selected={challenge_data.get('challenge_type')}"
     )
 
     # Record security event in audit trail
@@ -272,12 +328,37 @@ def request_step_up_challenge(
         session_id=session.id,
         application=norm_app or session.application,
         event_type="STEP_UP_CHALLENGE_ISSUED",
-        severity=session.current_risk_level or "MEDIUM",
+        severity=sess_level,
+        risk_score=float(risk_score),
         decision="STEP_UP_VERIFICATION",
-        details=f"Adaptive challenge '{challenge_data['challenge_type']}' issued for application '{norm_app or session.application}'."
+        details=json.dumps({
+            "message": f"Adaptive challenge '{challenge_data['challenge_type']}' issued for application '{norm_app or session.application}'."
+        })
     )
     db.add(sec_event)
     db.commit()
+    db.refresh(sec_event)
+
+    # Dispatch SecurityOrchestrator asynchronously after authoritative challenge creation
+    try:
+        from app.agents.execution.orchestrator import SecurityOrchestrator
+        SecurityOrchestrator.dispatch_background(
+            db_bind=db.get_bind(),
+            event_id=sec_event.id,
+            user_id=current_user.id,
+            session_id=session.id,
+            application=norm_app or session.application,
+            deterministic_risk_score=float(risk_score),
+            deterministic_risk_level=sess_level,
+            contributing_reasons=["step_up_challenge_requested"],
+            protected_resource=explicit_resource,
+            auto_containment=False,
+            skip_containment=True,
+            idempotency_key=f"stepup:{session.id}:{sec_event.id}",
+            trigger_event="STEP_UP_CHALLENGE_REQUEST",
+        )
+    except Exception as orch_err:
+        logger.warning(f"StepUp SecurityOrchestrator dispatch failed softly; challenge preserved: {orch_err}")
 
     return StepUpChallengeResponse(**challenge_data)
 
@@ -304,12 +385,11 @@ def verify_step_up_challenge(
 
     session = SessionService.get_session(db, request.session_id)
     verify_session_access(session, current_user)
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
 
     if session.status == "TERMINATED":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot verify a terminated session."
-        )
+        from app.services.portal_lock_service import PortalLockService
+        PortalLockService.raise_terminated_http_exception(status_code=status.HTTP_401_UNAUTHORIZED)
 
     if session.current_risk_level == "CRITICAL":
         raise HTTPException(
@@ -317,10 +397,34 @@ def verify_step_up_challenge(
             detail="Cannot override CRITICAL security risk: session is irrevocably revoked."
         )
 
-    norm_app = SessionService.normalize_application(request.application or session.application)
-    norm_res = SessionService.normalize_resource(request.resource) if request.resource else SessionService.get_resource_for_application(norm_app)
+    req_purpose = (request.challenge_purpose or "").upper().strip()
+    raw_explicit_res = SessionService.normalize_resource(request.resource) if request.resource else None
 
-    # Verify adaptive challenge submission bound to application and resource
+    if session.status == "PENDING_OTP" and (session.current_risk_level or "LOW").upper().strip() not in ("HIGH", "CRITICAL"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Initial Email OTP login verification must complete before adaptive step-up verification."
+        )
+
+    if (
+        session.status == "PENDING_OBSERVATION"
+        and (session.current_risk_level or "LOW").upper().strip() not in ("HIGH", "CRITICAL")
+        and req_purpose == "CONFIDENTIAL_RESOURCE"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Initial 20-second behavioral observation and Email OTP verification must complete before confidential vault verification."
+        )
+
+    norm_app = SessionService.normalize_application(request.application or session.application)
+    from app.services.portal_lock_service import PortalLockService
+    PortalLockService.enforce_not_locked(db, current_user.id, norm_app or session.application)
+    if req_purpose == "SESSION_STEP_UP" and not request.resource:
+        norm_res = None
+    else:
+        norm_res = raw_explicit_res if request.resource else SessionService.get_resource_for_application(norm_app)
+
+    # Verify adaptive challenge submission bound to application, resource, and purpose
     success, message, is_locked, details = StepUpService.verify_adaptive_challenge(
         session_id=request.session_id,
         user_id=current_user.id,
@@ -333,49 +437,35 @@ def verify_step_up_challenge(
         application=norm_app,
         resource=norm_res,
         challenge_id=request.challenge_id,
-        stage=request.stage
+        stage=request.stage,
+        challenge_purpose=request.challenge_purpose,
     )
 
     if not success:
+        from app.services.portal_lock_service import PortalLockService
         if is_locked:
-            # Check if repeated vault denials combined with failed verification elevate to CRITICAL
-            from app.services.access_tracker import ConfidentialAccessTracker
-            recent_denials = ConfidentialAccessTracker.get_recent_denials_count(current_user.id, session.id)
-            if recent_denials >= 2 or session.current_risk_level in ("HIGH", "CRITICAL"):
-                session.status = "TERMINATED"
-                session.current_risk_level = "CRITICAL"
-                sec_event = SecurityEvent(
+            active_lock = PortalLockService.get_active_lock(db, current_user.id, norm_app or session.application)
+            if active_lock:
+                PortalLockService.raise_locked_http_exception(active_lock, status_code=status.HTTP_423_LOCKED)
+            if session.current_risk_level in ("CRITICAL",) or session.status == "TERMINATED":
+                PortalLockService.terminate_session_and_revoke_grants(
+                    db=db,
                     user_id=current_user.id,
                     session_id=session.id,
                     application=norm_app or session.application,
-                    event_type="SESSION_TERMINATED",
-                    severity="CRITICAL",
-                    decision="TERMINATE_SESSION",
-                    details="Session terminated due to repeated confidential vault access denials combined with failed verification attempts."
+                    verification_purpose=req_purpose or "STEP_UP",
+                    factor_key=request.challenge_type or "UNKNOWN",
+                    reason="Critical security risk termination during step-up verification.",
+                    emit_step_up_locked_event=True,
                 )
-                db.add(sec_event)
-                db.commit()
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Session terminated due to critical security risk. Access denied."
+                PortalLockService.raise_terminated_http_exception(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=PortalLockService.SESSION_TERMINATED_MESSAGE,
                 )
-
-            # Session locked due to brute-force attempts
-            SessionService.update_session_status(db, request.session_id, status="RESTRICTED", risk_level="HIGH")
-            sec_event = SecurityEvent(
-                user_id=current_user.id,
-                session_id=session.id,
-                application=norm_app or session.application,
-                event_type="STEP_UP_LOCKED",
-                severity="HIGH",
-                decision="RESTRICT",
-                details="Session locked to RESTRICTED after exceeding maximum adaptive verification attempts."
-            )
-            db.add(sec_event)
-            db.commit()
+            PortalLockService.enforce_not_locked(db, current_user.id, norm_app or session.application)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Maximum verification attempts exceeded. Session has been restricted for security."
+                detail=message or "Maximum verification attempts exceeded. Challenge locked.",
             )
 
         # Log failed verification attempt
@@ -391,9 +481,13 @@ def verify_step_up_challenge(
         db.add(sec_event)
         db.commit()
 
+        rem_hdr = {}
+        if isinstance(details, dict) and details.get("attempts_remaining") is not None:
+            rem_hdr["X-Cognisec-Attempts-Remaining"] = str(details["attempts_remaining"])
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=message
+            detail=message,
+            headers=rem_hdr or None,
         )
 
     # Check for intermediate Stage 1 verification success of HIGH_RISK_DUAL
@@ -428,11 +522,20 @@ def verify_step_up_challenge(
             challenge_id=details.get("challenge_id")
         )
 
-    factor_to_grant = request.challenge_type or "GESTURE_PATTERN"
+    factor_to_grant = (details.get("challenge_type") if isinstance(details, dict) else None) or request.challenge_type or "OTP"
+    chal_purpose = (details.get("challenge_purpose") if isinstance(details, dict) else None) or req_purpose or ""
 
-    # Verification succeeded: Authoritatively create application-scoped grant in database if portal resource is targeted
+    # Verification succeeded: Authoritatively create application-scoped grant in database ONLY for protected vaults
+    # when the challenge was actually scoped to a confidential vault (never from PASSWORD_CHANGE or SESSION_STEP_UP)
     grant = None
-    if norm_app and norm_res and norm_app in ("college", "shopping", "healthcare"):
+    is_protected_vault = norm_res in ("academic_vault", "financial_vault", "ehr_vault")
+    if (
+        norm_app
+        and is_protected_vault
+        and norm_app in ("college", "shopping", "healthcare")
+        and factor_to_grant != "OTP"
+        and chal_purpose not in ("SESSION_STEP_UP", "PASSWORD_CHANGE", "HEALTHCARE_BOOKING")
+    ):
         grant = SessionService.record_application_grant(
             db=db,
             session_id=request.session_id,
@@ -535,7 +638,8 @@ def get_user_session_security_status(
         and session.current_risk_level not in ("HIGH", "CRITICAL")
     )
 
-    if session.status == "TERMINATED" or session.current_risk_level in ("CRITICAL", "TERMINATED"):
+    risk_lvl = (session.current_risk_level or "LOW").upper().strip()
+    if session.status == "TERMINATED" or risk_lvl in ("CRITICAL", "TERMINATED"):
         return UserSecurityOutcome(
             decision="TERMINATE_SESSION",
             message="Session terminated for security protection.",
@@ -543,8 +647,16 @@ def get_user_session_security_status(
             verification_required=False,
             confidential_access_granted=False,
             step_up_fresh=False,
-            step_up_factor=None
+            step_up_factor=None,
+            risk_level="CRITICAL",
+            recommended_factor="TERMINATE"
         )
+
+    rec_factor = "EMAIL_OTP"
+    if risk_lvl == "HIGH":
+        rec_factor = "HIGH_RISK_DUAL"
+    elif risk_lvl == "MEDIUM":
+        rec_factor = "GESTURE_PATTERN"
 
     if session.status == "ACTIVE":
         return UserSecurityOutcome(
@@ -554,7 +666,9 @@ def get_user_session_security_status(
             verification_required=False,
             confidential_access_granted=confidential_allowed,
             step_up_fresh=is_fresh,
-            step_up_factor=session.step_up_factor
+            step_up_factor=session.step_up_factor,
+            risk_level=risk_lvl,
+            recommended_factor=rec_factor
         )
     elif session.status == "PENDING_OBSERVATION":
         return UserSecurityOutcome(
@@ -564,7 +678,9 @@ def get_user_session_security_status(
             verification_required=False,
             confidential_access_granted=False,
             step_up_fresh=False,
-            step_up_factor=session.step_up_factor
+            step_up_factor=session.step_up_factor,
+            risk_level=risk_lvl,
+            recommended_factor=rec_factor
         )
     elif session.status in ("PENDING_OTP", "STEP_UP_REQUIRED"):
         return UserSecurityOutcome(
@@ -574,7 +690,9 @@ def get_user_session_security_status(
             verification_required=True,
             confidential_access_granted=False,
             step_up_fresh=False,
-            step_up_factor=session.step_up_factor
+            step_up_factor=session.step_up_factor,
+            risk_level=risk_lvl,
+            recommended_factor="EMAIL_OTP" if session.status == "PENDING_OTP" else rec_factor
         )
     elif session.status == "RESTRICTED":
         return UserSecurityOutcome(
@@ -584,7 +702,9 @@ def get_user_session_security_status(
             verification_required=False,
             confidential_access_granted=False,
             step_up_fresh=False,
-            step_up_factor=session.step_up_factor
+            step_up_factor=session.step_up_factor,
+            risk_level=risk_lvl,
+            recommended_factor=rec_factor
         )
     else:
         return UserSecurityOutcome(
@@ -594,7 +714,9 @@ def get_user_session_security_status(
             verification_required=False,
             confidential_access_granted=False,
             step_up_fresh=False,
-            step_up_factor=session.step_up_factor
+            step_up_factor=session.step_up_factor,
+            risk_level=risk_lvl,
+            recommended_factor="TERMINATE"
         )
 
 
@@ -612,6 +734,7 @@ def evaluate_resource_access_decision(
     """
     session = SessionService.get_session(db, request.session_id)
     verify_session_access(session, current_user)
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
 
     norm_app = SessionService.normalize_application(request.application or session.application)
     norm_res = SessionService.normalize_resource(request.resource)
@@ -659,10 +782,37 @@ def evaluate_resource_access_decision(
             application=norm_app
         )
 
-    # Check if there is an active brute-force or admin lockout on this session
+    # Check persistent portal security lock before ANY resource decision or step-up prompt
+    from app.services.portal_lock_service import PortalLockService
+    portal_lock = PortalLockService.get_active_lock(db, current_user.id, norm_app or session.application)
+    if portal_lock:
+        return AccessDecisionResponse(
+            decision="RESTRICT",
+            access_granted=False,
+            session_status="RESTRICTED",
+            risk_level=session.current_risk_level or "HIGH",
+            step_up_fresh=False,
+            step_up_factor=None,
+            message=(
+                f"SECURITY ACCESS SUSPENDED: {portal_lock.lock_reason} "
+                f"(Security Ref: {portal_lock.security_reference_id})"
+            ),
+            verification_required=False,
+            resource=norm_res or request.resource,
+            application=norm_app
+        )
+
+    # Check if there is an active brute-force or admin lockout on this session/portal
+    from sqlalchemy import or_, and_
     hard_lock = db.query(SecurityEvent).filter(
         SecurityEvent.session_id == session.id,
-        SecurityEvent.event_type.in_(["STEP_UP_LOCKED", "ADMIN_REVOCATION", "SESSION_TERMINATED"])
+        or_(
+            SecurityEvent.event_type.in_(["ADMIN_REVOCATION", "SESSION_TERMINATED"]),
+            and_(
+                SecurityEvent.event_type == "STEP_UP_LOCKED",
+                SecurityEvent.application == norm_app,
+            ),
+        ),
     ).first()
     if hard_lock:
         return AccessDecisionResponse(
@@ -681,6 +831,54 @@ def evaluate_resource_access_decision(
             application=norm_app
         )
 
+    # Handle pre-OTP login phases BEFORE tracking vault denials:
+    # A session in PENDING_OBSERVATION or PENDING_OTP must complete initial Email OTP first
+    # and must NEVER be routed to GESTURE_PATTERN (NeuralTrace) during initial observation/OTP.
+    if session.status == "PENDING_OBSERVATION":
+        obs = SessionService.get_observation_status(db, session.id)
+        if obs and not obs.get("is_completed"):
+            return AccessDecisionResponse(
+                decision="OBSERVATION_PENDING",
+                access_granted=False,
+                session_status="PENDING_OBSERVATION",
+                risk_level=session.current_risk_level or "LOW",
+                step_up_fresh=False,
+                step_up_factor=None,
+                message="Behavioral baseline observation active. Confidential access locked.",
+                verification_required=False,
+                resource=norm_res or request.resource,
+                application=norm_app
+            )
+        req_init = (obs or {}).get("required_initial_factor", "EMAIL_OTP")
+        return AccessDecisionResponse(
+            decision="STEP_UP_VERIFICATION",
+            access_granted=False,
+            session_status="PENDING_OBSERVATION",
+            risk_level=session.current_risk_level or "LOW",
+            step_up_fresh=False,
+            step_up_factor=None,
+            message="Baseline 20s observation completed. Initial Email OTP verification required before accessing confidential resources.",
+            verification_required=True,
+            required_factor=req_init,
+            resource=norm_res or request.resource,
+            application=norm_app
+        )
+
+    if session.status == "PENDING_OTP":
+        return AccessDecisionResponse(
+            decision="STEP_UP_VERIFICATION",
+            access_granted=False,
+            session_status="PENDING_OTP",
+            risk_level=session.current_risk_level or "LOW",
+            step_up_fresh=False,
+            step_up_factor=None,
+            message="Initial Email OTP login verification required before accessing confidential resources.",
+            verification_required=True,
+            required_factor="EMAIL_OTP",
+            resource=norm_res or request.resource,
+            application=norm_app
+        )
+
     # Server-side tracking: Repeated unauthorized clicks to confidential vaults elevate risk
     if not is_app_authorized:
         from app.services.access_tracker import ConfidentialAccessTracker
@@ -693,20 +891,6 @@ def evaluate_resource_access_decision(
             if session.current_risk_level not in ("CRITICAL", "TERMINATED"):
                 session.current_risk_level = "HIGH"
                 db.commit()
-
-    if session.status == "PENDING_OBSERVATION":
-        return AccessDecisionResponse(
-            decision="OBSERVATION_PENDING",
-            access_granted=False,
-            session_status="PENDING_OBSERVATION",
-            risk_level=session.current_risk_level,
-            step_up_fresh=False,
-            step_up_factor=None,
-            message="Behavioral baseline observation active. Confidential access locked.",
-            verification_required=False,
-            resource=norm_res or request.resource,
-            application=norm_app
-        )
 
     # Server-authoritative check: If application grant is already valid and unexpired
     if is_app_authorized:
@@ -817,6 +1001,7 @@ def get_confidential_vault_data(
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0, private"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
     target_session = None
     if session_id:
         target_session = SessionService.get_session(db, session_id)
@@ -844,7 +1029,7 @@ def get_confidential_vault_data(
                     behavior_vector=np.zeros(10),
                     context_signals={"denied_access_count": denials}
                 )
-                DecisionService.enforce_zero_trust_decision(
+                _, _, _, ev_id = DecisionService.enforce_zero_trust_decision(
                     db=db,
                     user_id=current_user.id,
                     session_id=target_session.id,
@@ -853,6 +1038,23 @@ def get_confidential_vault_data(
                     anomaly_score=a_score,
                     risk_level=r_level,
                     contributing_factors=factors
+                )
+                from app.agents.execution.orchestrator import SecurityOrchestrator
+                SecurityOrchestrator.dispatch_background(
+                    db_bind=db.get_bind(),
+                    event_id=ev_id,
+                    user_id=current_user.id,
+                    session_id=target_session.id,
+                    application=target_session.application,
+                    raw_anomaly_score=float(a_score),
+                    deterministic_risk_score=float(r_score),
+                    deterministic_risk_level=r_level,
+                    contributing_reasons=list(factors or []),
+                    protected_resource=resource,
+                    auto_containment=False,
+                    skip_containment=True,
+                    idempotency_key=f"vault_denial:{target_session.id}:{ev_id or denials}",
+                    trigger_event="VAULT_REPEATED_DENIAL",
                 )
         raise HTTPException(status_code=status_code, detail=detail_msg)
 
@@ -863,6 +1065,9 @@ def get_confidential_vault_data(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Unknown or invalid confidential vault resource."
         )
+
+    from app.services.portal_lock_service import PortalLockService
+    PortalLockService.enforce_not_locked(db, current_user.id, target_app)
 
     if not target_session:
         raise HTTPException(
@@ -920,6 +1125,24 @@ def get_confidential_vault_data(
     # Clear denial history upon successful authorized access
     from app.services.access_tracker import ConfidentialAccessTracker
     ConfidentialAccessTracker.clear_denials(user_id=current_user.id, session_id=target_session.id)
+
+    # Record protected resource access for Security Intelligence
+    db.add(SecurityEvent(
+        user_id=current_user.id,
+        session_id=target_session.id,
+        application=target_app,
+        event_type="PROTECTED_RESOURCE_ACCESSED",
+        severity=target_session.current_risk_level or "LOW",
+        anomaly_score=0.0,
+        risk_score=float(getattr(target_session, "risk_score", 0.0) or 0.0),
+        decision="ALLOW",
+        details=json.dumps({
+            "resource": norm_res,
+            "portal": target_app,
+            "required_factor": req_factor,
+        }),
+    ))
+    db.commit()
 
     res_norm = norm_res
     if res_norm == "financial_vault":
@@ -1276,6 +1499,7 @@ def relock_confidential_vault(
     """
     session = SessionService.get_session(db, request.session_id)
     verify_session_access(session, current_user)
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
 
     norm_res = SessionService.normalize_resource(request.resource)
     if not norm_res or norm_res not in ("academic_vault", "financial_vault", "ehr_vault"):
@@ -1431,6 +1655,9 @@ def request_college_exam_otp(
     """
     session = SessionService.get_session(db, request.session_id)
     verify_session_access(session, current_user)
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
+    from app.services.portal_lock_service import PortalLockService
+    PortalLockService.enforce_not_locked(db, current_user.id, "college")
     return StepUpService.create_exam_otp_challenge(
         session_id=session.id,
         user_id=current_user.id,
@@ -1451,6 +1678,9 @@ def resend_college_exam_otp(
     """
     session = SessionService.get_session(db, request.session_id)
     verify_session_access(session, current_user)
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
+    from app.services.portal_lock_service import PortalLockService
+    PortalLockService.enforce_not_locked(db, current_user.id, "college")
     return StepUpService.resend_exam_otp_challenge(
         session_id=session.id,
         user_id=current_user.id,
@@ -1471,6 +1701,9 @@ def verify_college_exam_otp(
     """
     session = SessionService.get_session(db, request.session_id)
     verify_session_access(session, current_user)
+    AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
+    from app.services.portal_lock_service import PortalLockService
+    PortalLockService.enforce_not_locked(db, current_user.id, "college")
     ok, msg, data = StepUpService.verify_exam_otp_challenge(
         session_id=session.id,
         user_id=current_user.id,
@@ -1480,6 +1713,9 @@ def verify_college_exam_otp(
         db=db
     )
     if not ok:
+        active_lock = PortalLockService.get_active_lock(db, current_user.id, "college")
+        if active_lock:
+            PortalLockService.raise_locked_http_exception(active_lock, status_code=status.HTTP_423_LOCKED)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=msg
@@ -1506,6 +1742,9 @@ def get_authorized_exam_session(
     session = SessionService.get_session(db, session_id)
     verify_session_access(session, current_user)
 
+    from app.services.portal_lock_service import PortalLockService
+    PortalLockService.enforce_not_locked(db, current_user.id, "college")
+
     if session.status != "ACTIVE" or session.current_risk_level in ("CRITICAL", "HIGH", "RESTRICTED"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1521,10 +1760,43 @@ def get_authorized_exam_session(
         required_factor="EXAM_OTP"
     )
     if not is_authorized:
+        db.add(SecurityEvent(
+            user_id=current_user.id,
+            session_id=session.id,
+            application="college",
+            event_type="EXAM_ACCESS_DENIED",
+            severity=session.current_risk_level or "MEDIUM",
+            anomaly_score=0.0,
+            risk_score=float(getattr(session, "risk_score", 0.0) or 0.0),
+            decision="DENY",
+            details=json.dumps({
+                "resource": "online_exam",
+                "portal": "college",
+                "reason": "Missing or expired EXAM_OTP grant",
+            }),
+        ))
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Online examination access denied: Valid examination OTP verification is required before launching the exam."
         )
+
+    db.add(SecurityEvent(
+        user_id=current_user.id,
+        session_id=session.id,
+        application="college",
+        event_type="EXAM_ACCESS_GRANTED",
+        severity=session.current_risk_level or "LOW",
+        anomaly_score=0.0,
+        risk_score=float(getattr(session, "risk_score", 0.0) or 0.0),
+        decision="ALLOW",
+        details=json.dumps({
+            "resource": "online_exam",
+            "portal": "college",
+            "proctoring_status": "ACTIVE_BEHAVIORAL_SHIELD",
+        }),
+    ))
+    db.commit()
 
     return {
         "authorized": True,
@@ -1535,5 +1807,265 @@ def get_authorized_exam_session(
         "exam_token": f"#BITS-EXM-{session.id[-4:].upper()}",
         "proctoring_status": "ACTIVE_BEHAVIORAL_SHIELD"
     }
+
+
+# ==============================================================================
+# PORTAL SECURITY LOCKOUT STATUS, RE-ENTRY MONITORING & RECOVERY GATE
+# ==============================================================================
+
+class PortalReentryRequest(BaseModel):
+    application: str
+    session_id: Optional[str] = None
+    reentry_correlation_id: Optional[str] = None
+    is_auto_poll: bool = False
+    source: Optional[str] = "PORTAL_REOPEN"
+
+
+class PortalRecoveryOtpRequest(BaseModel):
+    application: str
+    security_reference_id: Optional[str] = None
+
+
+class PortalRecoveryOtpVerifyRequest(BaseModel):
+    application: str
+    otp_code: str
+    challenge_id: Optional[str] = None
+    security_reference_id: Optional[str] = None
+
+
+class PortalRecoveryAuthRequest(BaseModel):
+    email: str
+    password: str
+    application: str
+    security_reference_id: Optional[str] = None
+
+
+@router.get("/portal-locks")
+def get_all_portal_locks_summary(
+    session_id: Optional[str] = Query(None, description="Optional active session_id context"),
+    authorization: Optional[str] = Header(None),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Read-only summary of all active portal security locks, grant readiness per portal,
+    and global session identity state for the central COGNISEC-AI user dashboard (index.html).
+    """
+    from app.services.portal_lock_service import PortalLockService
+    from app.core.security import decode_access_token
+
+    resolved_sid = session_id or x_session_id
+    if not resolved_sid and authorization and " " in authorization:
+        payload = decode_access_token(authorization.split(" ", 1)[1].strip())
+        resolved_sid = payload.get("sid") if payload else None
+    sess = SessionService.get_session(db, resolved_sid) if resolved_sid else None
+    if sess and sess.user_id != current_user.id:
+        sess = None
+    return PortalLockService.get_user_portal_locks_summary(db, current_user.id, current_session=sess)
+
+
+@router.get("/portal-lock/status")
+def get_portal_lock_status(
+    application: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Read-only query checking whether (current_user, application) currently holds
+    an active persistent portal security lock. Does not generate re-entry notifications.
+    """
+    from app.services.portal_lock_service import PortalLockService
+
+    norm_app = SessionService.normalize_application(application)
+    lock = PortalLockService.get_active_lock(db, current_user.id, norm_app)
+    if not lock:
+        return {"locked": False, "portal": norm_app}
+    return PortalLockService.serialize_lock(lock)
+
+
+@router.post("/portal-lock/reentry")
+def monitor_locked_portal_reentry(
+    payload: PortalReentryRequest,
+    request_conn: Request,
+    user_agent: Optional[str] = Header(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Evaluates an explicit user-initiated attempt to reopen/navigate into a portal.
+    When locked, denies portal access, records a distinct SecurityEvent,
+    and dispatches owner + Admin/SOC notifications deduplicated strictly by reentry_correlation_id.
+    """
+    from app.services.portal_lock_service import PortalLockService
+
+    client_ip = request_conn.client.host if request_conn.client else "127.0.0.1"
+    forwarded = request_conn.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    norm_app = SessionService.normalize_application(payload.application)
+    lock = PortalLockService.get_active_lock(db, current_user.id, norm_app)
+    if not lock:
+        return {"locked": False, "portal": norm_app, "reentry_recorded": False}
+
+    result = PortalLockService.record_reentry_attempt(
+        db=db,
+        user=current_user,
+        application=norm_app,
+        session_id=payload.session_id,
+        client_ip=client_ip,
+        user_agent=user_agent,
+        reentry_correlation_id=payload.reentry_correlation_id,
+        is_auto_poll=payload.is_auto_poll,
+        source=payload.source or "PORTAL_REOPEN",
+    )
+    return result or PortalLockService.serialize_lock(lock)
+
+
+@router.post("/portal-lock/recovery-auth")
+def authenticate_for_portal_recovery(
+    payload: PortalRecoveryAuthRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Credential-authenticated recovery pre-gate for logged-out or expired global sessions (Scenario B).
+    Verifies account credentials and confirms an active PortalSecurityLock exists without
+    creating any DbSession or ApplicationGrant or weakening the active lock.
+    Returns a short-lived recovery-only Bearer token (sid=None).
+    """
+    from app.core.security import verify_password, create_access_token
+    from app.services.portal_lock_service import PortalLockService
+
+    user = db.query(User).filter(User.email == payload.email.strip().lower()).first()
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password for portal recovery authentication.",
+        )
+    if (user.account_status or "ACTIVE").upper() != "ACTIVE":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is suspended or inactive.",
+        )
+
+    lock = PortalLockService.get_active_lock(db, user.id, payload.application)
+    if not lock:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No active portal security lock found for '{payload.application}'. Sign in normally through the portal.",
+        )
+    if payload.security_reference_id and lock.security_reference_id != payload.security_reference_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Security Reference ID does not match the active lock for this portal.",
+        )
+
+    recovery_token = create_access_token(
+        subject=user.id,
+        role=user.role,
+        session_id=None,
+        expires_delta=datetime.timedelta(minutes=15),
+    )
+    return {
+        "recovery_only": True,
+        "access_token": recovery_token,
+        "token_type": "bearer",
+        "portal_lock": PortalLockService.serialize_lock(lock),
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+        },
+        "message": (
+            f"Recovery authentication verified for {_norm_portal_label(lock.application)} "
+            f"(Ref: {lock.security_reference_id}). Proceed with Recovery OTP verification."
+        ),
+    }
+
+
+def _norm_portal_label(app_name: str) -> str:
+    return {
+        "shopping": "Shopping Portal",
+        "college": "College Portal",
+        "healthcare": "Healthcare Portal",
+    }.get((app_name or "").lower(), f"{app_name} Portal")
+
+
+def _extract_optional_sid(authorization: Optional[str], x_session_id: Optional[str]) -> Optional[str]:
+    if x_session_id:
+        return x_session_id
+    if authorization and " " in authorization:
+        from app.core.security import decode_access_token
+        payload = decode_access_token(authorization.split(" ", 1)[1].strip())
+        if payload:
+            return payload.get("sid")
+    return None
+
+
+@router.post("/portal-lock/recovery-otp/request")
+def request_portal_recovery_otp(
+    payload: PortalRecoveryOtpRequest,
+    authorization: Optional[str] = Header(None),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Step 2 of Security Recovery Gate: dispatches registered-email OTP without unlocking the portal."""
+    resolved_sid = _extract_optional_sid(authorization, x_session_id)
+    return StepUpService.create_recovery_otp_challenge(
+        user_id=current_user.id,
+        application=payload.application,
+        db=db,
+        security_reference_id=payload.security_reference_id,
+        session_id=resolved_sid,
+    )
+
+
+@router.post("/portal-lock/recovery-otp/verify")
+def verify_portal_recovery_otp(
+    payload: PortalRecoveryOtpVerifyRequest,
+    request_conn: Request,
+    authorization: Optional[str] = Header(None),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    user_agent: Optional[str] = Header(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Verifies registered-email recovery OTP and marks lock OTP_VERIFIED_AWAITING_ADMIN.
+    Strictly preserves lock_status='ACTIVE' until authorized administrator clearance.
+    """
+    from app.services.portal_lock_service import PortalLockService
+
+    resolved_sid = _extract_optional_sid(authorization, x_session_id)
+    ok, msg = StepUpService.verify_recovery_otp_code(
+        user_id=current_user.id,
+        application=payload.application,
+        otp_code=payload.otp_code,
+        db=db,
+        challenge_id=payload.challenge_id,
+        security_reference_id=payload.security_reference_id,
+        session_id=resolved_sid,
+    )
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+
+    client_ip = request_conn.client.host if request_conn.client else "127.0.0.1"
+    lock = PortalLockService.mark_recovery_otp_verified(
+        db=db,
+        user=current_user,
+        application=payload.application,
+        session_id=resolved_sid,
+        client_ip=client_ip,
+        user_agent=user_agent,
+        security_reference_id=payload.security_reference_id,
+    )
+    data = PortalLockService.serialize_lock(lock)
+    data["otp_verified"] = True
+    data["message"] = msg
+    return data
+
 
 

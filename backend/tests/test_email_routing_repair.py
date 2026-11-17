@@ -113,7 +113,7 @@ def test_new_device_login_alert_includes_all_required_attributes():
         for body in (p["plain"], p["html"]):
             assert "Primary MacBook Pro" in body
             assert "San Francisco, US (GPS)" in body
-            assert "2026-10-13 11:45:00 UTC" in body
+            assert "13 October 2026, 5:15 PM IST" in body
             assert "198.51.100.42" in body
             assert "Chrome 124 on macOS 14.4" in body
 

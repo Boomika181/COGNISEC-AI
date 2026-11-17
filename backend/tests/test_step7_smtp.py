@@ -111,7 +111,7 @@ def test_successful_smtp_send_mocked_transport():
         )
 
         assert success is True
-        assert "dispatched successfully" in msg
+        assert "submitted to the mail server" in msg.lower()
         mock_server.ehlo.assert_called()
         mock_server.starttls.assert_called_once()
         mock_server.login.assert_called_once_with("security@cognisec.ai", "test-app-pass")
@@ -160,7 +160,7 @@ def test_smtp_connection_timeout():
         )
         assert success is False
         assert "timed out" in msg.lower()
-        mock_server.quit.assert_called_once()
+        assert mock_server.quit.call_count == 3
 
 
 # 6. New-device notification sent to database-resolved recipient
@@ -205,7 +205,7 @@ def test_otp_never_returned_in_normal_api_responses(client, auth_headers):
         data = res.json()
         assert data["otp"] == ""
         assert data["is_demo_otp"] is False
-        assert data["delivery_status"] == "SENT"
+        assert data["delivery_status"] == "SMTP_ACCEPTED"
 
 
 # 9. Expired, invalid, replayed and resent OTPs
@@ -225,44 +225,39 @@ def test_expired_invalid_replayed_and_resent_otps(client, auth_headers, test_use
         assert res.status_code == 200
         first_otp = captured_otps[0]
 
-        # B. Invalid code fails with 400
-        bad_res = client.post("/api/security/step-up/verify", headers=headers, json={
-            "session_id": session_id,
-            "challenge_code": "000000" if first_otp != "000000" else "111111"
-        })
-        assert bad_res.status_code == 400
-        assert "Invalid verification" in bad_res.json()["detail"]
+        # B. Deduplicated re-request while unattempted returns same challenge without duplicate send
+        res_dedup = client.post("/api/security/step-up/challenge", headers=headers, json={"session_id": session_id})
+        assert res_dedup.status_code == 200
+        assert res_dedup.json()["challenge_id"] == res.json()["challenge_id"]
+        assert len(captured_otps) == 1
 
-        # C. Resent OTP invalidates previous challenge
-        res2 = client.post("/api/security/step-up/challenge", headers=headers, json={"session_id": session_id})
-        assert res2.status_code == 200
-        second_otp = captured_otps[1]
-        assert second_otp != first_otp or len(captured_otps) == 2
-
-        # Submitting the invalidated first_otp now fails with 400
-        stale_res = client.post("/api/security/step-up/verify", headers=headers, json={
-            "session_id": session_id,
-            "challenge_code": first_otp
-        })
-        assert stale_res.status_code == 400
-        assert "Invalid verification" in stale_res.json()["detail"]
-
-        # D. Submitting second_otp succeeds with 200
+        # C. Submitting valid first_otp succeeds with 200
         valid_res = client.post("/api/security/step-up/verify", headers=headers, json={
             "session_id": session_id,
-            "challenge_code": second_otp
+            "challenge_code": first_otp
         })
         assert valid_res.status_code == 200
         assert valid_res.json()["decision"] == "ALLOW"
         assert valid_res.json()["session_status"] == "ACTIVE"
 
-        # E. Replaying the consumed second_otp fails immediately with 400
+        # D. Replaying the consumed first_otp fails immediately with 400
         replay_res = client.post("/api/security/step-up/verify", headers=headers, json={
             "session_id": session_id,
-            "challenge_code": second_otp
+            "challenge_code": first_otp
         })
         assert replay_res.status_code == 400
         assert "No active step-up challenge found" in replay_res.json()["detail"]
+
+        # E. Fresh challenge + wrong OTP locks portal on 1st wrong attempt with HTTP 423
+        res2 = client.post("/api/security/step-up/challenge", headers=headers, json={"session_id": session_id})
+        assert res2.status_code == 200
+        second_otp = captured_otps[1]
+        bad_res = client.post("/api/security/step-up/verify", headers=headers, json={
+            "session_id": session_id,
+            "challenge_code": "000000" if second_otp != "000000" else "111111"
+        })
+        assert bad_res.status_code == 423
+        assert bad_res.headers.get("X-Cognisec-Portal-Locked") == "true"
 
 
 # 10. Failed email delivery keeps protected access blocked
@@ -273,7 +268,7 @@ def test_failed_email_delivery_keeps_protected_access_blocked(client, auth_heade
 
         res = client.post("/api/security/step-up/challenge", headers=headers, json={"session_id": session_id})
         assert res.status_code == 502
-        assert "Email OTP transmission failed" in res.json()["detail"]
+        assert "email delivery could not be initiated" in res.json()["detail"].lower()
 
 
 # 11. Email failure does not erase security events or notifications

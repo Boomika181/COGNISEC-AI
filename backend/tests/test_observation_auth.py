@@ -201,20 +201,21 @@ def test_7_incorrect_otp_terminates_pending_session_and_invalidates_challenge(cl
     )
     chal_id = req_res.json()["challenge_id"]
 
-    # Submit wrong OTP
+    # Submit wrong OTP -> 1 attempt limit immediately suspends portal (423), preserving global identity
     ver_res = client.post(
         "/api/auth/login-otp/verify",
         headers=headers,
         json={"session_id": session_id, "otp_code": "000000", "challenge_id": chal_id}
     )
-    assert ver_res.status_code == 400
-    assert "terminated" in ver_res.json()["detail"].lower()
+    assert ver_res.status_code == 423
+    assert ver_res.headers.get("X-Cognisec-Portal-Locked") == "true"
 
-    # Session in DB must be TERMINATED
+    # Session in DB must be RESTRICTED (NOT TERMINATED) with rejected login outcome
     db_session.expire_all()
     sess_after = db_session.query(SessionModel).filter(SessionModel.id == session_id).first()
-    assert sess_after.status == "TERMINATED"
+    assert sess_after.status == "RESTRICTED"
     assert sess_after.login_outcome == "rejected"
+    assert sess_after.logout_time is None
 
     # Challenge must be cleared from memory
     chal = StepUpService.get_challenge(session_id)

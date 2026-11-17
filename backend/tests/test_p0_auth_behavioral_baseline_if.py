@@ -70,7 +70,7 @@ def test_observation_30s_enforced_server_side(client: TestClient, db_session: Se
     headers = {"Authorization": f"Bearer {token}"}
 
     assert login_data["session_status"] == "PENDING_OBSERVATION"
-    assert login_data["observation_seconds_remaining"] == 30
+    assert login_data["observation_seconds_remaining"] == settings.OBSERVATION_WINDOW_SECONDS
 
     # Attempt requesting OTP immediately (< 30s) -> Server MUST reject with 400
     early_req = client.post("/api/auth/login-otp/request", json={"session_id": sid}, headers=headers)
@@ -169,12 +169,11 @@ def test_risk_decisions_follow_policy_at_observation_end(client: TestClient, db_
     sess_med.current_risk_level = "MEDIUM"
     db_session.commit()
 
-    # 3c. MEDIUM Risk with NeuralTrace enrolled -> Require NeuralTrace
+    # 3c. MEDIUM Risk -> Initial Login OTP issued after observation window completes per policy
     res_med = client.post("/api/auth/login-otp/request", json={"session_id": sid_med}, headers=headers_med)
-    assert res_med.status_code == 403
-    assert "neuraltrace" in res_med.json()["detail"].lower()
+    assert res_med.status_code == 200
     db_session.refresh(sess_med)
-    assert sess_med.status == "STEP_UP_REQUIRED"
+    assert sess_med.status == "PENDING_OTP"
 
 
 # -----------------------------------------------------------------------------
@@ -236,18 +235,19 @@ def test_invalid_expired_reused_and_cross_session_otp_rejected(client: TestClien
     }, headers=headers_b)
     assert cross_res.status_code in (403, 400)
 
-    # 5b. Invalid OTP code: Submitting wrong code fails and terminates session
+    # 5b. Invalid OTP code: 1st unsuccessful Login Email OTP triggers portal lockout (423)
     bad_res = client.post("/api/auth/login-otp/verify", json={
         "session_id": sid_a,
         "challenge_id": chal_a,
         "otp_code": "000000"
     }, headers=headers_a)
-    assert bad_res.status_code == 400
+    assert bad_res.status_code == 423
     db_session.refresh(sess_a)
-    assert sess_a.status == "TERMINATED"
+    assert sess_a.status == "RESTRICTED"
+    assert sess_a.logout_time is None
 
-    # 5c. Expired OTP
-    login_a2 = login_test_user(client, email_a, "college")
+    # 5c. Expired OTP (tested on unaffected portal)
+    login_a2 = login_test_user(client, email_a, "shopping")
     sid_a2 = login_a2["session_id"]
     headers_a2 = {"Authorization": f"Bearer {login_a2['access_token']}"}
     sess_a2 = db_session.query(DbSession).filter(DbSession.id == sid_a2).first()
@@ -271,8 +271,8 @@ def test_invalid_expired_reused_and_cross_session_otp_rejected(client: TestClien
     assert exp_res.status_code == 400
     assert "expired" in exp_res.json()["detail"].lower()
 
-    # 5d. Replay / Single Use
-    login_a3 = login_test_user(client, email_a, "college")
+    # 5d. Replay / Single Use (tested on unaffected portal)
+    login_a3 = login_test_user(client, email_a, "healthcare")
     sid_a3 = login_a3["session_id"]
     headers_a3 = {"Authorization": f"Bearer {login_a3['access_token']}"}
     sess_a3 = db_session.query(DbSession).filter(DbSession.id == sid_a3).first()
@@ -312,7 +312,7 @@ def test_all_three_portals_use_same_flow(client: TestClient, db_session: Session
         headers = {"Authorization": f"Bearer {login_res['access_token']}"}
 
         assert login_res["session_status"] == "PENDING_OBSERVATION"
-        assert login_res["observation_seconds_remaining"] == 30
+        assert login_res["observation_seconds_remaining"] == settings.OBSERVATION_WINDOW_SECONDS
 
         sess = db_session.query(DbSession).filter(DbSession.id == sid).first()
         sess.observation_started_at = datetime.now(timezone.utc) - timedelta(seconds=31)

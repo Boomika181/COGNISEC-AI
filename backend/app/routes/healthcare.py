@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Header, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
@@ -60,6 +61,16 @@ def get_doctor_by_id(doctor_id: str):
     return DoctorResponse(**doc)
 
 
+@router.get("/doctors/{doctor_id}/slots")
+def get_doctor_slots(
+    doctor_id: str,
+    date: str = Query(..., description="Appointment date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
+    """Returns configured OPD slots and live availability for a specific specialist and date."""
+    return HealthcareService.get_doctor_slots_for_date(db=db, doctor_id=doctor_id, appointment_date=date)
+
+
 @router.get("/availability")
 def check_availability(
     doctor_id: str = Query(..., description="Doctor ID"),
@@ -68,7 +79,14 @@ def check_availability(
     db: Session = Depends(get_db)
 ):
     """Checks whether an appointment slot is currently available."""
-    is_available = HealthcareService.check_slot_availability(db, doctor_id, date, slot)
+    doc = HealthcareService.get_doctor_by_id(doctor_id)
+    schedule_open = True
+    if doc:
+        try:
+            HealthcareService.validate_doctor_schedule(doc, date, slot)
+        except HTTPException:
+            schedule_open = False
+    is_available = schedule_open and HealthcareService.check_slot_availability(db, doctor_id, date, slot)
     return {
         "available": is_available,
         "doctor_id": doctor_id,
@@ -77,63 +95,122 @@ def check_availability(
     }
 
 
+def _resolve_appointment_actor(
+    authorization: Optional[str],
+    session_id: Optional[str],
+    db: Session,
+    require_completed_observation: bool = False
+):
+    """
+    Resolves optional authenticated user + session for outpatient appointment OTP flows.
+    - If Authorization header is present, validates token strictly (rejects revoked/terminated/invalid tokens).
+    - If session_id is supplied with an authenticated user, enforces ownership and session health.
+    - If unauthenticated (walk-in outpatient booking on healthcare.html), returns (None, None).
+    """
+    current_user = None
+    if authorization and authorization.strip():
+        parts = authorization.strip().split(" ", 1)
+        scheme = parts[0] if len(parts) == 2 else "Bearer"
+        creds_val = parts[1].strip() if len(parts) == 2 else authorization.strip()
+        creds = HTTPAuthorizationCredentials(scheme=scheme, credentials=creds_val)
+        current_user = get_current_user(auth_creds=creds, db=db)
+
+    session = None
+    if current_user is not None:
+        from app.services.portal_lock_service import PortalLockService
+        from app.services.adaptive_auth_service import AdaptiveAuthService
+        PortalLockService.enforce_not_locked(db, current_user.id, "healthcare")
+        AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
+        if session_id:
+            session = SessionService.get_session(db, session_id)
+            if not session:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Session not found."
+                )
+            if session.user_id != current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Session does not belong to the authenticated user."
+                )
+            if session.status in ("TERMINATED", "REVOKED") or session.current_risk_level == "CRITICAL":
+                if session.current_risk_level == "CRITICAL" and session.status != "TERMINATED":
+                    SessionService.terminate_session(db, session.id, risk_level="CRITICAL")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Session is terminated or restricted by security policy."
+                )
+            if require_completed_observation and session.status in ("PENDING_OBSERVATION", "PENDING_OTP"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Baseline behavioral observation or initial login verification is incomplete."
+                )
+            if require_completed_observation and (session.current_risk_level == "HIGH" or session.status == "RESTRICTED"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="High risk detected: cognitive step-up verification required before booking an appointment."
+                )
+            if require_completed_observation and (
+                session.status == "STEP_UP_REQUIRED"
+                or (
+                    session.current_risk_level == "MEDIUM"
+                    and not SessionService.is_step_up_fresh(session, current_risk_level="MEDIUM")
+                )
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Elevated risk step-up verification required before booking an appointment."
+                )
+    return current_user, session
+
+
 @router.post("/appointment-otp/request", response_model=AppointmentOtpResponse)
 def request_appointment_otp(
     request: AppointmentOtpRequest,
-    current_user: User = Depends(get_current_user),
+    raw_request: Request,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """
     Initiates outpatient appointment verification OTP for AyuSync MedCare.
-    Dispatches a single-use 6-digit code via Gmail SMTP to user's registered address (boomikaram35@gmail.com).
-    Binds challenge to patient details, doctor, date, time slot, session, and user.
+    1. Validates appointment, doctor schedule, and slot availability.
+    2. Creates a PENDING_VERIFICATION appointment record linked to patient & doctor.
+    3. Generates CSPRNG 6-digit OTP, stores only HMAC-SHA256 hash in OTPChallenge.
+    4. Dispatches OTP via EmailService to the patient's supplied, validated email.
     """
-    if not request.session_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Session ID is required."
-        )
+    current_user, session = _resolve_appointment_actor(
+        authorization=authorization,
+        session_id=request.session_id,
+        db=db,
+        require_completed_observation=True
+    )
 
-    session = SessionService.get_session(db, request.session_id)
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found."
-        )
-
-    if session.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Session does not belong to the authenticated user."
-        )
-
-    if session.status in ("TERMINATED", "REVOKED") or session.current_risk_level == "CRITICAL":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Session is terminated or restricted by security policy."
-        )
-
-    if session.status in ("PENDING_OBSERVATION", "PENDING_OTP"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Baseline behavioral observation or initial login verification is incomplete."
-        )
+    client_ip = raw_request.client.host if raw_request.client else "unknown"
+    rate_limiter.enforce(
+        key=f"appointment_otp:{request.patient_email}:{client_ip}",
+        max_requests=15,
+        window_seconds=60,
+        detail="Too many appointment verification requests. Please wait a moment."
+    )
 
     appointment_data = {
         "doctor_id": request.doctor_id,
         "appointment_date": request.appointment_date,
         "time_slot": request.time_slot,
         "patient_name": request.patient_name,
+        "patient_age": request.patient_age,
+        "patient_gender": request.patient_gender,
         "patient_phone": request.patient_phone,
         "patient_email": request.patient_email,
+        "reason_for_visit": request.reason_for_visit,
         "department": request.department,
         "consultation_mode": request.consultation_mode,
         "room": request.room
     }
 
     challenge_data = StepUpService.create_appointment_otp_challenge(
-        session_id=session.id,
-        user_id=current_user.id,
+        session_id=session.id if session else None,
+        user_id=current_user.id if current_user else None,
         appointment_data=appointment_data,
         db=db
     )
@@ -144,36 +221,36 @@ def request_appointment_otp(
 @router.post("/appointment-otp/verify", response_model=AppointmentOtpVerifyResponse)
 def verify_appointment_otp(
     request: AppointmentOtpVerifyRequest,
-    current_user: User = Depends(get_current_user),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """
     Atomically verifies the single-use appointment OTP code.
-    Upon success: re-checks slot availability, persists HealthcareAppointment, and logs security event.
-    Upon failure: rejects booking, decrements remaining attempts.
+    Upon success: re-checks slot availability, transitions PENDING_VERIFICATION -> CONFIRMED,
+    and logs a security event if associated with an authenticated session.
+    Upon failure: keeps appointment unconfirmed and decrements remaining attempts.
     """
-    session = SessionService.get_session(db, request.session_id)
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found."
-        )
-
-    if session.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Session does not belong to the authenticated user."
-        )
+    current_user, session = _resolve_appointment_actor(
+        authorization=authorization,
+        session_id=request.session_id,
+        db=db,
+        require_completed_observation=False
+    )
 
     success, message, appointment = StepUpService.verify_appointment_otp(
-        session_id=request.session_id,
-        user_id=current_user.id,
+        session_id=session.id if session else request.session_id,
+        user_id=current_user.id if current_user else None,
         challenge_id=request.challenge_id,
         otp_code=request.otp_code,
         db=db
     )
 
     if not success:
+        if current_user is not None:
+            from app.services.portal_lock_service import PortalLockService
+            active_lock = PortalLockService.get_active_lock(db, current_user.id, "healthcare")
+            if active_lock:
+                PortalLockService.raise_locked_http_exception(active_lock, status_code=status.HTTP_423_LOCKED)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=message
@@ -191,28 +268,31 @@ def verify_appointment_otp(
 @router.post("/appointment-otp/resend", response_model=AppointmentOtpResponse)
 def resend_appointment_otp(
     request: AppointmentOtpResendRequest,
-    current_user: User = Depends(get_current_user),
+    raw_request: Request,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """
     Resends appointment verification OTP subject to 15s cooldown.
     """
-    session = SessionService.get_session(db, request.session_id)
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found."
-        )
+    current_user, session = _resolve_appointment_actor(
+        authorization=authorization,
+        session_id=request.session_id,
+        db=db,
+        require_completed_observation=False
+    )
 
-    if session.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Session does not belong to the authenticated user."
-        )
+    client_ip = raw_request.client.host if raw_request.client else "unknown"
+    rate_limiter.enforce(
+        key=f"appointment_otp_resend:{request.challenge_id}:{client_ip}",
+        max_requests=10,
+        window_seconds=60,
+        detail="Too many resend attempts. Please wait a moment."
+    )
 
     challenge_data = StepUpService.resend_appointment_otp_challenge(
-        session_id=request.session_id,
-        user_id=current_user.id,
+        session_id=session.id if session else request.session_id,
+        user_id=current_user.id if current_user else None,
         challenge_id=request.challenge_id,
         db=db
     )
@@ -252,6 +332,11 @@ def list_appointments(
     db: Session = Depends(get_db)
 ):
     """Retrieves persisted appointments for patient view."""
+    if current_user is not None:
+        from app.services.portal_lock_service import PortalLockService
+        from app.services.adaptive_auth_service import AdaptiveAuthService
+        PortalLockService.enforce_not_locked(db, current_user.id, "healthcare")
+        AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
     if current_user and current_user.role.upper() not in ("DOCTOR", "ADMIN"):
         # Regular patients can only view their own appointments
         target_email = current_user.email
@@ -274,6 +359,11 @@ def cancel_appointment(
     """
     Cancels an appointment subject to patient ownership or doctor authorization rules.
     """
+    if current_user is not None:
+        from app.services.portal_lock_service import PortalLockService
+        from app.services.adaptive_auth_service import AdaptiveAuthService
+        PortalLockService.enforce_not_locked(db, current_user.id, "healthcare")
+        AdaptiveAuthService.enforce_enrollment_completed(db, current_user)
     return HealthcareService.cancel_appointment(
         db=db,
         reference_id=reference_id,
@@ -382,6 +472,38 @@ def doctor_login(
         role=user.role,
         session_id=active_session.id
     )
+
+    from app.services.portal_lock_service import PortalLockService
+    active_portal_lock = PortalLockService.get_active_lock(db, user.id, "healthcare")
+    if active_portal_lock:
+        active_session.status = "RESTRICTED"
+        active_session.login_outcome = "portal_locked"
+        db.commit()
+        lock_payload = PortalLockService.record_reentry_attempt(
+            db=db,
+            user=user,
+            application="healthcare",
+            session_id=active_session.id,
+            client_ip=client_ip,
+            user_agent=user_agent or request.browser or "",
+            source="DOCTOR_CREDENTIAL_LOGIN",
+        ) or PortalLockService.serialize_lock(active_portal_lock)
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+            role=user.role,
+            user_id=user.id,
+            name=user.name,
+            email=user.email,
+            session_id=active_session.id,
+            session_status="RESTRICTED",
+            observation_seconds_remaining=0,
+            is_new_device=is_new,
+            device_id=device.device_id,
+            trust_state=device.trust_state,
+            portal_locked=True,
+            portal_lock=lock_payload,
+        )
 
     return TokenResponse(
         access_token=access_token,

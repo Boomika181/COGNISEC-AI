@@ -300,12 +300,12 @@ def test_neuraltrace_attempt_limit_exhaustion(client: TestClient, auth_user):
     })
     assert r2.status_code == status.HTTP_400_BAD_REQUEST
 
-    # 3rd bad attempt (lockout)
+    # 3rd bad attempt (portal ejection / 423)
     r3 = client.post("/api/security/step-up/verify", headers=headers, json={
         "session_id": session_id, "challenge_type": "GESTURE_PATTERN", "gesture_pattern": [1, 5, 9, 13]
     })
-    assert r3.status_code == status.HTTP_400_BAD_REQUEST
-    assert "maximum" in r3.json()["detail"].lower() or "locked" in r3.json()["detail"].lower()
+    assert r3.status_code == status.HTTP_423_LOCKED
+    assert r3.headers.get("X-Cognisec-Portal-Locked") == "true"
 
 
 def test_neuraltrace_expired_challenge_rejected(client: TestClient, auth_user):

@@ -8,7 +8,8 @@ def test_step_up_challenge_verification(client, user_token):
 
     # 1. Request real step-up challenge
     chal_res = client.post("/api/security/step-up/challenge", headers={"Authorization": f"Bearer {user_token}"}, json={
-        "session_id": session_id
+        "session_id": session_id,
+        "preferred_factor": "OTP"
     })
     assert chal_res.status_code == 200
     challenge_data = chal_res.json()

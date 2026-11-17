@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -24,16 +25,26 @@ from app.schemas.auth import (
     PasswordResetVerifyResponse,
     RecoverAccountRequest,
     UnlockAccountRequest,
+    PasswordChangePolicyResponse,
+    PasswordChangeInitiateRequest,
+    PasswordChangeInitiateResponse,
+    PasswordChangeVerifyImageRequest,
+    PasswordChangeVerifyImageResponse,
+    PasswordChangeVerifyPrivateRequest,
+    PasswordChangeVerifyPrivateResponse,
+    PasswordChangeConfirmRequest,
+    PasswordChangeConfirmResponse,
 )
 from app.schemas.user import UserResponse
 from app.services.auth_service import AuthService
 from app.services.device_service import DeviceService
+from app.services.password_change_service import PasswordChangeService
 from app.services.session_service import SessionService
 from app.services.step_up_service import StepUpService
 from app.services.profile_service import ProfileService
 from app.ml.model_manager import ModelManager
 from app.services.adaptive_auth_service import AdaptiveAuthService, NEURALTRACE_EDGES
-from app.core.security import create_access_token
+from app.core.security import create_access_token, decode_access_token
 from app.core.config import settings
 from app.core.rate_limit import rate_limiter
 from app.routes.deps import get_current_user, verify_session_access
@@ -118,6 +129,52 @@ def register(request: RegisterRequest, request_conn: Request, db: Session = Depe
 
     # Force role to USER for all public registrations
     new_user = AuthService.create_user(db, request, forced_role="USER")
+    new_user.registration_source = "PUBLIC_REGISTRATION"
+    require_email_verif = bool(getattr(request, "require_email_verification", False))
+    if require_email_verif:
+        new_user.account_status = "PENDING_VERIFICATION"
+        new_user.email_verified = False
+        new_user.email_verified_at = None
+        new_user.security_enrollment_completed = False
+    else:
+        new_user.email_verified = (new_user.account_status == "ACTIVE")
+        new_user.email_verified_at = datetime.now(timezone.utc) if new_user.email_verified else None
+        # If factors are omitted in legacy API calls, default remains True unless require_email_verification=True
+        new_user.security_enrollment_completed = True
+
+    db.add(SecurityEvent(
+        user_id=new_user.id,
+        application="platform",
+        event_type="USER_REGISTERED",
+        severity="LOW",
+        anomaly_score=0.0,
+        risk_score=0.0,
+        decision="ALLOW",
+        details='{"registration_source": "PUBLIC_REGISTRATION", "email_verified": ' + ('true' if new_user.email_verified else 'false') + ', "require_email_verification": ' + ('true' if require_email_verif else 'false') + '}',
+    ))
+    db.commit()
+    db.refresh(new_user)
+
+    if require_email_verif:
+        _, _, masked_email, _, delivery_status, dev_otp = StepUpService.create_email_verification_challenge(
+            email=new_user.email,
+            db=db,
+        )
+        return {
+            "id": new_user.id,
+            "name": new_user.name,
+            "email": new_user.email,
+            "role": new_user.role,
+            "account_status": new_user.account_status,
+            "failed_login_attempts": new_user.failed_login_attempts,
+            "created_at": new_user.created_at,
+            "email_verified": new_user.email_verified,
+            "security_enrollment_completed": new_user.security_enrollment_completed,
+            "email_verification_required": True,
+            "masked_email": masked_email,
+            "delivery_status": delivery_status,
+            "dev_otp": dev_otp,
+        }
 
     # Enroll verified factors atomically for the newly registered account
     if request.gesture_pattern is not None:
@@ -177,7 +234,11 @@ def bootstrap_admin(
         password=request.password,
         role="ADMIN"
     )
-    return AuthService.create_user(db, admin_reg, forced_role="ADMIN")
+    admin_user = AuthService.create_user(db, admin_reg, forced_role="ADMIN")
+    admin_user.registration_source = "ADMIN_BOOTSTRAP"
+    db.commit()
+    db.refresh(admin_user)
+    return admin_user
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -211,7 +272,9 @@ def login(
     # Check if account is already locked
     existing_user = AuthService.get_user_by_email(db, request.email)
     if existing_user and existing_user.account_status != "ACTIVE":
-        if getattr(request, "doctor_required", False):
+        if existing_user.account_status in ("PENDING_VERIFICATION", "PENDING_EMAIL_VERIFICATION"):
+            detail = "EMAIL_VERIFICATION_REQUIRED (pending_verification): Please verify your email address with the OTP code before signing in."
+        elif getattr(request, "doctor_required", False):
             detail = f"Doctor account is {existing_user.account_status.lower()}. Please contact clinical administration."
         else:
             detail = f"Account is {existing_user.account_status.lower()}. Access denied."
@@ -230,6 +293,21 @@ def login(
             user_agent=user_agent or request.browser or ""
         )
         if is_now_locked or (db_user and db_user.account_status != "ACTIVE"):
+            if db_user and is_now_locked:
+                from app.agents.execution.orchestrator import SecurityOrchestrator
+                SecurityOrchestrator.dispatch_background(
+                    db_bind=db.get_bind(),
+                    user_id=db_user.id,
+                    session_id=None,
+                    application=getattr(request, "application", None) or "platform",
+                    deterministic_risk_score=0.80,
+                    deterministic_risk_level="HIGH",
+                    contributing_reasons=[f"repeated_failed_login:{fails}"],
+                    auto_containment=False,
+                    skip_containment=True,
+                    idempotency_key=f"login_lock:{db_user.id}:{fails}",
+                    trigger_event="SUSPICIOUS_LOGIN_LOCKOUT",
+                )
             if getattr(request, "doctor_required", False):
                 detail = "Doctor account is locked. Please contact clinical administration."
             else:
@@ -283,6 +361,19 @@ def login(
 
     # Create session: Administrators on platform application are granted ACTIVE sessions immediately; regular portal users enter observation window
     app_name = SessionService.normalize_application(request.application) or (request.application or "platform").lower()
+    if app_name in ("college", "shopping", "healthcare"):
+        from app.services.portal_lock_service import PortalLockService
+        active_lock = PortalLockService.get_active_lock(db, user.id, app_name)
+        if active_lock:
+            PortalLockService.record_reentry_attempt(
+                db=db,
+                user=user,
+                application=app_name,
+                source="CREDENTIAL_LOGIN",
+                client_ip=client_ip,
+                user_agent=user_agent or request.browser or "",
+            )
+            PortalLockService.raise_locked_http_exception(active_lock)
     is_privileged = (user.role.upper() == "ADMIN") and (app_name == "platform")
     active_session = SessionService.create_session(
         db,
@@ -317,6 +408,58 @@ def login(
         session_id=active_session.id
     )
 
+    from app.services.portal_lock_service import PortalLockService
+    active_portal_lock = PortalLockService.get_active_lock(db, user.id, app_name)
+    if active_portal_lock:
+        active_session.status = "RESTRICTED"
+        active_session.login_outcome = "portal_locked"
+        db.commit()
+        lock_payload = PortalLockService.record_reentry_attempt(
+            db=db,
+            user=user,
+            application=app_name,
+            session_id=active_session.id,
+            client_ip=client_ip,
+            user_agent=user_agent or request.browser or "",
+            source="CREDENTIAL_LOGIN",
+        ) or PortalLockService.serialize_lock(active_portal_lock)
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+            role=user.role,
+            user_id=user.id,
+            name=user.name,
+            email=user.email,
+            session_id=active_session.id,
+            session_status="RESTRICTED",
+            observation_seconds_remaining=0,
+            is_new_device=is_new,
+            device_id=device.device_id,
+            trust_state=device.trust_state,
+            portal_locked=True,
+            portal_lock=lock_payload,
+        )
+
+    # Record genuine user LOGIN_SUCCESS event for Security Intelligence
+    db.add(SecurityEvent(
+        user_id=user.id,
+        session_id=active_session.id,
+        application=app_name,
+        event_type="LOGIN_SUCCESS",
+        severity="LOW",
+        anomaly_score=0.0,
+        risk_score=0.0,
+        decision="ALLOW",
+        details=json.dumps({
+            "portal": app_name,
+            "is_new_device": bool(is_new),
+            "device_trust_state": device.trust_state,
+            "session_status": active_session.status,
+        }),
+    ))
+    db.commit()
+
+    enroll_status = AdaptiveAuthService.get_enrollment_status(db, user.id)
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
@@ -329,7 +472,9 @@ def login(
         observation_seconds_remaining=0 if is_privileged else settings.OBSERVATION_WINDOW_SECONDS,
         is_new_device=is_new,
         device_id=device.device_id,
-        trust_state=device.trust_state
+        trust_state=device.trust_state,
+        security_enrollment_completed=bool(getattr(user, "security_enrollment_completed", True)),
+        missing_factors=enroll_status.get("missing_factors", []),
     )
 
 
@@ -375,11 +520,11 @@ def request_login_otp(
     session = SessionService.get_session(db, request.session_id)
     verify_session_access(session, current_user)
 
+    from app.services.portal_lock_service import PortalLockService
+    PortalLockService.enforce_not_locked(db, current_user.id, session.application)
+
     if session.status == "TERMINATED":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot request verification code for a terminated session. Please sign in again."
-        )
+        PortalLockService.raise_terminated_http_exception(status_code=status.HTTP_401_UNAUTHORIZED)
 
     if session.status == "ACTIVE":
         raise HTTPException(
@@ -418,6 +563,13 @@ def request_login_otp(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="High risk detected during observation. Access restricted; multi-factor authorization required."
+        )
+
+    # If initial login OTP has already been completed once and session later became STEP_UP_REQUIRED, do not re-use login-otp/request
+    if session.status == "STEP_UP_REQUIRED" and session.login_outcome == "verified":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Session is already authenticated; complete step-up verification."
         )
 
     # Note: MEDIUM risk does NOT bypass initial OTP verification.
@@ -485,11 +637,11 @@ def verify_login_otp(
     session = SessionService.get_session(db, request.session_id)
     verify_session_access(session, current_user)
 
+    from app.services.portal_lock_service import PortalLockService
+    PortalLockService.enforce_not_locked(db, current_user.id, session.application)
+
     if session.status == "TERMINATED":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot verify a terminated session. Please sign in again."
-        )
+        PortalLockService.raise_terminated_http_exception(status_code=status.HTTP_401_UNAUTHORIZED)
 
     if session.status == "ACTIVE":
         raise HTTPException(
@@ -511,20 +663,56 @@ def verify_login_otp(
             f"[COGNISEC-AI] [LOGIN_OTP_VERIFY] timestamp={datetime.now(timezone.utc).isoformat()} "
             f"session_id={session.id} outcome=FAILURE reason={message}"
         )
+        db.refresh(session)
+        active_lock = PortalLockService.get_active_lock(db, current_user.id, session.application)
+        is_term = (session.status == "TERMINATED")
         sec_event = SecurityEvent(
             user_id=current_user.id,
             session_id=session.id,
             application=session.application,
             event_type="LOGIN_OTP_FAILED",
             severity="HIGH",
-            decision="TERMINATE_SESSION",
-            details="Login OTP verification failed. Pending session terminated."
+            decision="LOCK_PORTAL" if active_lock else ("TERMINATE_SESSION" if is_term else "DENY"),
+            details=message
         )
         db.add(sec_event)
         db.commit()
+        db.refresh(sec_event)
+        if active_lock or is_term:
+            from app.agents.execution.orchestrator import SecurityOrchestrator
+            SecurityOrchestrator.dispatch_background(
+                db_bind=db.get_bind(),
+                event_id=sec_event.id,
+                user_id=current_user.id,
+                session_id=session.id,
+                application=session.application,
+                deterministic_risk_score=0.88 if is_term else 0.75,
+                deterministic_risk_level="CRITICAL" if is_term else "HIGH",
+                contributing_reasons=["login_otp_lockout" if active_lock else "login_otp_session_terminated"],
+                auto_containment=False,
+                skip_containment=True,
+                idempotency_key=f"login_otp_lock:{session.id}:{sec_event.id}",
+                trigger_event="LOGIN_OTP_LOCKOUT",
+            )
+        if active_lock:
+            PortalLockService.raise_locked_http_exception(active_lock, status_code=status.HTTP_423_LOCKED)
+        if is_term:
+            PortalLockService.raise_terminated_http_exception(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=PortalLockService.SESSION_TERMINATED_MESSAGE,
+            )
+        cnt_status = PortalLockService.get_attempt_counter_status(
+            db,
+            user_id=current_user.id,
+            application=session.application,
+            verification_purpose="LOGIN_OTP",
+            factor_key="EMAIL_OTP",
+            session_id=session.id,
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=message
+            detail=message,
+            headers={"X-Cognisec-Attempts-Remaining": str(cnt_status["attempts_remaining"])},
         )
 
     logger.info(
@@ -571,11 +759,11 @@ def resend_login_otp(
     session = SessionService.get_session(db, request.session_id)
     verify_session_access(session, current_user)
 
+    from app.services.portal_lock_service import PortalLockService
+    PortalLockService.enforce_not_locked(db, current_user.id, session.application)
+
     if session.status == "TERMINATED":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot resend code for a terminated session. Please sign in again."
-        )
+        PortalLockService.raise_terminated_http_exception(status_code=status.HTTP_401_UNAUTHORIZED)
 
     if session.status == "ACTIVE":
         raise HTTPException(
@@ -634,6 +822,21 @@ def logout(
         )
 
     SessionService.terminate_session(db, session_id)
+    db.add(SecurityEvent(
+        user_id=session.user_id,
+        session_id=session.id,
+        application=session.application or "platform",
+        event_type="SESSION_LOGOUT",
+        severity=session.current_risk_level or "LOW",
+        anomaly_score=0.0,
+        risk_score=float(getattr(session, "risk_score", 0.0) or 0.0),
+        decision="ALLOW",
+        details=json.dumps({
+            "portal": session.application or "platform",
+            "terminated_by_user_id": current_user.id,
+        }),
+    ))
+    db.commit()
     return {"status": "success", "message": "Session terminated successfully."}
 
 
@@ -642,14 +845,54 @@ class VerifyEmailRequest(BaseModel):
     verification_code: str
 
 
+class ResendVerificationRequest(BaseModel):
+    email: str
+
+
+@router.post("/resend-verification")
+def resend_verification_email(
+    request: ResendVerificationRequest,
+    request_conn: Request,
+    db: Session = Depends(get_db)
+):
+    """Resends the 6-digit email verification OTP for a newly registered account."""
+    client_ip = request_conn.client.host if request_conn.client else "127.0.0.1"
+    rate_limiter.enforce(
+        key=f"resend_email_verif:{client_ip}:{request.email.lower().strip()}",
+        max_requests=5,
+        window_seconds=60,
+        detail="Too many verification code requests. Please wait before retrying."
+    )
+    normalized_email = request.email.lower().strip()
+    user = AuthService.get_user_by_email(db, normalized_email)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account with this email does not exist.")
+    if user.account_status == "ACTIVE" and user.email_verified:
+        return {"status": "ACTIVE", "message": "Email is already verified."}
+
+    _, msg_text, masked_email, _, delivery_status, dev_otp = StepUpService.create_email_verification_challenge(
+        email=normalized_email,
+        db=db,
+    )
+    return {
+        "success": True,
+        "message": msg_text,
+        "masked_email": masked_email,
+        "delivery_status": delivery_status,
+        "dev_otp": dev_otp,
+    }
+
+
 @router.post("/verify-email")
 def verify_email(
     request: VerifyEmailRequest,
+    request_conn: Request,
+    user_agent: str = Header(None),
     db: Session = Depends(get_db)
 ):
     """
     Activates an unverified account upon verification of email ownership.
-    Ensures unverified emails cannot be treated as authenticated accounts.
+    Issues an authenticated platform session token so mandatory 3-factor adaptive enrollment can proceed.
     """
     normalized_email = request.email.lower().strip()
     user = AuthService.get_user_by_email(db, normalized_email)
@@ -659,16 +902,84 @@ def verify_email(
             detail="Account with this email does not exist."
         )
     if user.account_status == "ACTIVE":
-        return {"status": "ACTIVE", "message": "Email is already verified."}
+        return {
+            "status": "ACTIVE",
+            "message": "Email is already verified.",
+            "security_enrollment_completed": bool(getattr(user, "security_enrollment_completed", True)),
+        }
 
-    if not request.verification_code or len(request.verification_code.strip()) < 4:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired email verification code."
+    if user.account_status == "PENDING_EMAIL_VERIFICATION" or StepUpService.has_email_verification_challenge(normalized_email):
+        ok, err_msg = StepUpService.verify_email_verification_challenge(
+            email=normalized_email,
+            otp_code=request.verification_code,
         )
+        if not ok:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=err_msg
+            )
+    else:
+        if not request.verification_code or len(request.verification_code.strip()) < 4:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired email verification code."
+            )
 
     AuthService.activate_user_account(db, normalized_email)
-    return {"status": "ACTIVE", "message": "Email verified successfully. Account activated."}
+    user.email_verified = True
+    user.email_verified_at = datetime.now(timezone.utc)
+
+    client_ip = request_conn.client.host if request_conn.client else "127.0.0.1"
+    device, _ = DeviceService.register_or_update_device(
+        db=db,
+        user_id=user.id,
+        device_fingerprint=f"reg_{user.id}",
+        ip_address=client_ip,
+        user_agent=user_agent or "",
+    )
+    enroll_session = SessionService.create_session(
+        db,
+        user_id=user.id,
+        application="platform",
+        device_id=device.id,
+        ip_address=client_ip,
+        status="ACTIVE",
+        is_pending_observation=False,
+    )
+    access_token = create_access_token(
+        subject=user.id,
+        role=user.role,
+        session_id=enroll_session.id,
+    )
+
+    db.add(SecurityEvent(
+        user_id=user.id,
+        session_id=enroll_session.id,
+        application="platform",
+        event_type="EMAIL_VERIFICATION_COMPLETED",
+        severity="LOW",
+        anomaly_score=0.0,
+        risk_score=0.0,
+        decision="ALLOW",
+        details='{"email_verified": true}',
+    ))
+    db.commit()
+    db.refresh(user)
+
+    enroll_status = AdaptiveAuthService.get_enrollment_status(db, user.id)
+    return {
+        "status": "ACTIVE",
+        "message": "Email verified successfully. Account activated.",
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_id": user.id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
+        "session_id": enroll_session.id,
+        "security_enrollment_completed": bool(getattr(user, "security_enrollment_completed", True)),
+        "missing_factors": enroll_status.get("missing_factors", []),
+    }
 
 
 @router.post("/password-reset/request", response_model=PasswordResetResponse)
@@ -924,3 +1235,193 @@ def dev_unlock_account(
         success=True,
         message=f"Account '{request.email}' has been successfully unlocked. All existing records preserved."
     )
+
+
+# ==============================================================================
+# AUTHENTICATED COGNITIVE-VERIFIED PASSWORD CHANGE ROUTES (ALL PORTALS)
+# ==============================================================================
+
+def _extract_auth_ctx(
+    request_conn: Request,
+    authorization: Optional[str],
+    x_session_id: Optional[str],
+) -> tuple:
+    client_ip = request_conn.client.host if request_conn.client else "127.0.0.1"
+    forwarded = request_conn.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    token_sid = None
+    if authorization and authorization.lower().startswith("bearer "):
+        payload = decode_access_token(authorization[7:].strip())
+        if payload:
+            token_sid = payload.get("sid")
+    return client_ip, token_sid, x_session_id
+
+
+@router.get("/password-change/policy", response_model=PasswordChangePolicyResponse)
+def get_password_change_policy(
+    request_conn: Request,
+    application: str = "platform",
+    session_id: Optional[str] = None,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Returns enrollment inventory, cognitive catalogue, and deterministic risk posture for password change."""
+    _, token_sid, hdr_sid = _extract_auth_ctx(request_conn, authorization, x_session_id)
+    db_session = PasswordChangeService.resolve_and_validate_session(
+        db=db,
+        current_user=current_user,
+        requested_session_id=session_id or hdr_sid,
+        token_session_id=token_sid,
+    )
+    data = PasswordChangeService.get_policy(
+        db=db,
+        current_user=current_user,
+        db_session=db_session,
+        application=application,
+    )
+    return PasswordChangePolicyResponse(**data)
+
+
+@router.post("/password-change/initiate", response_model=PasswordChangeInitiateResponse)
+def initiate_password_change(
+    request: PasswordChangeInitiateRequest,
+    request_conn: Request,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Verifies current password and behavioral risk, then issues bound two-part cognitive challenges."""
+    client_ip, token_sid, hdr_sid = _extract_auth_ctx(request_conn, authorization, x_session_id)
+    rate_limiter.enforce(
+        key=f"pwd_chg_init:{current_user.id}:{client_ip}",
+        max_requests=12,
+        window_seconds=60,
+        detail="Too many password change attempts. Please wait before retrying."
+    )
+    db_session = PasswordChangeService.resolve_and_validate_session(
+        db=db,
+        current_user=current_user,
+        requested_session_id=request.session_id or hdr_sid,
+        token_session_id=token_sid,
+    )
+    data = PasswordChangeService.initiate_change(
+        db=db,
+        current_user=current_user,
+        db_session=db_session,
+        application=request.application,
+        current_password=request.current_password,
+        bound_high_risk_challenge_id=request.bound_high_risk_challenge_id,
+    )
+    return PasswordChangeInitiateResponse(**data)
+
+
+@router.post("/password-change/verify-image", response_model=PasswordChangeVerifyImageResponse)
+def verify_password_change_image(
+    request: PasswordChangeVerifyImageRequest,
+    request_conn: Request,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cognitive Step 1: verifies user's image sequence bound to the password-change transaction."""
+    client_ip, token_sid, hdr_sid = _extract_auth_ctx(request_conn, authorization, x_session_id)
+    rate_limiter.enforce(
+        key=f"pwd_chg_img:{current_user.id}:{client_ip}",
+        max_requests=15,
+        window_seconds=60,
+        detail="Too many cognitive verification attempts. Please wait."
+    )
+    db_session = PasswordChangeService.resolve_and_validate_session(
+        db=db,
+        current_user=current_user,
+        requested_session_id=request.session_id or hdr_sid,
+        token_session_id=token_sid,
+    )
+    data = PasswordChangeService.verify_image_challenge(
+        db=db,
+        current_user=current_user,
+        db_session=db_session,
+        application=request.application,
+        transaction_id=request.transaction_id,
+        image_challenge_id=request.image_challenge_id,
+        image_sequence=request.image_sequence,
+    )
+    return PasswordChangeVerifyImageResponse(**data)
+
+
+@router.post("/password-change/verify-private", response_model=PasswordChangeVerifyPrivateResponse)
+def verify_password_change_private(
+    request: PasswordChangeVerifyPrivateRequest,
+    request_conn: Request,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cognitive Step 2: verifies user's private security response bound to the same transaction."""
+    client_ip, token_sid, hdr_sid = _extract_auth_ctx(request_conn, authorization, x_session_id)
+    rate_limiter.enforce(
+        key=f"pwd_chg_priv:{current_user.id}:{client_ip}",
+        max_requests=15,
+        window_seconds=60,
+        detail="Too many security response verification attempts. Please wait."
+    )
+    db_session = PasswordChangeService.resolve_and_validate_session(
+        db=db,
+        current_user=current_user,
+        requested_session_id=request.session_id or hdr_sid,
+        token_session_id=token_sid,
+    )
+    data = PasswordChangeService.verify_private_challenge(
+        db=db,
+        current_user=current_user,
+        db_session=db_session,
+        application=request.application,
+        transaction_id=request.transaction_id,
+        private_challenge_id=request.private_challenge_id,
+        private_response=request.private_response,
+    )
+    return PasswordChangeVerifyPrivateResponse(**data)
+
+
+@router.post("/password-change/confirm", response_model=PasswordChangeConfirmResponse)
+def confirm_password_change(
+    request: PasswordChangeConfirmRequest,
+    request_conn: Request,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Atomically updates password after confirming both cognitive checks, invalidates sessions, and sends security email."""
+    client_ip, token_sid, hdr_sid = _extract_auth_ctx(request_conn, authorization, x_session_id)
+    rate_limiter.enforce(
+        key=f"pwd_chg_confirm:{current_user.id}:{client_ip}",
+        max_requests=10,
+        window_seconds=60,
+        detail="Too many password update requests. Please wait."
+    )
+    db_session = PasswordChangeService.resolve_and_validate_session(
+        db=db,
+        current_user=current_user,
+        requested_session_id=request.session_id or hdr_sid,
+        token_session_id=token_sid,
+    )
+    data = PasswordChangeService.confirm_password_change(
+        db=db,
+        current_user=current_user,
+        db_session=db_session,
+        application=request.application,
+        transaction_id=request.transaction_id,
+        new_password=request.new_password,
+        confirm_password=request.confirm_password,
+        client_ip=client_ip,
+        bound_high_risk_challenge_id=request.bound_high_risk_challenge_id,
+    )
+    return PasswordChangeConfirmResponse(**data)

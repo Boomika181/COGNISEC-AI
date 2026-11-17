@@ -18,6 +18,8 @@ class UserSecurityOutcome(BaseModel):
     confidential_access_granted: bool = False
     step_up_fresh: bool = False
     step_up_factor: Optional[str] = None
+    risk_level: Optional[str] = None
+    recommended_factor: Optional[str] = None
     application: Optional[str] = None
     resource: Optional[str] = None
     stage: Optional[int] = None
@@ -34,6 +36,8 @@ class UserBehaviorEventResponse(BaseModel):
     user_message: str
     session_status: str
     verification_required: bool = False
+    observation_completed: Optional[bool] = None
+    observation_seconds_remaining: Optional[int] = None
     timestamp: datetime.datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -45,6 +49,8 @@ class AdminSecurityDecisionResponse(BaseModel):
     user_message: str
     session_status: str
     verification_required: bool = False
+    observation_completed: Optional[bool] = None
+    observation_seconds_remaining: Optional[int] = None
     risk_level: str  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
     risk_score: float
     anomaly_score: float
@@ -74,6 +80,8 @@ class MfaEnrollmentStatusResponse(BaseModel):
     has_cognitive_image_sequence: bool
     has_private_response: bool
     private_question: Optional[str] = None
+    security_enrollment_completed: bool = True
+    missing_factors: List[str] = []
 
 
 class GestureEnrollRequest(BaseModel):
@@ -113,6 +121,7 @@ class StepUpChallengeRequest(BaseModel):
     preferred_factor: Optional[str] = None  # Optional user factor preference (if permitted by policy)
     application: Optional[str] = None
     resource: Optional[str] = None
+    challenge_purpose: Optional[str] = None  # CONFIDENTIAL_RESOURCE | SESSION_STEP_UP | PASSWORD_CHANGE | HEALTHCARE_BOOKING
 
 
 class StepUpChallengeResponse(BaseModel):
@@ -130,8 +139,11 @@ class StepUpChallengeResponse(BaseModel):
     is_demo_otp: bool = False  # Clearly separates exhibition OTP delivery from production email OTP
     application: Optional[str] = None
     resource: Optional[str] = None
+    challenge_purpose: Optional[str] = None
     stage: Optional[int] = 1
     stage_1_passed: Optional[bool] = False
+    attempts_remaining: Optional[int] = 3
+    max_attempts: Optional[int] = 3
 
 
 class StepUpVerifyRequest(BaseModel):
@@ -144,6 +156,7 @@ class StepUpVerifyRequest(BaseModel):
     private_response: Optional[str] = None
     application: Optional[str] = None
     resource: Optional[str] = None
+    challenge_purpose: Optional[str] = None
     stage: Optional[int] = 1
 
 

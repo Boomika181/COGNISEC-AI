@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.security import get_password_hash
 from app.core.rate_limit import rate_limiter
 from app.models.user import User
+from app.models.session import Session as DbSession
 from app.models.security_event import SecurityEvent
 from app.models.application_grant import ApplicationGrant
 from app.services.session_service import SessionService
@@ -249,7 +250,7 @@ def test_5_correct_doctor_credentials_work_after_authorized_reset(client: TestCl
     data = doc_login.json()
     assert "access_token" in data
     assert data["role"] == "DOCTOR"
-    assert data["session_status"] == "ACTIVE"
+    assert data["session_status"] == "PENDING_OBSERVATION"
 
 
 def test_6_normal_user_accounts_cannot_access_clinical_vault(client: TestClient, patient_user_account: User):
@@ -281,6 +282,12 @@ def test_7_doctor_access_still_requires_zero_trust_grant(client: TestClient, dev
     })
     token = doc_login.json()["access_token"]
     sess_id = doc_login.json()["session_id"]
+
+    # Mark doctor session ACTIVE after observation
+    sess_obj = db_session.query(DbSession).filter(DbSession.id == sess_id).first()
+    if sess_obj:
+        sess_obj.status = "ACTIVE"
+        db_session.commit()
 
     # 1. Without grant: strictly denied
     no_grant_res = client.get(
@@ -326,6 +333,12 @@ def test_8_logout_locks_vault_and_invalidates_session(client: TestClient, dev_do
     })
     token = doc_login.json()["access_token"]
     sess_id = doc_login.json()["session_id"]
+
+    # Mark doctor session ACTIVE after observation
+    sess_obj = db_session.query(DbSession).filter(DbSession.id == sess_id).first()
+    if sess_obj:
+        sess_obj.status = "ACTIVE"
+        db_session.commit()
 
     # Create grant
     now = datetime.now(timezone.utc)

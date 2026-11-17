@@ -11,8 +11,29 @@ from app.models.application_grant import ApplicationGrant
 from app.services.session_service import SessionService
 from app.services.access_tracker import ConfidentialAccessTracker
 from app.services.step_up_service import StepUpService
+from app.core.security import get_password_hash
 from app.services.adaptive_auth_service import AdaptiveAuthService
 from app.services.email_service import EmailService
+from app.services.portal_lock_service import PortalLockService
+
+
+def _recover_portal_for_test(db: Session, sec_ref: str):
+    adm = db.query(User).filter(User.role == "ADMIN").first()
+    if not adm:
+        adm = User(
+            name="Test SOC Admin",
+            email=f"soc_adm_{int(time.time()*1000)}@example.com",
+            password_hash=get_password_hash("AdminPass!123"),
+            role="ADMIN",
+            account_status="ACTIVE",
+            failed_login_attempts=0,
+        )
+        db.add(adm)
+        db.commit()
+        db.refresh(adm)
+    return PortalLockService.admin_recover_portal_lock(
+        db, sec_ref, adm, notes="Test recovery before fresh login"
+    )
 
 
 def _create_user(client: TestClient, prefix: str):
@@ -63,7 +84,7 @@ def test_scenario_1_normal_login_low_risk_email_otp(client: TestClient, db_sessi
     data = res.json()
     assert data["risk_level"] == "LOW"
     assert data["challenge_type"] == "LOGIN_OTP"
-    assert "otp" in data["message"].lower() or "verification" in data["message"].lower()
+    assert "submitted to the mail server" in data["message"].lower() or "otp" in data["message"].lower() or "verification" in data["message"].lower()
 
     db_session.refresh(sess)
     assert sess.status == "PENDING_OTP"
@@ -238,13 +259,13 @@ def test_scenario_6_repeated_vault_clicks_and_wrong_attempts_triggers_critical_t
         }, headers=headers)
 
     # On exceeding attempts with repeated denials, session is terminated
-    assert ver_res.status_code in (400, 403)
+    assert ver_res.status_code in (400, 403, 423)
     db_session.refresh(sess)
     assert sess.status in ("TERMINATED", "RESTRICTED")
 
     # Vault access is unconditionally denied
     v_res = client.get(f"/api/security/vault/ehr_vault?session_id={sid}", headers=headers)
-    assert v_res.status_code in (400, 401, 403)
+    assert v_res.status_code in (400, 401, 403, 423)
 
 
 def test_scenario_7_and_8_failed_vs_successful_verification(client: TestClient, db_session: Session):
@@ -369,17 +390,18 @@ def test_portal_college_mandatory_otp_and_vault_flow(client: TestClient, db_sess
         db_session.refresh(sess)
         assert sess.status == "PENDING_OTP"
 
-        # Invalid OTP rejection terminates session
+        # Wrong Login OTP (1-attempt limit) enforces portal-scoped ejection (HTTP 423)
         inv_res = client.post("/api/auth/login-otp/verify", json={
             "session_id": sid,
             "otp_code": "000000",
             "challenge_id": req_data["challenge_id"]
         }, headers=headers)
-        assert inv_res.status_code == 400
+        assert inv_res.status_code == 423
         db_session.refresh(sess)
-        assert sess.status == "TERMINATED"
+        assert sess.status == "RESTRICTED"
+        _recover_portal_for_test(db_session, inv_res.headers["X-Cognisec-Security-Ref"])
 
-    # Fresh login to test resend, valid OTP verification, and vault access
+    # Fresh login (normal re-login permitted after terminated session)
     sid2, token2 = _login(client, email, pwd, "college")
     headers2 = {"Authorization": f"Bearer {token2}"}
     sess2 = db_session.query(DbSession).filter(DbSession.id == sid2).first()
@@ -506,15 +528,15 @@ def test_portal_shopping_mandatory_otp_and_vault_flow(client: TestClient, db_ses
         db_session.refresh(sess)
         assert sess.status == "PENDING_OTP"
 
-        # Invalid OTP terminates session
         inv_res = client.post("/api/auth/login-otp/verify", json={
             "session_id": sid,
             "otp_code": "000000",
             "challenge_id": req_data["challenge_id"]
         }, headers=headers)
-        assert inv_res.status_code == 400
+        assert inv_res.status_code == 423
         db_session.refresh(sess)
-        assert sess.status == "TERMINATED"
+        assert sess.status == "RESTRICTED"
+        _recover_portal_for_test(db_session, inv_res.headers["X-Cognisec-Security-Ref"])
 
     # Fresh login
     sid2, token2 = _login(client, email, pwd, "shopping")
@@ -643,15 +665,15 @@ def test_portal_healthcare_mandatory_otp_and_vault_flow(client: TestClient, db_s
         db_session.refresh(sess)
         assert sess.status == "PENDING_OTP"
 
-        # Invalid OTP terminates session
         inv_res = client.post("/api/auth/login-otp/verify", json={
             "session_id": sid,
             "otp_code": "000000",
             "challenge_id": req_data["challenge_id"]
         }, headers=headers)
-        assert inv_res.status_code == 400
+        assert inv_res.status_code == 423
         db_session.refresh(sess)
-        assert sess.status == "TERMINATED"
+        assert sess.status == "RESTRICTED"
+        _recover_portal_for_test(db_session, inv_res.headers["X-Cognisec-Security-Ref"])
 
     # Fresh login
     sid2, token2 = _login(client, email, pwd, "healthcare")

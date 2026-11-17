@@ -122,22 +122,29 @@ def run_step5_verification():
     # A. First test: Under production settings (EXHIBITION_MODE=False, no SMTP configured),
     # verifying that system strictly blocks access and does NOT silently fabricate or display OTP
     orig_smtp_enabled = settings.SMTP_ENABLED
-    settings.SMTP_ENABLED = False
-    settings.EXHIBITION_MODE = False
-    otp_fail_chal = client.post("/api/security/step-up/challenge", headers=headers, json={
-        "session_id": session_id,
-        "challenge_type": "OTP_EMAIL"
-    })
-    assert otp_fail_chal.status_code == 502, f"Expected 502 when SMTP is unconfigured, got: {otp_fail_chal.status_code}"
-    assert "SMTP mail server is not configured" in otp_fail_chal.json()["detail"]
-    print("[6A] Unconfigured SMTP properly blocks action with 502 and zero leakage (Strict Production Mode)")
+    orig_exhibition = settings.EXHIBITION_MODE
+    try:
+        settings.SMTP_ENABLED = False
+        settings.EXHIBITION_MODE = False
+        otp_fail_chal = client.post("/api/security/step-up/challenge", headers=headers, json={
+            "session_id": session_id,
+            "preferred_factor": "OTP",
+            "challenge_type": "OTP"
+        })
+        assert otp_fail_chal.status_code == 502, f"Expected 502 when SMTP is unconfigured, got: {otp_fail_chal.status_code}"
+        assert "email delivery could not be initiated" in otp_fail_chal.json()["detail"].lower()
+        print("[6A] Unconfigured SMTP properly blocks action with 502 and zero leakage (Strict Production Mode)")
+    finally:
+        settings.SMTP_ENABLED = orig_smtp_enabled
+        settings.EXHIBITION_MODE = orig_exhibition
 
     # B. Test OTP flow with EXHIBITION_MODE=True (Local Test Harness)
     settings.SMTP_ENABLED = orig_smtp_enabled
     settings.EXHIBITION_MODE = True
     otp_chal = client.post("/api/security/step-up/challenge", headers=headers, json={
         "session_id": session_id,
-        "challenge_type": "OTP_EMAIL"
+        "preferred_factor": "OTP",
+        "challenge_type": "OTP"
     })
     assert otp_chal.status_code == 200, f"OTP challenge failed in test mode: {otp_chal.text}"
     otp_data = otp_chal.json()

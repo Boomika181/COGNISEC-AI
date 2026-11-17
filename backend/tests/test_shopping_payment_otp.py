@@ -24,10 +24,29 @@ MASKED_TARGET = "b***5@gmail.com"
 
 
 @pytest.fixture(autouse=True)
-def clean_challenges():
+def clean_challenges(monkeypatch):
+    monkeypatch.setattr(settings, "EXHIBITION_DEMO_MAILBOX_OVERRIDE", True)
+    monkeypatch.setattr(settings, "DEMO_OTP_RECIPIENT_EMAIL", DELIVERY_TARGET)
+    monkeypatch.setattr(settings, "ENVIRONMENT", "development")
+    monkeypatch.setattr(settings, "EXHIBITION_MODE", True)
     StepUpService.reset()
+    _clear_customer_shopping_locks()
     yield
     StepUpService.reset()
+    _clear_customer_shopping_locks()
+
+
+def _clear_customer_shopping_locks():
+    from app.models.portal_lock import PortalSecurityLock, VerificationAttemptCounter
+    db = SessionLocal()
+    try:
+        u = db.query(User).filter(User.email == CUSTOMER_EMAIL).first()
+        if u:
+            db.query(PortalSecurityLock).filter(PortalSecurityLock.user_id == u.id).delete(synchronize_session=False)
+            db.query(VerificationAttemptCounter).filter(VerificationAttemptCounter.user_id == u.id).delete(synchronize_session=False)
+            db.commit()
+    finally:
+        db.close()
 
 
 def create_active_shopping_session():
@@ -153,15 +172,15 @@ def test_incorrect_otp_rejects_payment_and_decrements_attempts():
     assert r_req.status_code == 200
     chal_id = r_req.json()["challenge_id"]
 
-    # Attempt 1: bad OTP
+    # Attempt 1: bad OTP -> 1-attempt Email OTP limit suspends shopping portal (423) and leaves order PENDING
     r_bad1 = client.post("/api/shopping/payment-otp/verify", headers=headers, json={
         "session_id": sid,
         "order_id": order_id,
         "challenge_id": chal_id,
         "otp_code": "000000"
     })
-    assert r_bad1.status_code == 400
-    assert "2 attempt(s) remaining" in r_bad1.json()["detail"]
+    assert r_bad1.status_code == 423
+    assert r_bad1.headers.get("X-Cognisec-Portal-Locked") == "true"
 
     # Verify order is still PENDING
     db = SessionLocal()
@@ -171,26 +190,6 @@ def test_incorrect_otp_rejects_payment_and_decrements_attempts():
         assert order.paid_at is None
     finally:
         db.close()
-
-    # Attempt 2: bad OTP
-    r_bad2 = client.post("/api/shopping/payment-otp/verify", headers=headers, json={
-        "session_id": sid,
-        "order_id": order_id,
-        "challenge_id": chal_id,
-        "otp_code": "111111"
-    })
-    assert r_bad2.status_code == 400
-    assert "1 attempt(s) remaining" in r_bad2.json()["detail"]
-
-    # Attempt 3: bad OTP -> locks challenge
-    r_bad3 = client.post("/api/shopping/payment-otp/verify", headers=headers, json={
-        "session_id": sid,
-        "order_id": order_id,
-        "challenge_id": chal_id,
-        "otp_code": "222222"
-    })
-    assert r_bad3.status_code == 400
-    assert "Maximum attempts exceeded" in r_bad3.json()["detail"]
 
 
 def test_expired_otp_is_rejected():

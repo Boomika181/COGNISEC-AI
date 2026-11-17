@@ -17,11 +17,12 @@ if db_url.startswith("sqlite"):
     connect_args["check_same_thread"] = False
     engine_kwargs["connect_args"] = connect_args
 
-    # SQLite foreign key enforcement
+    # SQLite foreign key and concurrency busy-timeout enforcement
     @event.listens_for(Engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON;")
+        cursor.execute("PRAGMA busy_timeout=5000;")
         cursor.close()
 else:
     # PostgreSQL / Neon connection settings
@@ -59,6 +60,7 @@ if sim_db_url.startswith("sqlite"):
     def set_sim_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON;")
+        cursor.execute("PRAGMA busy_timeout=5000;")
         cursor.close()
 
 SimulatorSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=simulator_engine)

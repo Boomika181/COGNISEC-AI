@@ -130,9 +130,18 @@ class DeviceService:
         existing_devices_count = db.query(Device).filter(Device.user_id == user_id).count()
         is_first_device = (existing_devices_count == 0)
 
-        # Initial device is trusted; subsequent unfamiliar devices are strictly PENDING_CONFIRMATION
-        initial_trust_state = "TRUSTED" if is_first_device else "PENDING_CONFIRMATION"
-        is_trusted_bool = bool(is_first_device)
+        has_valid_identity = bool(
+            safe_fingerprint
+            and safe_fingerprint != "unknown"
+            and (
+                ua_info["browser_name"] != "Unknown"
+                or ua_info["os_name"] != "Unknown"
+                or bool(nickname and nickname.strip())
+            )
+        )
+        # Only an identified first device is auto-trusted; unknown devices never become TRUSTED automatically
+        initial_trust_state = "TRUSTED" if (is_first_device and has_valid_identity) else "PENDING_CONFIRMATION"
+        is_trusted_bool = bool(is_first_device and has_valid_identity)
 
         if nickname and nickname.strip() and not nickname.strip().startswith("Device #"):
             default_nickname = nickname.strip()[:95]

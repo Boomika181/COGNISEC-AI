@@ -34,7 +34,8 @@ try:
         sync_historical_device_identities,
         ensure_admin_account_provisioned,
         sync_alert_schema,
-        sync_doctor_roles_and_identities
+        sync_doctor_roles_and_identities,
+        sync_portal_lock_and_counter_schemas
     )
     sync_user_schema()
     sync_device_and_notification_schemas()
@@ -44,6 +45,7 @@ try:
     ensure_admin_account_provisioned()
     sync_alert_schema()
     sync_doctor_roles_and_identities()
+    sync_portal_lock_and_counter_schemas()
 except Exception as e:
     logger.warning(f"Schema sync deferred: {e}")
 

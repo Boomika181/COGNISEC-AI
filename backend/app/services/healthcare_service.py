@@ -1,6 +1,7 @@
 import secrets
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
+from sqlalchemy import or_, and_
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -81,6 +82,8 @@ HOSPITAL_DOCTORS: List[Dict[str, Any]] = [
         "fee": "₹1,200",
         "availability": "Available for Consultation",
         "opd_hours": "Mon–Sat • 09:00 AM – 01:00 PM",
+        "available_days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        "available_slots": ["09:00 AM", "09:45 AM", "10:30 AM", "11:30 AM", "12:15 PM"],
         "avatar": "👩‍⚕️",
         "bio": "Senior Consultant Cardiologist specializing in adult interventional cardiology, primary coronary angioplasty, transcatheter aortic valve implantation (TAVI), and structural heart disease.",
         "associated_email": "dr.boomika@ayusync.med.in"
@@ -97,6 +100,8 @@ HOSPITAL_DOCTORS: List[Dict[str, Any]] = [
         "fee": "₹1,500",
         "availability": "Available for Consultation",
         "opd_hours": "Mon–Fri • 10:00 AM – 02:00 PM",
+        "available_days": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        "available_slots": ["10:00 AM", "10:45 AM", "11:30 AM", "12:30 PM", "01:30 PM"],
         "avatar": "👩‍⚕️",
         "bio": "Chief Neurosurgeon and Director of Stroke Program. Specializes in minimally invasive skull-base neurosurgery, intracranial aneurysms, and epilepsy surgical therapies.",
         "associated_email": "dr.sarah@aetheriahealth.org"
@@ -113,6 +118,8 @@ HOSPITAL_DOCTORS: List[Dict[str, Any]] = [
         "fee": "₹900",
         "availability": "Available for Consultation",
         "opd_hours": "Mon–Sat • 09:00 AM – 04:00 PM",
+        "available_days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        "available_slots": ["09:30 AM", "10:30 AM", "11:30 AM", "02:00 PM", "03:30 PM"],
         "avatar": "👩‍⚕️",
         "bio": "Senior Consultant Pediatrician & Neonatologist leading the Level-III NICU. Expert in childhood infectious diseases, pediatric allergy screening, and infant growth development.",
         "associated_email": "dr.sunita@ayusync.med.in"
@@ -129,6 +136,8 @@ HOSPITAL_DOCTORS: List[Dict[str, Any]] = [
         "fee": "₹1,200",
         "availability": "Available for Consultation",
         "opd_hours": "Mon, Wed, Fri • 11:00 AM – 03:00 PM",
+        "available_days": ["Mon", "Wed", "Fri"],
+        "available_slots": ["11:00 AM", "11:45 AM", "12:30 PM", "01:30 PM", "02:30 PM"],
         "avatar": "👨‍⚕️",
         "bio": "Pioneer in robotic total knee and hip arthroplasty, arthroscopic cruciate ligament reconstructions, and sports medicine rehabilitation.",
         "associated_email": "dr.vikram@ayusync.med.in"
@@ -145,6 +154,8 @@ HOSPITAL_DOCTORS: List[Dict[str, Any]] = [
         "fee": "₹1,000",
         "availability": "Available for Consultation",
         "opd_hours": "Tue, Thu, Sat • 02:00 PM – 06:00 PM",
+        "available_days": ["Tue", "Thu", "Sat"],
+        "available_slots": ["02:00 PM", "02:45 PM", "03:30 PM", "04:30 PM", "05:30 PM"],
         "avatar": "👩‍⚕️",
         "bio": "Renowned clinical dermatologist specializing in chronic psoriasis phototherapy, pediatric atopic dermatitis, biological immunotherapy, and aesthetic laser rejuvenation.",
         "associated_email": "dr.ananya@ayusync.med.in"
@@ -161,6 +172,8 @@ HOSPITAL_DOCTORS: List[Dict[str, Any]] = [
         "fee": "₹800",
         "availability": "Available for Consultation",
         "opd_hours": "Mon–Sat • 08:30 AM – 12:30 PM",
+        "available_days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        "available_slots": ["08:30 AM", "09:15 AM", "10:00 AM", "11:00 AM", "12:00 PM"],
         "avatar": "👨‍⚕️",
         "bio": "Senior Consultant Physician specializing in diabetic metabolic management, hypertensive disorders, geriatric preventive medicine, and pre-operative cardiac evaluations.",
         "associated_email": "dr.sandeep@ayusync.med.in"
@@ -197,7 +210,9 @@ class HealthcareService:
                 opd_hours=doc["opd_hours"],
                 avatar=doc["avatar"],
                 bio=doc["bio"],
-                is_active=True
+                is_active=True,
+                available_days=list(doc.get("available_days", [])),
+                available_slots=list(doc.get("available_slots", []))
             ))
         return results
 
@@ -211,16 +226,90 @@ class HealthcareService:
         return None
 
     @staticmethod
+    def validate_doctor_schedule(doctor: Dict[str, Any], appointment_date: str, time_slot: str) -> None:
+        """
+        Verifies that the requested date's weekday and time_slot match the doctor's configured OPD schedule.
+        """
+        try:
+            parsed_date = datetime.strptime(appointment_date.strip(), "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid appointment date format. Expected YYYY-MM-DD."
+            )
+
+        weekday_abbr = parsed_date.strftime("%a")  # Mon, Tue, Wed, Thu, Fri, Sat, Sun
+        allowed_days = doctor.get("available_days") or []
+        if allowed_days and weekday_abbr not in allowed_days:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{doctor['name']} does not hold OPD on {parsed_date.strftime('%A')}. Available OPD days: {', '.join(allowed_days)}."
+            )
+
+        allowed_slots = doctor.get("available_slots") or []
+        if allowed_slots and time_slot.strip() not in allowed_slots:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Time slot '{time_slot}' is not within {doctor['name']}'s OPD schedule ({doctor['opd_hours']})."
+            )
+
+    @staticmethod
+    def get_doctor_slots_for_date(db: Session, doctor_id: str, appointment_date: str) -> Dict[str, Any]:
+        """Returns configured OPD slots and live availability for a doctor on a given date."""
+        doctor = HealthcareService.get_doctor_by_id(doctor_id)
+        if not doctor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Doctor '{doctor_id}' not found."
+            )
+        try:
+            parsed_date = datetime.strptime(appointment_date.strip(), "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid date format. Expected YYYY-MM-DD."
+            )
+
+        weekday_abbr = parsed_date.strftime("%a")
+        allowed_days = doctor.get("available_days") or []
+        is_opd_day = (weekday_abbr in allowed_days) if allowed_days else True
+
+        booked_rows = db.query(HealthcareAppointment.time_slot).filter(
+            HealthcareAppointment.doctor_id == doctor["id"],
+            HealthcareAppointment.appointment_date == appointment_date.strip(),
+            HealthcareAppointment.status == "CONFIRMED"
+        ).all()
+        booked_slots = {r[0] for r in booked_rows}
+
+        slots = []
+        for slot in doctor.get("available_slots", []):
+            slots.append({
+                "slot": slot,
+                "available": bool(is_opd_day and slot not in booked_slots)
+            })
+
+        return {
+            "doctor_id": doctor["id"],
+            "doctor_name": doctor["name"],
+            "date": appointment_date.strip(),
+            "weekday": parsed_date.strftime("%A"),
+            "is_opd_day": is_opd_day,
+            "available_days": allowed_days,
+            "opd_hours": doctor["opd_hours"],
+            "slots": slots,
+        }
+
+    @staticmethod
     def check_slot_availability(db: Session, doctor_id: str, date: str, slot: str) -> bool:
         """
         Validates whether a specific consultation time slot is open for a doctor.
-        Prevents double-booking.
+        Only CONFIRMED appointments permanently occupy a slot so abandoned pending or failed attempts do not block slots.
         """
         existing = db.query(HealthcareAppointment).filter(
             HealthcareAppointment.doctor_id == doctor_id,
             HealthcareAppointment.appointment_date == date,
             HealthcareAppointment.time_slot == slot,
-            HealthcareAppointment.status != "CANCELLED"
+            HealthcareAppointment.status == "CONFIRMED"
         ).first()
         return existing is None
 
@@ -259,15 +348,16 @@ class HealthcareService:
 
         appointment = HealthcareAppointment(
             reference_id=ref_id,
-            patient_name=req.patient_name,
-            patient_phone=req.patient_phone,
-            patient_email=req.patient_email,
+            patient_name=req.patient_name.strip(),
+            patient_phone=req.patient_phone.strip(),
+            patient_email=req.patient_email.strip().lower(),
             department=doctor["dept_label"],
             doctor_id=doctor["id"],
             doctor_name=doctor["name"],
-            appointment_date=req.appointment_date,
-            time_slot=req.time_slot,
-            consultation_mode=req.consultation_mode,
+            appointment_date=req.appointment_date.strip(),
+            time_slot=req.time_slot.strip(),
+            consultation_mode=req.consultation_mode.strip() if req.consultation_mode else "In-Person OPD Visit",
+            consultation_fee=doctor["fee"],
             room=doctor["room"],
             status="CONFIRMED",
             user_id=user_id
@@ -284,12 +374,28 @@ class HealthcareService:
         user_id: Optional[int] = None,
         limit: int = 50
     ) -> List[HealthcareAppointment]:
-        """Queries persisted appointments for patient or authenticated session."""
-        query = db.query(HealthcareAppointment)
-        if user_id:
+        """
+        Queries persisted patient appointments.
+        Excludes PENDING_VERIFICATION, FAILED, and EXPIRED records so unverified bookings never show as confirmed.
+        """
+        query = db.query(HealthcareAppointment).filter(
+            HealthcareAppointment.status.in_(["CONFIRMED", "CANCELLED"])
+        )
+        clean_email = email.strip().lower() if email else None
+        if user_id and clean_email:
+            query = query.filter(
+                or_(
+                    HealthcareAppointment.user_id == user_id,
+                    and_(
+                        HealthcareAppointment.user_id.is_(None),
+                        HealthcareAppointment.patient_email == clean_email
+                    )
+                )
+            )
+        elif user_id:
             query = query.filter(HealthcareAppointment.user_id == user_id)
-        elif email:
-            query = query.filter(HealthcareAppointment.patient_email == email.strip().lower())
+        elif clean_email:
+            query = query.filter(HealthcareAppointment.patient_email == clean_email)
         return query.order_by(HealthcareAppointment.created_at.desc()).limit(limit).all()
 
     @staticmethod

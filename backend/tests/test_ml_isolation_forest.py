@@ -105,11 +105,11 @@ def test_end_to_end_ml_integration_and_anti_poisoning(client, user_token):
         assert legit_res.status_code == 200
         assert legit_res.json()["decision"] == "ALLOW"
 
-    # Verify Profile reaches ML_READY
+    # Verify Profile reaches mature statistical baseline while ML remains in ML_LEARNING (< 25 samples)
     prof = client.get("/api/behavior/profile", headers={"Authorization": f"Bearer {user_token}"}).json()
     assert prof["sample_count"] >= 5
     assert prof["is_mature"] is True
-    assert prof["ml_status"] == "ML_READY"
+    assert prof["ml_status"] == "ML_LEARNING"
     model_samples_before = prof["model_sample_count"]
 
     # 3. Submit abnormal behavioral attack -> must trigger elevated risk and NOT train model
@@ -172,11 +172,11 @@ def test_model_hydration_from_database_after_restart(client, user_token):
     # 2. Clear in-memory ModelManager to simulate process restart / cold-start
     ModelManager.reset_memory()
 
-    # 3. Get profile -> triggers on-demand DB hydration and immediately returns ML_READY
+    # 3. Get profile -> triggers on-demand DB hydration and restores training samples (ML_LEARNING until 25 samples)
     prof_res = client.get("/api/behavior/profile", headers={"Authorization": f"Bearer {user_token}"})
     assert prof_res.status_code == 200
     prof = prof_res.json()
-    assert prof["ml_status"] == "ML_READY"
+    assert prof["ml_status"] == "ML_LEARNING"
     assert prof["model_sample_count"] >= 5
 
     # 4. Evaluate event on hydrated model -> successfully runs without requiring 5 new live samples

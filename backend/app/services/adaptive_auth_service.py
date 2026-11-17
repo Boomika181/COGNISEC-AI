@@ -89,13 +89,98 @@ class AdaptiveAuthService:
             except Exception:
                 private_question = "Security Verification Question"
 
+        user = db.query(User).filter(User.id == user_id).first()
+        has_gesture = "GESTURE_PATTERN" in factor_map
+        has_image = "COGNITIVE_IMAGE_SEQUENCE" in factor_map
+        has_private = "PRIVATE_RESPONSE" in factor_map
+        missing_factors = []
+        if not has_gesture:
+            missing_factors.append("GESTURE_PATTERN")
+        if not has_image:
+            missing_factors.append("COGNITIVE_IMAGE_SEQUENCE")
+        if not has_private:
+            missing_factors.append("PRIVATE_RESPONSE")
+        sec_completed = bool(getattr(user, "security_enrollment_completed", True)) if user else (len(missing_factors) == 0)
+
         return {
             "user_id": user_id,
-            "has_gesture_pattern": "GESTURE_PATTERN" in factor_map,
-            "has_cognitive_image_sequence": "COGNITIVE_IMAGE_SEQUENCE" in factor_map,
-            "has_private_response": "PRIVATE_RESPONSE" in factor_map,
+            "has_gesture_pattern": has_gesture,
+            "has_cognitive_image_sequence": has_image,
+            "has_private_response": has_private,
             "private_question": private_question,
+            "security_enrollment_completed": sec_completed,
+            "missing_factors": missing_factors,
         }
+
+    @classmethod
+    def complete_enrollment(cls, db: Session, user_id: int) -> Dict[str, Any]:
+        """
+        Server-authoritatively verifies that all three adaptive authentication
+        factors are enrolled in the database before marking enrollment complete.
+        """
+        status_data = cls.get_enrollment_status(db, user_id)
+        if status_data["missing_factors"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "SECURITY_ENROLLMENT_INCOMPLETE: All three adaptive authentication factors "
+                    f"must be configured before completing enrollment. Missing: {', '.join(status_data['missing_factors'])}."
+                )
+            )
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        if not getattr(user, "security_enrollment_completed", True):
+            user.security_enrollment_completed = True
+            db.add(SecurityEvent(
+                user_id=user.id,
+                application="platform",
+                event_type="SECURITY_ENROLLMENT_COMPLETED",
+                severity="LOW",
+                anomaly_score=0.0,
+                risk_score=0.0,
+                decision="ALLOW",
+                details=json.dumps({
+                    "factors_enrolled": [
+                        "GESTURE_PATTERN",
+                        "COGNITIVE_IMAGE_SEQUENCE",
+                        "PRIVATE_RESPONSE",
+                    ],
+                    "security_enrollment_completed": True,
+                }),
+            ))
+            db.commit()
+            db.refresh(user)
+
+        return {
+            "success": True,
+            "security_enrollment_completed": True,
+            "missing_factors": [],
+            "message": "Mandatory adaptive authentication enrollment completed.",
+        }
+
+    @classmethod
+    def enforce_enrollment_completed(cls, db: Session, user: Optional[User]) -> None:
+        """
+        Blocks portal access and security grants for non-admin users who have not
+        completed mandatory 3-factor adaptive authentication enrollment.
+        """
+        if not user:
+            return
+        if (user.role or "USER").upper() == "ADMIN":
+            return
+        if not getattr(user, "security_enrollment_completed", True):
+            status_data = cls.get_enrollment_status(db, user.id)
+            missing = status_data.get("missing_factors") or []
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "SECURITY_ENROLLMENT_REQUIRED: Mandatory adaptive authentication enrollment "
+                    "must be completed before accessing portals. "
+                    f"Missing factors: {', '.join(missing) if missing else 'final confirmation'}."
+                )
+            )
 
     @classmethod
     def get_factor(cls, db: Session, user_id: int, factor_type: str) -> Optional[AdaptiveFactor]:
@@ -387,14 +472,25 @@ class AdaptiveAuthService:
         - Stores challenge in StepUpService._neuraltrace_resets.
         - Never reveals OTP in response or server logs.
         """
+        from datetime import datetime, timedelta, timezone
         from app.services.email_service import EmailService
         from app.services.step_up_service import StepUpService
+        from app.utils.email_time import compute_expiry_display
+
+        ttl_seconds = 600
+        issued_at = datetime.now(timezone.utc)
+        expires_at = issued_at + timedelta(seconds=ttl_seconds)
+        issued_display, expires_display, remaining_label = compute_expiry_display(
+            issued_at=issued_at,
+            expires_at=expires_at,
+            expires_in_minutes=ttl_seconds // 60,
+        )
 
         otp = f"{secrets.randbelow(1000000):06d}"
         challenge_id = StepUpService.create_neuraltrace_reset_challenge(
             user_id=user.id,
             otp=otp,
-            ttl_seconds=600
+            ttl_seconds=ttl_seconds
         )
 
         masked_email = EmailService.mask_email(user.email)
@@ -403,7 +499,9 @@ class AdaptiveAuthService:
             f"Hello {user.name},\n\n"
             f"A request was received to reset your NeuralTrace route for your COGNISEC-AI account.\n\n"
             f"Your single-use 6-digit re-authentication code is: {otp}\n\n"
-            f"This code will expire in 10 minutes. If you did not initiate this reset, your account is safe; "
+            f"Issued: {issued_display}\n"
+            f"Expires: {expires_display} ({remaining_label})\n\n"
+            f"If you did not initiate this reset, your account is safe; "
             f"your existing NeuralTrace route remains active and protected.\n\n"
             f"— COGNISEC-AI Zero-Trust Security"
         )
@@ -415,7 +513,11 @@ class AdaptiveAuthService:
             <span style="font-size: 11px; font-family: monospace; color: #fca5a5; letter-spacing: 1px; display: block; margin-bottom: 8px;">SINGLE-USE RESET VERIFICATION CODE</span>
             <strong style="font-size: 32px; letter-spacing: 8px; font-family: monospace; color: #ffffff;">{otp}</strong>
           </div>
-          <p style="color: #94a3b8; font-size: 12px; line-height: 1.5;">This verification code is valid for 10 minutes. Enter this code on your security dashboard to draw and confirm your new route. If you did not request this, your existing route remains active and untouched.</p>
+          <p style="color: #cbd5e1; font-size: 12px; line-height: 1.6;">
+            <strong>Issued:</strong> {issued_display}<br />
+            <strong>Expires:</strong> <strong style="color: #fbbf24;">{expires_display}</strong> ({remaining_label})
+          </p>
+          <p style="color: #94a3b8; font-size: 12px; line-height: 1.5;">Enter this code on your security dashboard to draw and confirm your new route. If you did not request this, your existing route remains active and untouched.</p>
         </div>
         """
 

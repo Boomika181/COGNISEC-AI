@@ -48,6 +48,7 @@ class RegisterRequest(BaseModel):
     private_response: Optional[str] = None
     confirm_private_response: Optional[str] = None
     enrollment_telemetry: Optional[dict] = None
+    require_email_verification: Optional[bool] = False
 
     @field_validator("password")
     @classmethod
@@ -82,15 +83,22 @@ class TokenResponse(BaseModel):
     is_new_device: bool = False
     device_id: Optional[str] = None
     trust_state: Optional[str] = None
+    portal_locked: bool = False
+    portal_lock: Optional[dict] = None
+    security_enrollment_completed: bool = True
+    missing_factors: List[str] = []
 
 
 class ObservationStatusResponse(BaseModel):
     session_id: str
+    application: Optional[str] = None
     status: str
     observation_seconds_remaining: int
     is_completed: bool
     telemetry_samples_count: int
     observation_started_at: Optional[datetime.datetime] = None
+    risk_level: str = "LOW"
+    required_initial_factor: str = "EMAIL_OTP"
 
 
 class LoginOtpRequest(BaseModel):
@@ -106,6 +114,8 @@ class LoginOtpResponse(BaseModel):
     message: str
     otp: str = ""
     risk_level: str = "LOW"
+    attempts_remaining: int = 1
+    max_attempts: int = 1
 
 
 class LoginOtpVerifyRequest(BaseModel):
@@ -179,3 +189,109 @@ class RecoverAccountRequest(BaseModel):
 
 class UnlockAccountRequest(BaseModel):
     email: EmailStr
+
+
+class PasswordChangePolicyResponse(BaseModel):
+    has_cognitive_image_sequence: bool
+    has_private_response: bool
+    has_gesture_pattern: bool
+    private_question: Optional[str] = None
+    catalogue: List[dict]
+    risk_level: str
+    session_status: str
+    requires_behavioral_step_up: bool = False
+    required_behavioral_factor: Optional[str] = None
+    can_proceed: bool = True
+    message: str
+
+
+class PasswordChangeInitiateRequest(BaseModel):
+    current_password: str
+    session_id: Optional[str] = None
+    application: str = "platform"
+    bound_high_risk_challenge_id: Optional[str] = None
+
+
+class PasswordChangeInitiateResponse(BaseModel):
+    success: bool
+    transaction_id: str
+    image_challenge_id: str
+    private_challenge_id: str
+    application: str
+    risk_level: str
+    current_stage: int = 1
+    expires_in_seconds: int = 300
+    private_question: str
+    catalogue: List[dict]
+    already_completed_high_risk_dual: bool = False
+    image_attempts_remaining: int = 2
+    private_attempts_remaining: int = 2
+    max_attempts: int = 2
+    message: str
+
+
+class PasswordChangeVerifyImageRequest(BaseModel):
+    transaction_id: str
+    image_challenge_id: str
+    image_sequence: List[str]
+    session_id: Optional[str] = None
+    application: str = "platform"
+
+
+class PasswordChangeVerifyImageResponse(BaseModel):
+    success: bool
+    transaction_id: str
+    image_challenge_id: str
+    image_verified: bool
+    current_stage: int = 2
+    private_challenge_id: str
+    private_question: str
+    message: str
+
+
+class PasswordChangeVerifyPrivateRequest(BaseModel):
+    transaction_id: str
+    private_challenge_id: str
+    private_response: str
+    session_id: Optional[str] = None
+    application: str = "platform"
+
+
+class PasswordChangeVerifyPrivateResponse(BaseModel):
+    success: bool
+    transaction_id: str
+    private_challenge_id: str
+    private_verified: bool
+    ready_to_commit: bool
+    current_stage: int = 3
+    message: str
+
+
+class PasswordChangeConfirmRequest(BaseModel):
+    transaction_id: str
+    new_password: str
+    confirm_password: str
+    session_id: Optional[str] = None
+    application: str = "platform"
+    bound_high_risk_challenge_id: Optional[str] = None
+
+    @field_validator("new_password")
+    @classmethod
+    def check_password_strength(cls, v: str) -> str:
+        return validate_password_strength(v)
+
+    @model_validator(mode="after")
+    def check_password_match(self) -> "PasswordChangeConfirmRequest":
+        if self.confirm_password != self.new_password:
+            raise ValueError("New password and confirmation do not match.")
+        return self
+
+
+class PasswordChangeConfirmResponse(BaseModel):
+    success: bool
+    message: str
+    application: str
+    sessions_revoked: int
+    email_notification_sent: bool = False
+    security_event_recorded: bool = True
+    requires_reauth: bool = True

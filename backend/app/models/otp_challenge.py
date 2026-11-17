@@ -13,8 +13,9 @@ class OTPChallenge(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     challenge_id = Column(String(64), unique=True, index=True, nullable=False)
-    session_id = Column(String(64), index=True, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    session_id = Column(String(64), index=True, nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    appointment_id = Column(Integer, ForeignKey("healthcare_appointments.id", ondelete="SET NULL"), nullable=True, index=True)
     purpose = Column(String(50), nullable=False, default="APPOINTMENT_OTP", index=True)  # "APPOINTMENT_OTP", "LOGIN_OTP", "PAYMENT_OTP"
     recipient_email = Column(String(255), nullable=False)
     otp_hash = Column(String(128), nullable=False)

@@ -121,7 +121,7 @@ class NotificationService:
                 is_recognized=is_recog
             )
             if email_sent:
-                notif.email_delivery_status = "SENT"
+                notif.email_delivery_status = "SMTP_ACCEPTED"
             else:
                 if "not configured" in email_msg.lower() or "disabled" in email_msg.lower():
                     notif.email_delivery_status = "SKIPPED_UNCONFIGURED"
@@ -152,7 +152,7 @@ class NotificationService:
                     with SessionLocal() as bg_db:
                         n = bg_db.query(DeviceNotification).filter(DeviceNotification.id == notif_id).first()
                         if n:
-                            n.email_delivery_status = "SENT" if es else ("SKIPPED_UNCONFIGURED" if "not configured" in em.lower() or "disabled" in em.lower() else "FAILED")
+                            n.email_delivery_status = "SMTP_ACCEPTED" if es else ("SKIPPED_UNCONFIGURED" if "not configured" in em.lower() or "disabled" in em.lower() else "FAILED")
                             if not es:
                                 n.email_error = em[:490]
                             bg_db.commit()
@@ -332,3 +332,166 @@ class NotificationService:
             return notif, device
 
         raise ValueError("Invalid decision parameter. Expected 'yes' or 'no'.")
+
+    @classmethod
+    def _dispatch_portal_emails(
+        cls,
+        owner_email: Optional[str],
+        owner_name: str,
+        admin_email: Optional[str],
+        portal: str,
+        event_type: str,
+        lock_reason: str,
+        security_reference_id: str,
+        timestamp_str: str,
+        device_summary: str,
+        owner_notif_id: Optional[int] = None,
+    ) -> None:
+        """Dispatches portal security emails to owner and Admin/SOC without letting SMTP errors propagate."""
+        def _send():
+            es_owner = False
+            msg_owner = "SKIPPED"
+            if owner_email:
+                try:
+                    es_owner, msg_owner = EmailService.send_portal_security_notification(
+                        recipient_email=owner_email,
+                        user_name=owner_name,
+                        portal=portal,
+                        event_type=event_type,
+                        lock_reason=lock_reason,
+                        security_reference_id=security_reference_id,
+                        timestamp_str=timestamp_str,
+                        device_summary=device_summary,
+                        is_admin_notice=False,
+                    )
+                except Exception as exc:
+                    msg_owner = str(exc)
+
+            if admin_email and admin_email.lower() != (owner_email or "").lower():
+                try:
+                    EmailService.send_portal_security_notification(
+                        recipient_email=admin_email,
+                        user_name="SOC Administrator",
+                        portal=portal,
+                        event_type=event_type,
+                        lock_reason=lock_reason,
+                        security_reference_id=security_reference_id,
+                        timestamp_str=timestamp_str,
+                        device_summary=device_summary,
+                        is_admin_notice=True,
+                        target_account_email=owner_email,
+                    )
+                except Exception as exc:
+                    logger.warning(f"[COGNISEC-AI] Admin SOC portal email notice failed cleanly: {exc}")
+
+            if owner_notif_id:
+                try:
+                    from app.database.connection import SessionLocal
+                    with SessionLocal() as bg_db:
+                        rec = bg_db.query(DeviceNotification).filter(DeviceNotification.id == owner_notif_id).first()
+                        if rec:
+                            rec.email_delivery_status = (
+                                "SMTP_ACCEPTED" if es_owner
+                                else ("SKIPPED_UNCONFIGURED" if ("not configured" in msg_owner.lower() or "suppressed" in msg_owner.lower() or "disabled" in msg_owner.lower()) else "FAILED")
+                            )
+                            if not es_owner:
+                                rec.email_error = str(msg_owner)[:490]
+                            bg_db.commit()
+                except Exception as exc:
+                    logger.debug(f"[COGNISEC-AI] Notification status update notice: {exc}")
+
+        env = (getattr(settings, "ENVIRONMENT", "") or "").lower()
+        if env in ("test", "testing"):
+            _send()
+        else:
+            import threading
+            t = threading.Thread(target=_send, daemon=True)
+            t.start()
+
+    @classmethod
+    def notify_portal_security_event(
+        cls,
+        db: Session,
+        user: User,
+        application: str,
+        notification_type: str,
+        title: str,
+        message: str,
+        security_reference_id: str,
+        lock_reason: str,
+        alert_type: str,
+        alert_severity: str = "HIGH",
+        device_summary: str = "Unknown Device Context",
+        ip_address: Optional[str] = None,
+        device_id: Optional[int] = None,
+        security_event_id: Optional[int] = None,
+        create_admin_alert: bool = True,
+    ) -> Optional[DeviceNotification]:
+        """
+        Records persistent owner DeviceNotification + SOC Alert and dispatches emails
+        to both registered account owner and SOC Administrator.
+        A notification or SMTP failure never aborts or rolls back security lock state.
+        """
+        from app.models.alert import Alert
+        now = utc_now()
+        ts_str = now.strftime("%Y-%m-%d %H:%M:%S UTC")
+        admin_email = getattr(settings, "ADMIN_EMAIL", "cognisecai.security@gmail.com")
+        owner_notif_id = None
+        notif = None
+
+        try:
+            notif = DeviceNotification(
+                user_id=user.id,
+                device_id=device_id,
+                notification_type=notification_type,
+                title=title[:255],
+                message=message,
+                device_summary=(device_summary or "Unknown Device Context")[:255],
+                ip_address=(ip_address or "")[:45] or None,
+                location_summary=f"Portal: {application} • Ref: {security_reference_id}"[:255],
+                status="READ" if notification_type == "PORTAL_ACCESS_RESTORED" else "PENDING_CONFIRMATION",
+                email_delivery_status="PENDING",
+                is_read=False,
+                created_at=now,
+            )
+            db.add(notif)
+            if create_admin_alert:
+                soc_alert = Alert(
+                    user_id=user.id,
+                    security_event_id=security_event_id,
+                    application=application,
+                    alert_type=alert_type,
+                    message=f"[{security_reference_id}] {message}",
+                    severity=alert_severity,
+                    status="RESOLVED" if notification_type == "PORTAL_ACCESS_RESTORED" else "OPEN",
+                    resolved_at=now if notification_type == "PORTAL_ACCESS_RESTORED" else None,
+                    created_at=now,
+                )
+                db.add(soc_alert)
+            db.commit()
+            db.refresh(notif)
+            owner_notif_id = notif.id
+        except Exception as exc:
+            logger.warning(f"[COGNISEC-AI] Portal security notification DB persistence warning: {exc}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+        try:
+            cls._dispatch_portal_emails(
+                owner_email=user.email,
+                owner_name=user.name or "User",
+                admin_email=admin_email,
+                portal=application,
+                event_type=notification_type,
+                lock_reason=lock_reason,
+                security_reference_id=security_reference_id,
+                timestamp_str=ts_str,
+                device_summary=device_summary or "Unknown Device Context",
+                owner_notif_id=owner_notif_id,
+            )
+        except Exception as exc:
+            logger.warning(f"[COGNISEC-AI] Portal security email dispatch warning: {exc}")
+
+        return notif

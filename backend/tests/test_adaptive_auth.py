@@ -395,12 +395,14 @@ def test_adaptive_failed_attempt_lockout(client: TestClient, auth_user, db_sessi
         "session_id": sid, "challenge_type": "GESTURE_PATTERN", "gesture_pattern": [0, 0, 0, 0]
     })
 
-    assert third_res.status_code == 400
-    assert "Maximum verification attempts exceeded" in third_res.json()["detail"]
+    assert third_res.status_code == 423
+    assert third_res.headers.get("X-Cognisec-Portal-Locked") == "true"
 
-    # Verify session locked in DB
+    # Verify portal session restricted (NOT terminated) in DB
+    db_session.expire_all()
     session = db_session.query(DbSession).filter(DbSession.id == sid).first()
     assert session.status == "RESTRICTED"
+    assert session.logout_time is None
 
     # Verify SecurityEvent logged
     locked_event = db_session.query(SecurityEvent).filter(

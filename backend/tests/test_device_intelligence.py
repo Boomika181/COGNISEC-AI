@@ -205,7 +205,7 @@ def test_6_successful_email_delivery_verified_when_smtp_configured(client, test_
             DeviceNotification.notification_type == "NEW_DEVICE_LOGIN"
         ).order_by(DeviceNotification.created_at.desc()).first()
         assert notif is not None
-        assert notif.email_delivery_status == "SENT"
+        assert notif.email_delivery_status == "SMTP_ACCEPTED"
 
 
 def test_7_smtp_failure_reported_honestly_and_does_not_bypass_security(client, test_user_pair, db_session):

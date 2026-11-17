@@ -30,14 +30,23 @@ class SessionService:
                 term_query = db.query(DbSession).filter(
                     DbSession.user_id == user_id,
                     DbSession.application == application.lower(),
-                    DbSession.status.in_(["ACTIVE", "PENDING_OBSERVATION", "STEP_UP_REQUIRED"])
+                    DbSession.status.in_(["ACTIVE", "PENDING_OBSERVATION", "PENDING_OTP", "STEP_UP_REQUIRED"])
                 )
                 if device_id:
                     term_query = term_query.filter(DbSession.device_id == device_id)
-                term_query.update({
-                    "status": "TERMINATED",
-                    "logout_time": now
-                }, synchronize_session=False)
+                stale_sids = [row.id for row in term_query.all()]
+                if stale_sids:
+                    term_query.update({
+                        "status": "TERMINATED",
+                        "logout_time": now
+                    }, synchronize_session=False)
+                    db.query(ApplicationGrant).filter(
+                        ApplicationGrant.session_id.in_(stale_sids),
+                        ApplicationGrant.revoked == False
+                    ).update({"revoked": True}, synchronize_session=False)
+                    from app.services.step_up_service import StepUpService
+                    for old_sid in stale_sids:
+                        StepUpService.purge_session_challenges(old_sid)
             except Exception:
                 pass
 
@@ -103,6 +112,30 @@ class SessionService:
         except Exception:
             db.rollback()
         return reaped
+
+    @staticmethod
+    def is_session_expired(
+        db_session: Optional[DbSession],
+        max_lifetime_minutes: Optional[int] = None,
+    ) -> bool:
+        """
+        Authoritative session expiration check matching `reap_expired_sessions` and JWT lifetime:
+        - Missing session, TERMINATED/EXPIRED/REVOKED status, or populated logout_time -> expired.
+        - Missing login_time or elapsed `ACCESS_TOKEN_EXPIRE_MINUTES` since login_time -> expired.
+        """
+        if db_session is None:
+            return True
+        if str(getattr(db_session, "status", "") or "").upper() in ("TERMINATED", "EXPIRED", "REVOKED"):
+            return True
+        if getattr(db_session, "logout_time", None) is not None:
+            return True
+        login_time = getattr(db_session, "login_time", None)
+        if login_time is None:
+            return True
+        if login_time.tzinfo is None:
+            login_time = login_time.replace(tzinfo=timezone.utc)
+        lifetime = max_lifetime_minutes or getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
+        return datetime.now(timezone.utc) >= login_time + timedelta(minutes=lifetime)
 
     @staticmethod
     def get_session(db: Session, session_id: str) -> Optional[DbSession]:
@@ -323,20 +356,31 @@ class SessionService:
                 started_at = started_at.replace(tzinfo=timezone.utc)
             elapsed = (now - started_at).total_seconds()
             remaining = max(0, int(settings.OBSERVATION_WINDOW_SECONDS - elapsed))
-            is_completed = elapsed >= settings.OBSERVATION_WINDOW_SECONDS or db_session.status in ("PENDING_OTP", "ACTIVE")
+            is_completed = elapsed >= settings.OBSERVATION_WINDOW_SECONDS or db_session.status in ("PENDING_OTP", "ACTIVE", "STEP_UP_REQUIRED", "RESTRICTED")
         else:
             remaining = 0
             is_completed = True
 
         sample_count = db.query(BehaviorLog).filter(BehaviorLog.session_id == session_id).count()
+        risk_lvl = (db_session.current_risk_level or "LOW").upper().strip()
+        if db_session.status == "TERMINATED" or risk_lvl == "CRITICAL":
+            req_initial = "TERMINATE"
+        elif db_session.status == "RESTRICTED" or risk_lvl == "HIGH":
+            req_initial = "HIGH_RISK_DUAL"
+        else:
+            # Initial login verification after 20s observation MUST always be EMAIL_OTP (never GESTURE_PATTERN)
+            req_initial = "EMAIL_OTP"
 
         return {
             "session_id": session_id,
+            "application": db_session.application,
             "status": db_session.status,
             "observation_seconds_remaining": remaining,
             "is_completed": is_completed,
             "telemetry_samples_count": sample_count,
-            "observation_started_at": started_at
+            "observation_started_at": started_at,
+            "risk_level": risk_lvl,
+            "required_initial_factor": req_initial,
         }
 
     @staticmethod

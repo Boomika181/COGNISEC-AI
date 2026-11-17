@@ -1,3 +1,4 @@
+import uuid
 import pytest
 import datetime
 from datetime import timedelta, timezone
@@ -43,8 +44,8 @@ def _setup_high_risk_user_and_session(db_session: Session, email: str = "highris
         confirm_response="argon2id-aes-256"
     )
 
-    # Create session
-    session_id = f"test_highrisk_{user.id}_{int(datetime.datetime.now().timestamp())}"
+    # Create session with globally unique ID
+    session_id = f"test_highrisk_{user.id}_{uuid.uuid4().hex}"
     now = datetime.datetime.now(timezone.utc)
     sess = DbSession(
         id=session_id,

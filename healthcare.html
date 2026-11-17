@@ -152,6 +152,41 @@
           <span>🛡️ MFA Setup</span>
         </button>
 
+        <!-- Shared Account Profile Dropdown Bar -->
+        <div id="header-profile-dropdown-wrap" class="relative hidden">
+          <button id="btn-header-profile" type="button" onclick="window.toggleProfileDropdown && window.toggleProfileDropdown(event)"
+            aria-haspopup="true" aria-expanded="false"
+            class="px-3 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-900 font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+            title="Account & Security Profile">
+            <span id="header-profile-avatar" class="w-5 h-5 rounded-full bg-teal-600 text-white text-[10px] font-extrabold flex items-center justify-center">P</span>
+            <span id="header-profile-name" class="hidden sm:inline max-w-[100px] truncate">Account</span>
+            <span class="text-[10px] text-teal-700">▾</span>
+          </button>
+          <div id="profile-dropdown-menu" class="hidden absolute right-0 mt-2 w-56 rounded-2xl bg-white border border-slate-200 shadow-xl py-1.5 z-50 font-mono text-xs text-slate-800">
+            <div class="px-3.5 py-2 border-b border-slate-100">
+              <div id="profile-menu-display-name" class="font-bold text-slate-900 truncate">Patient / Clinician</div>
+              <div id="profile-menu-display-email" class="text-[10px] text-slate-500 truncate">Signed In</div>
+            </div>
+            <button type="button" data-profile-action="account" onclick="window.openAccountProfileModal && window.openAccountProfileModal('account', 'healthcare')"
+              class="w-full text-left px-3.5 py-2 hover:bg-teal-50 text-slate-700 hover:text-teal-900 font-semibold flex items-center gap-2 cursor-pointer">
+              <span>👤</span><span>My Account</span>
+            </button>
+            <button type="button" data-profile-action="edit" onclick="window.openAccountProfileModal && window.openAccountProfileModal('edit', 'healthcare')"
+              class="w-full text-left px-3.5 py-2 hover:bg-teal-50 text-slate-700 hover:text-teal-900 font-semibold flex items-center gap-2 cursor-pointer">
+              <span>✏️</span><span>Edit Profile</span>
+            </button>
+            <button id="btn-header-change-password" type="button" data-profile-action="password"
+              onclick="window.cognisec && window.cognisec.closeProfileDropdown(); window.openChangePasswordModal ? window.openChangePasswordModal('healthcare') : (window.cognisec && window.cognisec.openChangePasswordModal('healthcare'))"
+              class="w-full text-left px-3.5 py-2 hover:bg-teal-50 text-slate-700 hover:text-teal-900 font-semibold flex items-center gap-2 cursor-pointer">
+              <span>🔑</span><span>Change Password</span>
+            </button>
+            <button type="button" data-profile-action="security" onclick="window.openAccountProfileModal && window.openAccountProfileModal('security', 'healthcare')"
+              class="w-full text-left px-3.5 py-2 hover:bg-teal-50 text-slate-700 hover:text-teal-900 font-semibold flex items-center gap-2 cursor-pointer border-t border-slate-100 mt-1 pt-2">
+              <span>🛡️</span><span>Security Settings</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Sign Out Button (Preserved ID) -->
         <button id="btn-header-signout" onclick="handleDoctorSignOut()"
           class="hidden px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
@@ -627,16 +662,23 @@
           <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Patient Appointments,
             Reports &amp; Guidance</h2>
         </div>
-        <div class="flex items-center gap-2 border border-slate-200 bg-white p-1 rounded-2xl text-xs font-semibold">
-          <button onclick="switchPatientTab('tab-appointments')" id="btn-tab-appointments"
-            class="px-3.5 py-1.5 rounded-xl bg-teal-600 text-white font-bold cursor-pointer transition-colors">Upcoming
-            Appointments</button>
-          <button onclick="switchPatientTab('tab-reports')" id="btn-tab-reports"
-            class="px-3.5 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer transition-colors">Diagnostic
-            Reports</button>
-          <button onclick="switchPatientTab('tab-faqs')" id="btn-tab-faqs"
-            class="px-3.5 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer transition-colors">Patient
-            Guidance &amp; FAQ</button>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button id="btn-patient-change-password"
+            onclick="window.openChangePasswordModal ? window.openChangePasswordModal('healthcare') : (window.cognisec && window.cognisec.openChangePasswordModal('healthcare'))"
+            class="hidden px-3.5 py-2 rounded-2xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-bold text-xs font-mono cursor-pointer transition-colors">
+            🔑 Change Password
+          </button>
+          <div class="flex items-center gap-2 border border-slate-200 bg-white p-1 rounded-2xl text-xs font-semibold">
+            <button onclick="switchPatientTab('tab-appointments')" id="btn-tab-appointments"
+              class="px-3.5 py-1.5 rounded-xl bg-teal-600 text-white font-bold cursor-pointer transition-colors">Upcoming
+              Appointments</button>
+            <button onclick="switchPatientTab('tab-reports')" id="btn-tab-reports"
+              class="px-3.5 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer transition-colors">Diagnostic
+              Reports</button>
+            <button onclick="switchPatientTab('tab-faqs')" id="btn-tab-faqs"
+              class="px-3.5 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer transition-colors">Patient
+              Guidance &amp; FAQ</button>
+          </div>
         </div>
       </div>
 
@@ -1115,7 +1157,13 @@
                 Dynamics Engine</p>
             </div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <button id="btn-shield-change-password"
+              onclick="window.openChangePasswordModal ? window.openChangePasswordModal('healthcare') : (window.cognisec && window.cognisec.openChangePasswordModal('healthcare'))"
+              class="hidden px-3.5 py-1.5 rounded-xl bg-teal-950/80 hover:bg-teal-900 border border-teal-600/50 text-teal-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Account Settings: Change Password (Cognitive MFA)">
+              <span>🔑 Change Password</span>
+            </button>
             <button onclick="triggerExhibitionStepUpTest()"
               class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-teal-600/40 text-teal-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
               title="Demonstrate step-up verification challenge during project exhibition">
@@ -1444,10 +1492,29 @@
       </div>
 
       <!-- FORM VIEW: STAGE 1 & 2 -->
-      <form id="appointment-form" onsubmit="handleAppointmentSubmit(event)" class="space-y-4">
+      <form id="appointment-form" novalidate onsubmit="handleAppointmentSubmit(event)" class="space-y-4">
+        <div id="booking-modal-error" class="hidden p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium leading-relaxed"></div>
 
         <!-- STEP 1 CONTAINER -->
         <div id="booking-step-1" class="space-y-4">
+          <!-- Selected Doctor Context Card -->
+          <div id="selected-doctor-banner" class="p-3.5 rounded-2xl bg-teal-50/70 border border-teal-200 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div id="banner-doc-avatar" class="w-11 h-11 rounded-xl bg-white border border-teal-200 text-2xl flex items-center justify-center shrink-0">👩‍⚕️</div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <strong id="banner-doc-name" class="text-sm font-extrabold text-slate-900 truncate">Dr. Boomika Ram</strong>
+                  <span id="banner-doc-dept" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800">Cardiology</span>
+                </div>
+                <p id="banner-doc-schedule" class="text-[11px] font-mono text-slate-600 truncate">Mon–Sat • 09:00 AM – 01:00 PM • Room 204, Tower B</p>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold block">Fee</span>
+              <strong id="banner-doc-fee" class="text-sm font-extrabold text-emerald-700 font-mono">₹1,200</strong>
+            </div>
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Department *</label>
@@ -1464,7 +1531,7 @@
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Consulting Specialist
                 *</label>
-              <select id="modal-doc-select" onchange="updateSlotAvailabilityUI()" required
+              <select id="modal-doc-select" onchange="onModalDoctorChanged()" required
                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-teal-500">
                 <!-- Dynamically populated -->
               </select>
@@ -1477,7 +1544,7 @@
                 *</label>
               <input id="modal-date-input" type="date" required onchange="updateSlotAvailabilityUI()"
                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500" />
-              <span class="text-[10px] text-slate-500 mt-1 block">Past dates are automatically disabled.</span>
+              <span id="modal-opd-days-hint" class="text-[10px] text-slate-500 mt-1 block">Past dates are disabled.</span>
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Consultation Mode
@@ -1499,30 +1566,11 @@
                 <span class="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse"></span> Live Hospital Schedule
               </span>
             </div>
+            <div id="opd-schedule-notice" class="hidden mb-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium"></div>
             <div id="time-slots-container" class="grid grid-cols-3 sm:grid-cols-4 gap-2 text-xs font-mono">
-              <button type="button" data-slot="09:30 AM" onclick="selectTimeSlot('09:30 AM', this)"
-                class="slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer transition-all">09:30
-                AM</button>
-              <button type="button" data-slot="10:30 AM" onclick="selectTimeSlot('10:30 AM', this)"
-                class="slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer transition-all">10:30
-                AM</button>
-              <button type="button" data-slot="11:30 AM" onclick="selectTimeSlot('11:30 AM', this)"
-                class="slot-pill py-2 px-3 rounded-xl border border-teal-500 bg-teal-50 text-teal-800 text-center font-bold cursor-pointer transition-all">11:30
-                AM</button>
-              <button type="button" data-slot="02:00 PM" onclick="selectTimeSlot('02:00 PM', this)"
-                class="slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer transition-all">02:00
-                PM</button>
-              <button type="button" data-slot="03:30 PM" onclick="selectTimeSlot('03:30 PM', this)"
-                class="slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer transition-all">03:30
-                PM</button>
-              <button type="button" data-slot="05:00 PM" onclick="selectTimeSlot('05:00 PM', this)"
-                class="slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer transition-all">05:00
-                PM</button>
-              <button type="button" data-slot="06:30 PM" onclick="selectTimeSlot('06:30 PM', this)"
-                class="slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer transition-all">06:30
-                PM</button>
+              <!-- Rendered dynamically for the selected doctor -->
             </div>
-            <input type="hidden" id="modal-selected-slot" value="11:30 AM" />
+            <input type="hidden" id="modal-selected-slot" value="" />
           </div>
 
           <button type="button" onclick="goToStep2()"
@@ -1533,6 +1581,21 @@
 
         <!-- STEP 2 CONTAINER -->
         <div id="booking-step-2" class="space-y-4 hidden">
+          <div id="booking-review-summary" class="p-3.5 rounded-xl bg-teal-50/60 border border-teal-200 text-xs space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 font-semibold">Selected Specialist:</span>
+              <strong id="review-summary-doctor" class="text-slate-900">—</strong>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 font-semibold">Schedule &amp; Mode:</span>
+              <span id="review-summary-schedule" class="font-mono font-bold text-teal-700">—</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 font-semibold">OPD Room &amp; Fee:</span>
+              <span id="review-summary-fee" class="font-mono font-bold text-emerald-700">—</span>
+            </div>
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Patient Full Name
@@ -1558,9 +1621,9 @@
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Mobile Phone (10
-                digits) *</label>
-              <input id="modal-patient-phone" type="tel" required pattern="[0-9]{10}" placeholder="e.g. 9876543210"
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Mobile Phone
+                *</label>
+              <input id="modal-patient-phone" type="tel" required pattern="[+\d\s().-]{7,20}" placeholder="e.g. 9876543210 or +91 98765 43210"
                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-800 focus:outline-none focus:border-teal-500" />
             </div>
             <div>
@@ -1579,13 +1642,12 @@
               class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500"></textarea>
           </div>
 
-          <!-- Simulated Demo Notice -->
+          <!-- Zero-Trust OTP Verification Notice -->
           <div class="p-3.5 rounded-xl bg-teal-50 border border-teal-200 text-xs text-teal-900 flex items-start gap-2">
-            <span class="text-base leading-none">ℹ️</span>
+            <span class="text-base leading-none">🔒</span>
             <div>
-              <strong class="font-bold block">Simulated Demo Booking</strong>
-              <p class="text-[11px] text-teal-800 leading-relaxed">This frontend flow generates an official
-                demonstration appointment reference and syncs with your patient portal for exhibition.</p>
+              <strong class="font-bold block">Email OTP Confirmation Required</strong>
+              <p class="text-[11px] text-teal-800 leading-relaxed">Clicking Review &amp; Confirm creates a pending reservation and sends a 6-digit single-use verification OTP to the email address entered above. Your appointment is confirmed only after verifying that OTP.</p>
             </div>
           </div>
 
@@ -1612,43 +1674,48 @@
 
         <div class="space-y-1">
           <span
-            class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-bold">APPOINTMENT
-            RESERVED</span>
-          <h4 class="text-2xl font-extrabold text-slate-900">Consultation Scheduled!</h4>
+            class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-bold">APPOINTMENT CONFIRMED</span>
+          <h4 class="text-2xl font-extrabold text-slate-900">Consultation Confirmed!</h4>
           <p class="text-xs text-slate-500 font-mono">Reference Token: <strong id="confirm-ref-id"
-              class="text-teal-700 font-bold">#AYU-APT-84920</strong></p>
+              class="text-teal-700 font-bold">—</strong></p>
         </div>
 
         <div class="bg-slate-50 rounded-2xl p-5 border border-slate-200 text-left text-xs font-mono space-y-2.5">
           <div class="flex justify-between border-b border-slate-200 pb-2">
             <span class="text-slate-500">Patient Name:</span>
-            <strong id="confirm-patient-name" class="text-slate-900 font-sans font-bold">Ananya Sharma</strong>
+            <strong id="confirm-patient-name" class="text-slate-900 font-sans font-bold">—</strong>
           </div>
           <div class="flex justify-between border-b border-slate-200 pb-2">
             <span class="text-slate-500">Specialist Doctor:</span>
-            <strong id="confirm-doctor-name" class="text-slate-900 font-sans font-bold">Dr. Boomika Ram
-              (Cardiology)</strong>
+            <strong id="confirm-doctor-name" class="text-slate-900 font-sans font-bold">—</strong>
+          </div>
+          <div class="flex justify-between border-b border-slate-200 pb-2">
+            <span class="text-slate-500">Department:</span>
+            <span id="confirm-dept" class="text-slate-800">—</span>
           </div>
           <div class="flex justify-between border-b border-slate-200 pb-2">
             <span class="text-slate-500">Date &amp; Time Slot:</span>
-            <strong id="confirm-slot-time" class="text-teal-700 font-bold">Tomorrow &bull; 11:30 AM</strong>
+            <strong id="confirm-slot-time" class="text-teal-700 font-bold">—</strong>
           </div>
           <div class="flex justify-between border-b border-slate-200 pb-2">
-            <span class="text-slate-500">Consultation Type:</span>
-            <span id="confirm-mode" class="text-slate-800">In-Person OPD Visit</span>
+            <span class="text-slate-500">Consultation Mode:</span>
+            <span id="confirm-mode" class="text-slate-800">—</span>
+          </div>
+          <div class="flex justify-between border-b border-slate-200 pb-2">
+            <span class="text-slate-500">Consultation Fee:</span>
+            <strong id="confirm-fee" class="text-emerald-700 font-bold">—</strong>
           </div>
           <div class="flex justify-between">
             <span class="text-slate-500">OPD Room:</span>
-            <span id="confirm-room" class="text-slate-800">Room 204, Tower B</span>
+            <span id="confirm-room" class="text-slate-800">—</span>
           </div>
         </div>
 
         <div
           class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 text-left flex items-start gap-2">
           <span class="text-emerald-700 font-bold">✓</span>
-          <p class="text-[11px] leading-relaxed"><strong>Confirmed &amp; Registered:</strong> Your outpatient
-            consultation has been registered in the AyuSync clinical database. Please present your booking token at the
-            hospital reception desk on the scheduled date.</p>
+          <p class="text-[11px] leading-relaxed"><strong>OTP Verified &amp; Registered:</strong> Your outpatient
+            consultation has been permanently confirmed in the AyuSync clinical database and added to your Appointment History.</p>
         </div>
 
         <div class="flex flex-wrap gap-3 pt-2">
@@ -2066,7 +2133,7 @@
   </footer>
 
   <!-- FRONTEND WORKING SCRIPTS (PRESERVED ALL COGNISEC INTEGRATIONS) -->
-  <script src="cognisec-client.js?v=20261102b"></script>
+  <script src="cognisec-client.js?v=20261112c"></script>
   <script>
     if (window.cognisec) window.cognisec.setApplication('healthcare');
     let isDoctorLoggedIn = false;
@@ -2317,6 +2384,9 @@
           : 20;
         obsDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
         obsState.textContent = `Active (${rem}s Baseline Learning)`;
+      } else if (sessionStatus === 'PENDING_OTP') {
+        obsDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+        obsState.textContent = 'Observation Complete (Email OTP Pending)';
       } else {
         obsDot.className = 'w-2 h-2 rounded-full bg-teal-400';
         obsState.textContent = 'Active (Continuous Proximity Stream)';
@@ -2359,12 +2429,16 @@
     window.addEventListener('cognisec:observation_tick', (e) => {
       const rem = e.detail?.remaining;
       const obsState = document.getElementById('status-observation-state');
-      if (obsState && rem !== undefined && rem > 0) {
-        obsState.textContent = `Active (${rem}s Baseline Learning)`;
+      if (obsState && rem !== undefined) {
+        obsState.textContent = rem > 0
+          ? `Active (${rem}s Baseline Learning)`
+          : 'Baseline Complete — Verifying Session';
       }
       const obsEl = document.getElementById('cv-observation-state');
-      if (obsEl && rem !== undefined && rem > 0) {
-        obsEl.textContent = `Active (${rem}s Baseline Learning)`;
+      if (obsEl && rem !== undefined) {
+        obsEl.textContent = rem > 0
+          ? `Active (${rem}s Baseline Learning)`
+          : 'Observation Complete — Requesting OTP';
       }
     });
 
@@ -2376,11 +2450,23 @@
       if (!container) return;
       const patient = data.patient_profile || {};
       const vitals = data.vitals || {};
-      const meds = data.prescriptions || [];
-      const labs = data.lab_reports || [];
+      const meds = Array.isArray(data.prescriptions) ? data.prescriptions : [];
+      const labs = Array.isArray(data.lab_reports) ? data.lab_reports : [];
       const notes = data.clinical_notes || {};
-      const allergies = data.allergies || [];
-      const consultations = data.consultations || [];
+      const rawAllergies = data.allergies;
+      const allergies = Array.isArray(rawAllergies)
+        ? rawAllergies
+        : (rawAllergies && typeof rawAllergies === 'object'
+          ? Object.entries(rawAllergies).map(([k, v]) => ({
+              substance: String(v || ''),
+              type: k.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase()),
+              verification: 'Clinical Record',
+              severity: /no\s+known|negative|none/i.test(String(v || '')) ? 'Negative' : 'Documented'
+            }))
+          : (typeof rawAllergies === 'string' && rawAllergies.trim()
+            ? [{ substance: rawAllergies.trim(), type: 'Allergy Screening', verification: 'Clinical Record', severity: /no\s+known|nkda|negative/i.test(rawAllergies) ? 'Negative' : 'Documented' }]
+            : []));
+      const consultations = Array.isArray(data.consultations) ? data.consultations : [];
 
       let medsHtml = meds.map(m => `
         <div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-mono">
@@ -2405,7 +2491,7 @@
       let consultsHtml = consultations.map(c => `
         <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-1 text-xs">
           <div class="flex justify-between items-center">
-            <strong class="text-slate-900 font-sans font-bold">${c.doctor || ''}</strong>
+            <strong class="text-slate-900 font-sans font-bold">${c.physician || c.doctor || ''}</strong>
             <span class="text-[10px] text-slate-400 font-mono">${c.date || ''}</span>
           </div>
           <span class="text-[10px] font-mono text-teal-700 font-bold block">${c.specialty || ''}</span>
@@ -2651,6 +2737,19 @@
           return;
         }
 
+        if (accessCheck && (accessCheck.session_status === 'PENDING_OTP' || accessCheck.session_status === 'PENDING_OBSERVATION' || accessCheck.required_factor === 'EMAIL_OTP' || accessCheck.required_factor === 'OTP')) {
+          lockEhrVault();
+          cs.showVaultAccessNotice({
+            anchorId: ANCHOR,
+            tone: 'info',
+            title: 'Initial Email OTP verification required',
+            message: accessCheck.message || 'Please complete initial Email OTP login verification before unlocking restricted clinical EHR records.',
+            actions: [{ label: 'Verify Email OTP →', onClick: () => cs.triggerLoginOtpModal && cs.triggerLoginOtpModal() }, retry]
+          });
+          if (typeof cs.triggerLoginOtpModal === 'function') cs.triggerLoginOtpModal();
+          return;
+        }
+
         if (accessCheck && accessCheck.decision === 'UNAUTHENTICATED') {
           lockEhrVault();
           cs.showVaultAccessNotice({ anchorId: ANCHOR, tone: 'warn', title: 'Please sign in again', message: accessCheck.message, actions: [{ label: 'Sign in', onClick: () => { cs.clearAuth(); syncHealthcareAuthState(); openDoctorSignInModal(); } }] });
@@ -2765,10 +2864,21 @@
     function syncHealthcareAuthState() {
       const isAuth = window.cognisec ? window.cognisec.isAuthenticated() : false;
       const isVerified = window.cognisec ? window.cognisec.isFullyVerified() : false;
+      const sessionStatus = window.cognisec ? window.cognisec.sessionStatus : null;
       const user = window.cognisec ? window.cognisec.getUser() : null;
       const userRole = (user?.role || '').toUpperCase();
       const isDoctor = isAuth && (userRole === 'DOCTOR' || userRole === 'ADMIN');
       isDoctorLoggedIn = isDoctor;
+
+      // Clear stale observation/verification blocker inside booking modal once session becomes ACTIVE
+      if (isVerified && typeof clearBookingModalError === 'function') {
+        clearBookingModalError();
+      } else if (isAuth && sessionStatus === 'PENDING_OTP') {
+        const bookingErrEl = document.getElementById('booking-modal-error');
+        if (bookingErrEl && !bookingErrEl.classList.contains('hidden')) {
+          bookingErrEl.textContent = "Baseline 20s observation completed. Please verify your sign-in email OTP to activate your session and complete booking.";
+        }
+      }
 
       if (!isAuth && isEhrVaultUnlocked) {
         lockEhrVault();
@@ -2784,8 +2894,14 @@
 
       if (isAuth && user) {
         if (headerInfo) headerInfo.classList.remove('hidden');
+        const statusBadge = isVerified
+          ? ''
+          : (sessionStatus === 'PENDING_OTP'
+            ? ' (Verify OTP)'
+            : (sessionStatus === 'STEP_UP_REQUIRED' || sessionStatus === 'RESTRICTED'
+              ? ' (Step-Up Required)'
+              : ' (Observing)'));
         if (isDoctor) {
-          const statusBadge = isVerified ? '' : ' (Observing)';
           if (statusLabel) statusLabel.textContent = `${user.email || ''}` + statusBadge;
           const docDisplayName = (user.name || '').startsWith('Dr.') ? user.name : `Dr. ${user.name}`;
           if (nameLabel) nameLabel.textContent = `${docDisplayName} (${user.department || 'Consultant Physician'})`;
@@ -2793,7 +2909,6 @@
             ? 'w-2 h-2 rounded-full bg-emerald-400'
             : 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
         } else {
-          const statusBadge = isVerified ? '' : ' (Observing)';
           if (statusLabel) statusLabel.textContent = `Patient • ${user.email || ''}` + statusBadge;
           if (nameLabel) nameLabel.textContent = user.name || 'Patient';
           if (statusDot) statusDot.className = isVerified
@@ -2804,9 +2919,21 @@
         if (btnSignout) btnSignout.classList.remove('hidden');
         if (btnSignin) btnSignin.classList.add('hidden');
         if (btnMfa) btnMfa.classList.remove('hidden');
+        document.getElementById('header-profile-dropdown-wrap')?.classList.remove('hidden');
+        const hpAv = document.getElementById('header-profile-avatar');
+        const hpNm = document.getElementById('header-profile-name');
+        const mpNm = document.getElementById('profile-menu-display-name');
+        const mpEm = document.getElementById('profile-menu-display-email');
+        if (hpAv) hpAv.textContent = (user.name || user.email || 'P').trim().charAt(0).toUpperCase();
+        if (hpNm) hpNm.textContent = user.name ? user.name.split(' ')[0] : 'Account';
+        if (mpNm) mpNm.textContent = user.name || 'Account User';
+        if (mpEm) mpEm.textContent = user.email || '';
+        document.getElementById('btn-header-change-password')?.classList.remove('hidden');
+        document.getElementById('btn-patient-change-password')?.classList.remove('hidden');
+        document.getElementById('btn-shield-change-password')?.classList.remove('hidden');
 
         // Check authoritative server access decision for cross-portal synchronization
-        if (isVerified && isDoctor) {
+        if (isVerified && isDoctor && window.cognisec.sessionStatus === 'ACTIVE') {
           window.cognisec.checkResourceAccess('ehr_vault').then(async decision => {
             if (decision && decision.access_granted) {
               if (!isEhrVaultUnlocked) {
@@ -2828,6 +2955,11 @@
         if (btnSignout) btnSignout.classList.add('hidden');
         if (btnSignin) btnSignin.classList.remove('hidden');
         if (btnMfa) btnMfa.classList.add('hidden');
+        document.getElementById('header-profile-dropdown-wrap')?.classList.add('hidden');
+        if (window.cognisec && typeof window.cognisec.closeProfileDropdown === 'function') window.cognisec.closeProfileDropdown();
+        document.getElementById('btn-header-change-password')?.classList.add('hidden');
+        document.getElementById('btn-patient-change-password')?.classList.add('hidden');
+        document.getElementById('btn-shield-change-password')?.classList.add('hidden');
         if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-rose-500';
       }
 
@@ -2846,6 +2978,20 @@
     window.addEventListener('cognisec:session_locked', () => {
       showToast("Clinical Workstation Locked", "Verification failed. EHR access restricted.", "🔒");
       lockEhrVault();
+      syncHealthcareAuthState();
+    });
+    window.addEventListener('cognisec:portal_suspended', () => {
+      lockEhrVault();
+      ['modal-signin', 'modal-booking', 'modal-doctor-profile', 'modal-appointments'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+      const vc = document.getElementById('ehr-vault-dynamic-content');
+      if (vc) vc.innerHTML = '';
+      syncHealthcareAuthState();
+    });
+    window.addEventListener('cognisec:session_terminated', () => {
+      lockEhrVault();
+      ['modal-booking', 'modal-doctor-profile', 'modal-appointments'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+      const vc = document.getElementById('ehr-vault-dynamic-content');
+      if (vc) vc.innerHTML = '';
       syncHealthcareAuthState();
     });
     document.addEventListener('DOMContentLoaded', syncHealthcareAuthState);
@@ -2930,25 +3076,29 @@
         experience: '18+ Years',
         reg: 'KMC #84920',
         fee: '₹1,200',
-        availability: 'Available Today',
-        opdHours: 'Mon–Sat &bull; 09:00 AM – 01:00 PM',
+        availability: 'Available for Consultation',
+        opdHours: 'Mon–Sat • 09:00 AM – 01:00 PM',
+        availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        availableSlots: ['09:00 AM', '09:45 AM', '10:30 AM', '11:30 AM', '12:15 PM'],
         avatar: '👩‍⚕️',
         bio: 'Senior Consultant Cardiologist specializing in adult interventional cardiology, primary coronary angioplasty, transcatheter aortic valve implantation (TAVI), and structural heart disease.'
       },
       {
         id: 'doc-2',
         name: 'Dr. Sarah Lin, MD',
-        degrees: 'MD, PhD (Neurology, Stanford)',
+        degrees: 'MBBS, MS, MCh (Neurosurgery)',
         dept: 'neurology',
         deptLabel: 'Neurology & Stroke Care',
-        room: 'Room 312, Neurosciences Block',
-        experience: '14+ Years',
-        reg: 'MCI #54190',
-        fee: '₹1,400',
-        availability: 'Available Today',
-        opdHours: 'Mon–Fri &bull; 10:00 AM – 02:00 PM',
+        room: 'Room 112, Tower A',
+        experience: '22+ Years',
+        reg: 'KMC #71294',
+        fee: '₹1,500',
+        availability: 'Available for Consultation',
+        opdHours: 'Mon–Fri • 10:00 AM – 02:00 PM',
+        availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+        availableSlots: ['10:00 AM', '10:45 AM', '11:30 AM', '12:30 PM', '01:30 PM'],
         avatar: '👩‍⚕️',
-        bio: 'Senior Consultant Neurologist and Neuro-intensivist specializing in acute stroke thrombolysis, mechanical thrombectomy pathways, epilepsy mapping, and neurodegenerative disorders.'
+        bio: 'Chief Neurosurgeon and Director of Stroke Program. Specializes in minimally invasive skull-base neurosurgery, intracranial aneurysms, and epilepsy surgical therapies.'
       },
       {
         id: 'doc-3',
@@ -2960,8 +3110,10 @@
         experience: '15+ Years',
         reg: 'KMC #90214',
         fee: '₹900',
-        availability: 'Available Today',
-        opdHours: 'Daily &bull; 09:00 AM – 04:00 PM',
+        availability: 'Available for Consultation',
+        opdHours: 'Mon–Sat • 09:00 AM – 04:00 PM',
+        availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        availableSlots: ['09:30 AM', '10:30 AM', '11:30 AM', '02:00 PM', '03:30 PM'],
         avatar: '👩‍⚕️',
         bio: 'Senior Consultant Pediatrician & Neonatologist leading the Level-III NICU. Expert in childhood infectious diseases, pediatric allergy screening, and infant growth development.'
       },
@@ -2975,8 +3127,10 @@
         experience: '19+ Years',
         reg: 'KMC #65812',
         fee: '₹1,200',
-        availability: 'Available Today',
-        opdHours: 'Mon, Wed, Fri &bull; 11:00 AM – 03:00 PM',
+        availability: 'Available for Consultation',
+        opdHours: 'Mon, Wed, Fri • 11:00 AM – 03:00 PM',
+        availableDays: ['Mon', 'Wed', 'Fri'],
+        availableSlots: ['11:00 AM', '11:45 AM', '12:30 PM', '01:30 PM', '02:30 PM'],
         avatar: '👨‍⚕️',
         bio: 'Pioneer in robotic total knee and hip arthroplasty, arthroscopic cruciate ligament reconstructions, and sports medicine rehabilitation.'
       },
@@ -2990,8 +3144,10 @@
         experience: '12+ Years',
         reg: 'KMC #94821',
         fee: '₹1,000',
-        availability: 'Next Slot: Available',
-        opdHours: 'Tue, Thu, Sat &bull; 02:00 PM – 06:00 PM',
+        availability: 'Available for Consultation',
+        opdHours: 'Tue, Thu, Sat • 02:00 PM – 06:00 PM',
+        availableDays: ['Tue', 'Thu', 'Sat'],
+        availableSlots: ['02:00 PM', '02:45 PM', '03:30 PM', '04:30 PM', '05:30 PM'],
         avatar: '👩‍⚕️',
         bio: 'Renowned clinical dermatologist specializing in chronic psoriasis phototherapy, pediatric atopic dermatitis, biological immunotherapy, and aesthetic laser rejuvenation.'
       },
@@ -3005,8 +3161,10 @@
         experience: '16+ Years',
         reg: 'KMC #81920',
         fee: '₹800',
-        availability: 'Available Today',
-        opdHours: 'Mon–Sat &bull; 08:30 AM – 12:30 PM',
+        availability: 'Available for Consultation',
+        opdHours: 'Mon–Sat • 08:30 AM – 12:30 PM',
+        availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        availableSlots: ['08:30 AM', '09:15 AM', '10:00 AM', '11:00 AM', '12:00 PM'],
         avatar: '👨‍⚕️',
         bio: 'Senior Consultant Physician specializing in diabetic metabolic management, hypertensive disorders, geriatric preventive medicine, and pre-operative cardiac evaluations.'
       }
@@ -3027,8 +3185,10 @@
               experience: d.experience,
               reg: d.reg || d.reg_no || 'MCI Verified',
               fee: d.fee || (d.fee_inr ? `₹${d.fee_inr}` : '₹1,000'),
-              availability: d.availability || (d.is_available_today ? 'Available Today' : 'Available Today'),
+              availability: d.availability || 'Available for Consultation',
               opdHours: d.opd_hours || d.opdHours || 'Mon–Sat',
+              availableDays: Array.isArray(d.available_days) && d.available_days.length ? d.available_days : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+              availableSlots: Array.isArray(d.available_slots) && d.available_slots.length ? d.available_slots : ['09:30 AM', '10:30 AM', '11:30 AM', '02:00 PM'],
               avatar: d.avatar || '👨‍⚕️',
               bio: d.bio
             }));
@@ -3167,8 +3327,10 @@
               experience: d.experience,
               reg: d.reg || d.reg_no || 'MCI Verified',
               fee: d.fee || (d.fee_inr ? `₹${d.fee_inr}` : '₹1,000'),
-              availability: d.availability || 'Available Today',
+              availability: d.availability || 'Available for Consultation',
               opdHours: d.opd_hours || d.opdHours || 'Mon–Sat',
+              availableDays: Array.isArray(d.available_days) && d.available_days.length ? d.available_days : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+              availableSlots: Array.isArray(d.available_slots) && d.available_slots.length ? d.available_slots : ['09:30 AM', '10:30 AM', '11:30 AM', '02:00 PM'],
               avatar: d.avatar || '👨‍⚕️',
               bio: d.bio
             }));
@@ -3183,9 +3345,9 @@
         return;
       }
 
-      const availableSlots = ["09:30 AM", "11:00 AM", "02:30 PM", "04:00 PM"];
-
-      listEl.innerHTML = docs.map(doc => `
+      listEl.innerHTML = docs.map(doc => {
+        const docSlots = Array.isArray(doc.availableSlots) && doc.availableSlots.length ? doc.availableSlots : ['09:30 AM', '11:30 AM', '02:00 PM'];
+        return `
         <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4 hover:border-teal-300 transition-all shadow-sm">
           <div class="flex items-start justify-between gap-4">
             <div class="flex items-start gap-3.5">
@@ -3218,7 +3380,7 @@
               <span class="text-teal-700 font-mono">${doc.opdHours || 'Mon–Sat'}</span>
             </div>
             <div class="flex flex-wrap gap-2 pt-1">
-              ${availableSlots.map(s => `
+              ${docSlots.map(s => `
                 <button type="button" onclick="selectDeptDoctorSlot('${doc.id}', '${doc.dept}', '${s}')" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-teal-500 hover:bg-teal-50 text-slate-700 hover:text-teal-800 text-xs font-medium transition-colors cursor-pointer">
                   ⏱️ ${s}
                 </button>
@@ -3232,7 +3394,8 @@
             </button>
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
     }
 
     function selectDeptDoctorSlot(docId, dept, slot = null) {
@@ -3242,12 +3405,14 @@
         setTimeout(() => {
           const slotInput = document.getElementById('modal-selected-slot');
           if (slotInput) slotInput.value = slot;
-          const chips = document.querySelectorAll('.slot-btn');
+          const chips = document.querySelectorAll('.slot-pill');
           chips.forEach(c => {
-            if (c.getAttribute('data-slot') === slot) {
-              c.className = 'slot-btn py-2 px-1 text-center rounded-xl border border-teal-500 bg-teal-50 text-teal-900 font-bold text-xs transition-all';
-            } else {
-              c.className = 'slot-btn py-2 px-1 text-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-xs transition-all';
+            if (c.getAttribute('data-available') !== 'false') {
+              if (c.getAttribute('data-slot') === slot) {
+                c.className = 'slot-pill py-2 px-3 rounded-xl border border-teal-500 bg-teal-50 text-teal-800 text-center font-bold cursor-pointer transition-all';
+              } else {
+                c.className = 'slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer transition-all';
+              }
             }
           });
         }, 150);
@@ -3313,9 +3478,10 @@
                 <div class="flex items-center gap-4">
                   <span class="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center text-xl font-bold">🩺</span>
                   <div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                       <strong class="text-slate-900 text-sm font-sans font-bold">${apt.doctor_name}</strong>
                       <span class="px-2 py-0.5 rounded text-[10px] font-bold ${apt.status === 'CONFIRMED' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}">${apt.status}</span>
+                      ${apt.consultation_fee ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">${apt.consultation_fee}</span>` : ''}
                     </div>
                     <span class="text-slate-500 text-xs block pt-0.5 font-sans">${apt.department.toUpperCase()} &bull; ${apt.consultation_mode}</span>
                     <span class="text-teal-700 text-xs font-bold block pt-0.5">📅 ${apt.appointment_date} at ${apt.time_slot} &bull; ${apt.room || 'Tower B'} &bull; Token: ${apt.reference_id}</span>
@@ -3340,11 +3506,11 @@
       }
 
       container.innerHTML = `
-      < div class="p-8 rounded-2xl bg-white border border-dashed border-slate-300 text-center space-y-2" >
+        <div class="p-8 rounded-2xl bg-white border border-dashed border-slate-300 text-center space-y-2">
           <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-xl">📋</div>
           <h4 class="text-sm font-bold text-slate-800">No Appointments Found</h4>
-          <p class="text-xs text-slate-500 max-w-sm mx-auto font-mono">No booked outpatient consultations found for ${targetEmail}. Use the "Book OPD Consultation" button above to schedule an appointment with our specialist doctors.</p>
-        </div > `;
+          <p class="text-xs text-slate-500 max-w-sm mx-auto font-mono">No booked outpatient consultations found for ${targetEmail}. Use the "Book Appointment" button on any doctor card to schedule a consultation.</p>
+        </div>`;
     }
 
     async function handleCancelAppointment(referenceId) {
@@ -3372,65 +3538,210 @@
       }
     }
 
+    function showBookingModalError(msg) {
+      const errEl = document.getElementById('booking-modal-error');
+      if (errEl) {
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+        errEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function clearBookingModalError() {
+      const errEl = document.getElementById('booking-modal-error');
+      if (errEl) {
+        errEl.textContent = '';
+        errEl.classList.add('hidden');
+      }
+    }
+
+    function getNearestOpdDateForDoctor(doc) {
+      const allowedDays = (doc && Array.isArray(doc.availableDays) && doc.availableDays.length)
+        ? doc.availableDays
+        : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const candidate = new Date();
+      candidate.setDate(candidate.getDate() + 1); // Start from tomorrow
+      for (let i = 0; i < 14; i++) {
+        const dayAbbr = dayNames[candidate.getDay()];
+        if (allowedDays.includes(dayAbbr)) {
+          return candidate.toLocaleDateString('en-CA');
+        }
+        candidate.setDate(candidate.getDate() + 1);
+      }
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return tomorrow.toLocaleDateString('en-CA');
+    }
+
+    function updateSelectedDoctorBanner(doc = null) {
+      const docId = document.getElementById('modal-doc-select')?.value;
+      const activeDoc = doc || DOCTORS.find(d => d.id === docId) || DOCTORS[0];
+      if (!activeDoc) return;
+
+      const avatarEl = document.getElementById('banner-doc-avatar');
+      const nameEl = document.getElementById('banner-doc-name');
+      const deptEl = document.getElementById('banner-doc-dept');
+      const schedEl = document.getElementById('banner-doc-schedule');
+      const feeEl = document.getElementById('banner-doc-fee');
+      const hintEl = document.getElementById('modal-opd-days-hint');
+
+      if (avatarEl) avatarEl.textContent = activeDoc.avatar || '🩺';
+      if (nameEl) nameEl.textContent = activeDoc.name;
+      if (deptEl) deptEl.textContent = activeDoc.deptLabel || activeDoc.dept;
+      if (schedEl) schedEl.textContent = `${activeDoc.opdHours} • ${activeDoc.room}`;
+      if (feeEl) feeEl.textContent = activeDoc.fee || '₹1,000';
+      if (hintEl) {
+        const daysStr = (activeDoc.availableDays && activeDoc.availableDays.length)
+          ? activeDoc.availableDays.join(', ')
+          : 'Mon–Sat';
+        hintEl.textContent = `OPD Days: ${daysStr}. Past dates disabled.`;
+      }
+    }
+
+    function onModalDoctorChanged() {
+      const docId = document.getElementById('modal-doc-select')?.value;
+      const doc = DOCTORS.find(d => d.id === docId);
+      if (doc) {
+        const dateInput = document.getElementById('modal-date-input');
+        if (dateInput) {
+          dateInput.value = getNearestOpdDateForDoctor(doc);
+        }
+      }
+      updateSelectedDoctorBanner(doc);
+      updateSlotAvailabilityUI();
+    }
+
     async function updateSlotAvailabilityUI() {
       const docSelect = document.getElementById('modal-doc-select');
       const dateInput = document.getElementById('modal-date-input');
+      const container = document.getElementById('time-slots-container');
+      const noticeEl = document.getElementById('opd-schedule-notice');
+      const selectedInput = document.getElementById('modal-selected-slot');
       const docId = docSelect ? docSelect.value : null;
       const date = dateInput ? dateInput.value : null;
 
-      if (!docId || !date || !window.cognisec || typeof window.cognisec.checkHealthcareSlotAvailability !== 'function') {
+      if (!docId || !date || !container) {
         return;
       }
 
+      const doc = DOCTORS.find(d => d.id === docId);
+      updateSelectedDoctorBanner(doc);
+
       const syncInd = document.getElementById('slot-sync-indicator');
-      if (syncInd) syncInd.innerHTML = `< span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" ></span > Checking Availability...`;
+      if (syncInd) syncInd.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span> Checking Availability...`;
 
-      const slotButtons = document.querySelectorAll('.slot-pill');
-      for (const btn of slotButtons) {
-        const slot = btn.getAttribute('data-slot') || btn.textContent.trim();
-        try {
-          const res = await window.cognisec.checkHealthcareSlotAvailability(docId, date, slot);
-          const isAvail = (res && res.available !== undefined)
-            ? res.available
-            : ((res && res.data && res.data.available !== undefined)
-              ? res.data.available
-              : (res && res.is_available !== undefined ? res.is_available : true));
+      let slotData = null;
+      if (window.cognisec && typeof window.cognisec.fetchDoctorSlotsForDate === 'function') {
+        slotData = await window.cognisec.fetchDoctorSlotsForDate(docId, date);
+      }
 
-          if (!isAvail) {
-              btn.setAttribute('data-available', 'false');
-              btn.disabled = true;
-              btn.className = 'slot-pill py-2 px-3 rounded-xl border border-rose-200 bg-rose-50/60 text-rose-400 text-center font-bold line-through cursor-not-allowed opacity-60';
-              btn.title = 'Slot already booked by another patient';
-            } else {
-              btn.setAttribute('data-available', 'true');
-              btn.disabled = false;
-              const isSelected = document.getElementById('modal-selected-slot')?.value === slot;
-              btn.className = isSelected
-                ? 'slot-pill py-2 px-3 rounded-xl border border-teal-500 bg-teal-50 text-teal-800 text-center font-bold cursor-pointer transition-all'
-                : 'slot-pill py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:border-teal-500 text-center font-bold cursor-pointer transition-all';
-              btn.title = 'Available for booking';
-            }
-        } catch (e) {
-          // Non-blocking error
+      const fallbackSlots = (doc && Array.isArray(doc.availableSlots) && doc.availableSlots.length)
+        ? doc.availableSlots
+        : ['09:30 AM', '10:30 AM', '11:30 AM', '02:00 PM'];
+
+      let slotsList = [];
+      let isOpdDay = true;
+      let weekdayName = '';
+      let allowedDays = (doc && doc.availableDays) ? doc.availableDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+      if (slotData && Array.isArray(slotData.slots)) {
+        slotsList = slotData.slots;
+        isOpdDay = slotData.is_opd_day !== false;
+        weekdayName = slotData.weekday || '';
+        if (Array.isArray(slotData.available_days) && slotData.available_days.length) {
+          allowedDays = slotData.available_days;
+        }
+      } else {
+        const parsed = new Date(`${date}T00:00:00`);
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const fullDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const abbr = dayNames[parsed.getDay()];
+        weekdayName = fullDayNames[parsed.getDay()];
+        isOpdDay = allowedDays.includes(abbr);
+
+        for (const s of fallbackSlots) {
+          let isAvail = isOpdDay;
+          if (isAvail && window.cognisec && typeof window.cognisec.checkHealthcareSlotAvailability === 'function') {
+            try {
+              const res = await window.cognisec.checkHealthcareSlotAvailability(docId, date, s);
+              isAvail = res ? res.available !== false : true;
+            } catch (_) {}
+          }
+          slotsList.push({ slot: s, available: isAvail });
         }
       }
-      if (syncInd) syncInd.innerHTML = `< span class="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" ></span > Live Hospital Schedule`;
+
+      if (noticeEl) {
+        if (!isOpdDay) {
+          noticeEl.textContent = `${doc ? doc.name : 'This specialist'} does not hold OPD clinic on ${weekdayName}. Available OPD days: ${allowedDays.join(', ')}.`;
+          noticeEl.classList.remove('hidden');
+        } else {
+          noticeEl.textContent = '';
+          noticeEl.classList.add('hidden');
+        }
+      }
+
+      const prevSelected = selectedInput ? selectedInput.value : '';
+      let chosenSlot = '';
+      if (isOpdDay) {
+        const prevMatch = slotsList.find(item => item.slot === prevSelected && item.available);
+        if (prevMatch) {
+          chosenSlot = prevMatch.slot;
+        } else {
+          const firstOpen = slotsList.find(item => item.available);
+          chosenSlot = firstOpen ? firstOpen.slot : '';
+        }
+      }
+      if (selectedInput) selectedInput.value = chosenSlot;
+
+      container.innerHTML = slotsList.map(item => {
+        const isAvail = Boolean(item.available);
+        const isSelected = isAvail && item.slot === chosenSlot;
+        if (!isAvail) {
+          return `<button type="button" data-slot="${item.slot}" data-available="false" disabled title="${isOpdDay ? 'Slot already booked' : 'No OPD on selected day'}"
+            class="slot-pill py-2 px-3 rounded-xl border border-rose-200 bg-rose-50/60 text-rose-400 text-center font-bold line-through cursor-not-allowed opacity-60">${item.slot}</button>`;
+        }
+        return `<button type="button" data-slot="${item.slot}" data-available="true" onclick="selectTimeSlot('${item.slot}', this)" title="Available for booking"
+          class="slot-pill py-2 px-3 rounded-xl ${isSelected ? 'border border-teal-500 bg-teal-50 text-teal-800' : 'border border-slate-200 text-slate-700 hover:border-teal-500'} text-center font-bold cursor-pointer transition-all">${item.slot}</button>`;
+      }).join('');
+
+      if (syncInd) syncInd.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse"></span> Live Hospital Schedule`;
     }
 
     function renderPatientAppointments() {
       refreshPatientAppointments();
     }
 
+    function resetAppointmentSubmitState() {
+      isSubmittingAppointment = false;
+      const submitBtn = document.getElementById('btn-submit-appointment');
+      if (submitBtn) {
+        submitBtn.innerHTML = 'Review &amp; Confirm Appointment →';
+        submitBtn.disabled = false;
+      }
+    }
+
     function openAppointmentModal(preselectedDoctorId = null, preselectedDept = null) {
-      const todayStr = new Date().toISOString().split('T')[0];
+      clearBookingModalError();
+      resetAppointmentSubmitState();
+
+      if (preselectedDept) {
+        const deptEl = document.getElementById('modal-dept-select');
+        if (deptEl) deptEl.value = preselectedDept;
+      }
+
+      // Sync doctor dropdown for department, then select exact doctor if requested
+      syncModalDoctorOptions(preselectedDoctorId, true);
+
+      const selectedDocId = document.getElementById('modal-doc-select')?.value || preselectedDoctorId;
+      const activeDoc = DOCTORS.find(d => d.id === selectedDocId) || DOCTORS[0];
+
+      const todayStr = new Date().toLocaleDateString('en-CA');
       const dateInput = document.getElementById('modal-date-input');
       if (dateInput) {
         dateInput.min = todayStr;
-        if (!dateInput.value) {
-          const tomorrow = new Date();
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          dateInput.value = tomorrow.toISOString().split('T')[0];
-        }
+        dateInput.value = getNearestOpdDateForDoctor(activeDoc);
       }
 
       const user = window.cognisec ? window.cognisec.getUser() : null;
@@ -3441,50 +3752,52 @@
         if (emailInput && !emailInput.value) emailInput.value = user.email || '';
       }
 
-      if (preselectedDept) {
-        document.getElementById('modal-dept-select').value = preselectedDept;
-      }
-      syncModalDoctorOptions();
-
-      if (preselectedDoctorId) {
-        document.getElementById('modal-doc-select').value = preselectedDoctorId;
-      }
-
+      updateSelectedDoctorBanner(activeDoc);
       goToStep1();
       document.getElementById('appointment-modal').classList.remove('hidden');
-      setTimeout(updateSlotAvailabilityUI, 120);
+      setTimeout(updateSlotAvailabilityUI, 60);
     }
 
     function closeAppointmentModal() {
+      clearBookingModalError();
+      resetAppointmentSubmitState();
       document.getElementById('appointment-modal').classList.add('hidden');
     }
 
-    function syncModalDoctorOptions() {
+    function syncModalDoctorOptions(preferredDoctorId = null, skipSlotRefresh = false) {
       const dept = document.getElementById('modal-dept-select').value;
       const docSelect = document.getElementById('modal-doc-select');
+      const prevVal = preferredDoctorId || docSelect.value;
       const filtered = DOCTORS.filter(d => d.dept === dept);
-      
+
       if (filtered.length === 0) {
-        docSelect.innerHTML = `< option value = "" > No specialists currently available</option > `;
+        docSelect.innerHTML = `<option value="">No specialists currently available</option>`;
       } else {
-        docSelect.innerHTML = filtered.map(d => `
-      < option value = "${d.id}" > ${ d.name } (${ d.degrees }) & bull; ${ d.room }</option >
-        `).join('');
+        docSelect.innerHTML = filtered.map(d => `<option value="${d.id}">${d.name} (${d.fee}) &bull; ${d.room}</option>`).join('');
+        if (prevVal && filtered.some(d => d.id === prevVal)) {
+          docSelect.value = prevVal;
+        }
       }
-      updateSlotAvailabilityUI();
+      const activeDoc = DOCTORS.find(d => d.id === docSelect.value);
+      updateSelectedDoctorBanner(activeDoc);
+      if (!skipSlotRefresh) {
+        const dateInput = document.getElementById('modal-date-input');
+        if (dateInput && activeDoc) {
+          dateInput.value = getNearestOpdDateForDoctor(activeDoc);
+        }
+        updateSlotAvailabilityUI();
+      }
     }
 
     function syncQuickDoctorOptions() {
       const dept = document.getElementById('quick-dept-select').value;
       const docSelect = document.getElementById('quick-doc-select');
       const filtered = DOCTORS.filter(d => d.dept === dept);
-      
+
       if (filtered.length === 0) {
-        docSelect.innerHTML = `< option value = "" > No specialists currently available</option > `;
+        docSelect.innerHTML = `<option value="">No specialists currently available</option>`;
       } else {
-        docSelect.innerHTML = filtered.map(d => `
-      < option value = "${d.id}" > ${ d.name } (${ d.room })</option >
-        `).join('');
+        docSelect.innerHTML = filtered.map(d => `<option value="${d.id}">${d.name} (${d.room})</option>`).join('');
       }
     }
 
@@ -3497,11 +3810,13 @@
       openAppointmentModal(docId, dept);
       if (dateVal) document.getElementById('modal-date-input').value = dateVal;
       if (modeVal) document.getElementById('modal-mode-select').value = modeVal;
+      updateSlotAvailabilityUI();
     }
 
     function selectTimeSlot(slot, btn) {
+      clearBookingModalError();
       if (btn.disabled || btn.getAttribute('data-available') === 'false') {
-        showToast("Slot Unavailable", "This time slot has already been reserved. Please pick another available slot.", "⚠️");
+        showToast("Slot Unavailable", "This time slot is unavailable. Please pick another open slot.", "⚠️");
         return;
       }
       document.getElementById('modal-selected-slot').value = slot;
@@ -3514,6 +3829,7 @@
     }
 
     function goToStep1() {
+      clearBookingModalError();
       document.getElementById('booking-step-1').classList.remove('hidden');
       document.getElementById('booking-step-2').classList.add('hidden');
       document.getElementById('booking-confirmation-view').classList.add('hidden');
@@ -3525,16 +3841,55 @@
     }
 
     function goToStep2() {
-      const dateVal = document.getElementById('modal-date-input').value;
+      clearBookingModalError();
+      const docId = document.getElementById('modal-doc-select')?.value;
+      const dateVal = document.getElementById('modal-date-input')?.value;
+      const slotVal = document.getElementById('modal-selected-slot')?.value;
+      const modeVal = document.getElementById('modal-mode-select')?.value || 'In-Person Hospital Visit';
+
+      if (!docId) {
+        const msg = "Please select a consulting specialist before proceeding.";
+        showBookingModalError(msg);
+        showToast("Select Specialist", msg, "⚠️");
+        return;
+      }
       if (!dateVal) {
-        showToast("Select Date", "Please pick an appointment date.", "⚠️");
+        const msg = "Please select an appointment date.";
+        showBookingModalError(msg);
+        showToast("Select Date", msg, "⚠️");
         return;
       }
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = new Date().toLocaleDateString('en-CA');
       if (dateVal < todayStr) {
-        showToast("Invalid Date", "Appointment date cannot be in the past.", "⚠️");
+        const msg = "Appointment date cannot be in the past.";
+        showBookingModalError(msg);
+        showToast("Invalid Date", msg, "⚠️");
         return;
       }
+      if (!slotVal) {
+        const noticeEl = document.getElementById('opd-schedule-notice');
+        const opdWarn = (noticeEl && !noticeEl.classList.contains('hidden') && noticeEl.textContent)
+          ? noticeEl.textContent
+          : "No open time slot selected. Please pick an available OPD date and time slot.";
+        showBookingModalError(opdWarn);
+        showToast("Select Time Slot", opdWarn, "⚠️");
+        return;
+      }
+      const selectedPill = Array.from(document.querySelectorAll('.slot-pill')).find(el => el.getAttribute('data-slot') === slotVal);
+      if (selectedPill && (selectedPill.disabled || selectedPill.getAttribute('data-available') === 'false')) {
+        const msg = `Time slot ${slotVal} is unavailable. Please choose another open slot.`;
+        showBookingModalError(msg);
+        showToast("Slot Unavailable", msg, "⚠️");
+        return;
+      }
+
+      const doc = DOCTORS.find(d => d.id === docId);
+      const revDocEl = document.getElementById('review-summary-doctor');
+      const revSchedEl = document.getElementById('review-summary-schedule');
+      const revFeeEl = document.getElementById('review-summary-fee');
+      if (revDocEl) revDocEl.textContent = doc ? `${doc.name} (${doc.deptLabel})` : docId;
+      if (revSchedEl) revSchedEl.textContent = `${dateVal} • ${slotVal} • ${modeVal}`;
+      if (revFeeEl) revFeeEl.textContent = doc ? `${doc.room} • Fee: ${doc.fee}` : 'OPD Clinic';
 
       document.getElementById('booking-step-1').classList.add('hidden');
       document.getElementById('booking-step-2').classList.remove('hidden');
@@ -3549,41 +3904,179 @@
 
     async function handleAppointmentSubmit(e) {
       if (e) e.preventDefault();
+      clearBookingModalError();
+
       if (isSubmittingAppointment) {
         console.warn('[AyuSync] Appointment booking submission already in-flight.');
         return;
       }
 
-      if (!window.cognisec || !window.cognisec.token) {
-        showToast("Authentication Required", "Please sign in to schedule an appointment with verified OTP security.", "⚠️");
-        openAuthModal('login');
-        return;
+      // Synchronize with authoritative backend session status before enforcing observation/Zero Trust gate
+      if (window.cognisec && window.cognisec.token) {
+        let authState = null;
+        if (typeof window.cognisec.refreshAuthoritativeSessionStatus === 'function') {
+          authState = await window.cognisec.refreshAuthoritativeSessionStatus();
+        }
+
+        if (authState && (authState.terminated || authState.session_status === 'TERMINATED')) {
+          const termMsg = authState.message || "Your previous session expired or was terminated by Zero Trust security policy. Please sign in again.";
+          showBookingModalError(termMsg);
+          showToast("Session Ended", termMsg, "🚨");
+          return;
+        }
+
+        const isVerifiedNow = authState
+          ? authState.is_verified
+          : (typeof window.cognisec.isFullyVerified === 'function' ? window.cognisec.isFullyVerified() : true);
+
+        if (!isVerifiedNow) {
+          let status = (authState && authState.session_status) || window.cognisec.sessionStatus || 'PENDING_OBSERVATION';
+
+          // If backend 20s observation already elapsed while frontend timer lagged or reloaded, trigger server OTP transition now
+          if (status === 'PENDING_OBSERVATION' && authState && authState.is_observation_completed) {
+            if (typeof window.cognisec.executeObservationOtpTransition === 'function') {
+              await window.cognisec.executeObservationOtpTransition();
+            }
+            if (typeof window.cognisec.refreshAuthoritativeSessionStatus === 'function') {
+              authState = await window.cognisec.refreshAuthoritativeSessionStatus();
+            }
+            if (authState && (authState.terminated || authState.session_status === 'TERMINATED')) {
+              const termMsg = authState.message || "Session terminated due to critical security risk policy. Please sign in again.";
+              showBookingModalError(termMsg);
+              showToast("Session Terminated", termMsg, "🚨");
+              return;
+            }
+            if (authState && authState.is_verified) {
+              clearBookingModalError();
+            } else {
+              status = (authState && authState.session_status) || window.cognisec.sessionStatus || 'PENDING_OTP';
+            }
+          }
+
+          if (!(authState && authState.is_verified)) {
+            if (status === 'STEP_UP_REQUIRED' || status === 'RESTRICTED') {
+              const riskLvl = (authState && authState.risk_level ? String(authState.risk_level).toUpperCase() : 'LOW');
+              const prefFactor = (status === 'RESTRICTED' || riskLvl === 'HIGH')
+                ? 'HIGH_RISK_DUAL'
+                : (riskLvl === 'LOW' ? 'OTP' : null);
+              const riskMsg = authState?.message || (status === 'RESTRICTED' || riskLvl === 'HIGH'
+                ? "High risk detected for your session. Complete sequential cognitive verification to unlock appointment booking."
+                : (riskLvl === 'MEDIUM'
+                  ? "Elevated behavioral risk detected. Complete gesture verification before booking an appointment."
+                  : "Email OTP verification is required to complete appointment booking."));
+              showBookingModalError(riskMsg);
+              showToast("Step-Up Verification Required", riskMsg, "🛡️");
+              if (typeof window.cognisec.openStepUpModal === 'function') {
+                window.cognisec.openStepUpModal({
+                  preferredFactor: prefFactor,
+                  targetResource: 'healthcare_booking',
+                  reason: riskMsg,
+                  onSuccess: () => {
+                    clearBookingModalError();
+                    handleAppointmentSubmit();
+                  }
+                });
+              }
+              return;
+            }
+
+            if (status === 'PENDING_OTP') {
+              const otpMsg = "Baseline 20s observation complete. Please enter your sign-in email OTP before booking an appointment.";
+              showBookingModalError(otpMsg);
+              showToast("Login OTP Required", otpMsg, "📧");
+              if (typeof window.cognisec.triggerLoginOtpModal === 'function') {
+                window.cognisec.triggerLoginOtpModal();
+              }
+              return;
+            }
+
+            const rem = (authState && typeof authState.observation_seconds_remaining === 'number' && authState.observation_seconds_remaining > 0)
+              ? authState.observation_seconds_remaining
+              : (window.cognisec.observationSecondsRemaining || 20);
+            const obsMsg = `Baseline behavioral observation (20s) is still in progress (${rem}s remaining). Please wait until session verification completes.`;
+            showBookingModalError(obsMsg);
+            showToast("Session Verification Required", obsMsg, "⏳");
+            return;
+          }
+        }
       }
 
       const name = document.getElementById('modal-patient-name').value.trim();
+      const ageVal = document.getElementById('modal-patient-age').value.trim();
+      const gender = document.getElementById('modal-patient-gender').value;
       const phone = document.getElementById('modal-patient-phone').value.trim();
-      const email = document.getElementById('modal-patient-email').value.trim();
+      const email = document.getElementById('modal-patient-email').value.trim().toLowerCase();
+      const reason = document.getElementById('modal-patient-reason').value.trim();
       const docId = document.getElementById('modal-doc-select').value;
       const date = document.getElementById('modal-date-input').value;
       const slot = document.getElementById('modal-selected-slot').value;
       const mode = document.getElementById('modal-mode-select').value;
 
-      if (!name || !phone || !email || !date || !slot) {
-        showToast("Incomplete Form", "Please fill in all required patient fields.", "⚠️");
+      if (!docId || !date || !slot) {
+        const msg = "Doctor, date, or time slot selection is missing. Please select an available slot.";
+        goToStep1();
+        showBookingModalError(msg);
+        showToast("Incomplete Schedule", msg, "⚠️");
         return;
       }
 
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = new Date().toLocaleDateString('en-CA');
       if (date < todayStr) {
-        showToast("Invalid Date", "Appointment date cannot be in the past.", "⚠️");
+        const msg = "Appointment date cannot be in the past.";
+        goToStep1();
+        showBookingModalError(msg);
+        showToast("Invalid Date", msg, "⚠️");
         return;
       }
 
-      const doc = DOCTORS.find(d => d.id === docId) || DOCTORS[0];
+      if (name.length < 2) {
+        const msg = "Please enter the patient's full name (at least 2 characters).";
+        showBookingModalError(msg);
+        showToast("Invalid Name", msg, "⚠️");
+        document.getElementById('modal-patient-name')?.focus();
+        return;
+      }
+
+      const ageNum = Number(ageVal);
+      if (!ageVal || Number.isNaN(ageNum) || ageNum < 1 || ageNum > 110) {
+        const msg = "Please enter a valid patient age between 1 and 110.";
+        showBookingModalError(msg);
+        showToast("Invalid Age", msg, "⚠️");
+        document.getElementById('modal-patient-age')?.focus();
+        return;
+      }
+
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+        const msg = "Please enter a valid phone number containing 7 to 15 digits.";
+        showBookingModalError(msg);
+        showToast("Invalid Phone Number", msg, "⚠️");
+        document.getElementById('modal-patient-phone')?.focus();
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        const msg = "Please enter a valid patient email address.";
+        showBookingModalError(msg);
+        showToast("Invalid Email", msg, "⚠️");
+        document.getElementById('modal-patient-email')?.focus();
+        return;
+      }
+
+      const doc = DOCTORS.find(d => d.id === docId);
+      if (!doc) {
+        const msg = "Selected specialist could not be verified. Please choose a specialist from the list.";
+        goToStep1();
+        showBookingModalError(msg);
+        showToast("Invalid Specialist", msg, "⚠️");
+        return;
+      }
+
       const submitBtn = document.getElementById('btn-submit-appointment');
       const originalText = submitBtn ? submitBtn.innerHTML : 'Review &amp; Confirm Appointment →';
       if (submitBtn) {
-        submitBtn.innerHTML = '<span>Requesting Verification Code...</span>';
+        submitBtn.innerHTML = '<span>Dispatching Verification OTP...</span>';
         submitBtn.disabled = true;
       }
 
@@ -3591,36 +4084,41 @@
 
       try {
         const challenge = await window.cognisec.requestHealthcareAppointmentOtp({
-          doctorId: doc ? doc.id : 'doc-1',
+          doctorId: doc.id,
           appointmentDate: date,
           timeSlot: slot,
           patientName: name,
+          patientAge: ageNum,
+          patientGender: gender,
           patientPhone: phone,
           patientEmail: email,
-          department: doc ? (doc.deptLabel || doc.dept) : 'General Medicine',
+          reasonForVisit: reason || null,
+          department: doc.deptLabel || doc.dept || 'General Medicine',
           consultationMode: mode,
-          room: doc ? doc.room : null
+          room: doc.room || null
         });
 
         // Hide appointment booking modal while OTP verification modal is open
-        closeAppointmentModal();
+        document.getElementById('appointment-modal').classList.add('hidden');
 
-        // Trigger the Shopping-style email OTP popup via CogniSec Client
+        // Trigger out-of-band email OTP verification modal via CogniSec Client
         window.cognisec.openAppointmentOtpModal(challenge, {
-          doctorName: doc ? doc.name : challenge.doctor_name,
+          doctorName: doc.name || challenge.doctor_name,
           appointmentDate: date,
           timeSlot: slot,
           onSuccess: (verifyRes) => {
             const bookedApt = verifyRes.appointment;
+            const resolvedFee = bookedApt.consultation_fee || doc.fee || '₹1,000';
             lastConfirmedAppointment = {
               id: bookedApt.reference_id,
               doctorName: bookedApt.doctor_name,
-              dept: doc ? doc.deptLabel : bookedApt.department,
+              dept: bookedApt.department || doc.deptLabel,
               date: bookedApt.appointment_date,
               time: bookedApt.time_slot,
               patientName: bookedApt.patient_name,
               mode: bookedApt.consultation_mode,
-              room: bookedApt.room || (doc ? doc.room : 'Tower B'),
+              fee: resolvedFee,
+              room: bookedApt.room || doc.room || 'Tower B',
               status: bookedApt.status
             };
 
@@ -3628,11 +4126,16 @@
             document.getElementById('confirm-ref-id').textContent = bookedApt.reference_id;
             document.getElementById('confirm-patient-name').textContent = bookedApt.patient_name;
             document.getElementById('confirm-doctor-name').textContent = bookedApt.doctor_name;
-            document.getElementById('confirm-slot-time').textContent = `${ bookedApt.appointment_date } • ${ bookedApt.time_slot } `;
+            const confDeptEl = document.getElementById('confirm-dept');
+            if (confDeptEl) confDeptEl.textContent = bookedApt.department || doc.deptLabel;
+            document.getElementById('confirm-slot-time').textContent = `${bookedApt.appointment_date} • ${bookedApt.time_slot}`;
             document.getElementById('confirm-mode').textContent = bookedApt.consultation_mode;
-            document.getElementById('confirm-room').textContent = bookedApt.room || (doc ? doc.room : 'Tower B');
+            const confFeeEl = document.getElementById('confirm-fee');
+            if (confFeeEl) confFeeEl.textContent = resolvedFee;
+            document.getElementById('confirm-room').textContent = bookedApt.room || doc.room || 'Tower B';
 
             // Switch to Confirmation view
+            clearBookingModalError();
             document.getElementById('appointment-form').classList.add('hidden');
             document.getElementById('booking-confirmation-view').classList.remove('hidden');
 
@@ -3645,18 +4148,28 @@
 
             refreshPatientAppointments(email);
             updateSlotAvailabilityUI();
-            showToast("Appointment Confirmed", `Token: ${ bookedApt.reference_id } `, "✅");
+            showToast("Appointment Confirmed", `Token: ${bookedApt.reference_id}`, "✅");
           },
           onCancel: () => {
+            resetAppointmentSubmitState();
             document.getElementById('appointment-modal').classList.remove('hidden');
           }
         });
 
       } catch (err) {
         console.error('[AyuSync] Booking OTP request error:', err);
-        showToast("Booking Failed", err.message || "Could not reserve slot.", "⚠️");
-        goToStep1();
-        updateSlotAvailabilityUI();
+        const errMsg = err.message || "Could not reserve consultation slot. Please try again.";
+        showToast("Booking Verification Failed", errMsg, "⚠️");
+        if (err.status === 409 || err.status === 422) {
+          if (err.status === 409) goToStep1();
+          showBookingModalError(errMsg);
+          updateSlotAvailabilityUI();
+        } else if (err.status === 401 && window.cognisec && typeof window.cognisec.clearAuth === 'function') {
+          window.cognisec.clearAuth();
+          showBookingModalError("Your session has expired. Please sign in again to complete booking.");
+        } else {
+          showBookingModalError(errMsg);
+        }
       } finally {
         isSubmittingAppointment = false;
         if (submitBtn) {
@@ -3681,6 +4194,7 @@ Consulting Doctor : ${lastConfirmedAppointment.doctorName}
 Department        : ${lastConfirmedAppointment.dept}
 Date & Time       : ${lastConfirmedAppointment.date} at ${lastConfirmedAppointment.time}
 Consultation Mode : ${lastConfirmedAppointment.mode}
+Consultation Fee  : ${lastConfirmedAppointment.fee || 'Per OPD Tariff'}
 Clinic Room       : ${lastConfirmedAppointment.room}
 Hospital Campus   : AyuSync MedCare, Bengaluru Indiranagar
 ABDM Gateway      : IN-KA-BLR-004921 (NABH Accredited)
@@ -3715,6 +4229,7 @@ Consulting Doctor : ${apt.doctor_name}
 Department        : ${apt.department.toUpperCase()}
 Date & Time       : ${apt.appointment_date} at ${apt.time_slot}
 Consultation Mode : ${apt.consultation_mode}
+Consultation Fee  : ${apt.consultation_fee || 'Per OPD Tariff'}
 Clinic Room       : ${apt.room || 'Tower B'}
 Hospital Campus   : AyuSync MedCare, Bengaluru Indiranagar
 ABDM Gateway      : IN-KA-BLR-004921 (NABH Accredited)

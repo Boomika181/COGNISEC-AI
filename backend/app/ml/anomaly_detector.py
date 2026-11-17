@@ -1,9 +1,10 @@
 import math
+import threading
 from datetime import datetime, timezone
 import numpy as np
 from typing import Dict, Any, List, Optional, Tuple
 from sklearn.ensemble import IsolationForest
-from app.ml.feature_engineering import FEATURE_NAMES
+from app.ml.feature_engineering import FEATURE_NAMES, FeatureEngineering
 from app.core.config import settings
 
 
@@ -44,10 +45,12 @@ class IsolationForestDetector:
             max_samples="auto",
             n_jobs=1
         )
+        self._fit_lock = threading.RLock()
         self.is_fitted = False
         self.trained_sample_count = 0
         self.retrain_count = 0
         self.last_trained_at = None
+        self.last_fit_succeeded = False
 
     @staticmethod
     def standardize_vector(
@@ -81,32 +84,103 @@ class IsolationForestDetector:
         baseline_stats: Optional[Dict[str, Any]] = None
     ) -> "IsolationForestDetector":
         """
-        Trains the Isolation Forest on standardized legitimate behavioral feature vectors.
+        Trains a candidate Isolation Forest on standardized legitimate behavioral feature vectors
+        and atomically swaps the fitted estimator into place on success.
         Enforces minimum dataset size threshold (MIN_SAMPLES_FOR_TRAINING) to ensure tree stability.
+        If fitting fails, any previously fitted estimator and its metadata remain intact.
         """
         if len(training_vectors) < self.min_samples_for_training:
-            self.is_fitted = False
-            self.trained_sample_count = len(training_vectors)
+            with self._fit_lock:
+                if not self.is_fitted:
+                    self.trained_sample_count = len(training_vectors)
+                self.last_fit_succeeded = False
             return self
 
-        # Standardize each historical training vector
-        scaled_samples = []
-        for vec in training_vectors:
-            scaled_samples.append(self.standardize_vector(vec, baseline_stats))
+        try:
+            # Standardize each historical training vector
+            scaled_samples = []
+            for vec in training_vectors:
+                scaled_samples.append(self.standardize_vector(vec, baseline_stats))
 
-        X_train = np.array(scaled_samples, dtype=np.float64)
-        self.model.fit(X_train)
-        self.is_fitted = True
-        self.trained_sample_count = len(training_vectors)
-        self.retrain_count += 1
-        self.last_trained_at = datetime.now(timezone.utc).isoformat()
+            X_train = np.array(scaled_samples, dtype=np.float64)
+            if X_train.ndim != 2 or X_train.shape[1] != len(FEATURE_NAMES) or not np.all(np.isfinite(X_train)):
+                with self._fit_lock:
+                    self.last_fit_succeeded = False
+                return self
+
+            candidate_model = IsolationForest(
+                n_estimators=self.n_estimators,
+                contamination=self.contamination,
+                random_state=self.random_state,
+                max_samples="auto",
+                n_jobs=1
+            )
+            candidate_model.fit(X_train)
+
+            with self._fit_lock:
+                self.model = candidate_model
+                self.is_fitted = True
+                self.trained_sample_count = len(training_vectors)
+                self.retrain_count += 1
+                self.last_trained_at = datetime.now(timezone.utc).isoformat()
+                self.last_fit_succeeded = True
+        except Exception:
+            with self._fit_lock:
+                self.last_fit_succeeded = False
         return self
+
+    @staticmethod
+    def build_evaluation_vector(
+        sample_vector: np.ndarray,
+        baseline_stats: Optional[Dict[str, Any]] = None,
+        observed_features: Optional[Dict[str, bool]] = None,
+        observed_modalities: Optional[Dict[str, bool]] = None,
+        context_signals: Optional[Dict[str, Any]] = None,
+        sample_counts: Optional[Dict[str, int]] = None
+    ) -> Tuple[np.ndarray, Dict[str, bool]]:
+        """
+        Constructs an isolated evaluation copy of the 10-dimensional sample vector for anomaly
+        scoring, imputing missing (unobserved) features from the user's baseline means while
+        preserving genuine observed zero values.
+
+        Imputation is strictly scoped to anomaly evaluation and never mutates sample_vector
+        or baseline_stats.
+        Returns: (evaluation_vector, observed_features_mask)
+        """
+        eval_vector = np.array(sample_vector, dtype=np.float64, copy=True)
+        resolved_mask = (
+            {name: bool(observed_features.get(name, False)) for name in FEATURE_NAMES}
+            if isinstance(observed_features, dict)
+            else FeatureEngineering.resolve_observed_features(
+                event_vector=eval_vector,
+                observed_modalities=observed_modalities,
+                context_signals=context_signals,
+                sample_counts=sample_counts
+            )
+        )
+
+        if not baseline_stats or "means" not in baseline_stats:
+            return eval_vector, resolved_mask
+
+        means_dict = baseline_stats.get("means", {})
+        for idx, feat_name in enumerate(FEATURE_NAMES):
+            # Only impute when the feature is resolved as unobserved AND carries the 0.0 missing placeholder.
+            # Genuine observed zeros (resolved_mask[feat_name] == True) and non-zero physical values are preserved.
+            if not resolved_mask.get(feat_name, False) and float(eval_vector[idx]) == 0.0:
+                if feat_name in means_dict and means_dict[feat_name] is not None:
+                    eval_vector[idx] = float(means_dict[feat_name])
+
+        return eval_vector, resolved_mask
 
     def predict_anomaly(
         self,
         sample_vector: np.ndarray,
         baseline_stats: Optional[Dict[str, Any]] = None,
-        sample_count: int = 0
+        sample_count: int = 0,
+        observed_features: Optional[Dict[str, bool]] = None,
+        observed_modalities: Optional[Dict[str, bool]] = None,
+        context_signals: Optional[Dict[str, Any]] = None,
+        sample_counts: Optional[Dict[str, int]] = None
     ) -> Tuple[bool, float, str]:
         """
         Evaluates behavioral anomaly deviation.
@@ -126,17 +200,14 @@ class IsolationForestDetector:
         # 2. Learning State (1 to 4 trusted samples)
         if effective_samples < 5:
             if baseline_stats and "means" in baseline_stats and "stds" in baseline_stats:
-                means_dict = baseline_stats.get("means", {})
-                eval_vector = sample_vector.copy()
-                # Missing modality handling: if user produced no typing in this window, impute baseline mean
-                if eval_vector[0] == 0.0 and eval_vector[1] == 0.0 and eval_vector[2] == 0.0 and float(means_dict.get("typing_speed_wpm", 0.0)) > 0:
-                    eval_vector[0] = float(means_dict.get("typing_speed_wpm", 0.0))
-                    eval_vector[1] = float(means_dict.get("avg_flight_time_ms", 0.0))
-                    eval_vector[2] = float(means_dict.get("avg_dwell_time_ms", 0.0))
-                if eval_vector[3] == 0.0 and eval_vector[4] == 0.0 and float(means_dict.get("mouse_velocity_avg", 0.0)) > 0:
-                    eval_vector[3] = float(means_dict.get("mouse_velocity_avg", 0.0))
-                    eval_vector[4] = float(means_dict.get("mouse_acceleration_avg", 0.0))
-
+                eval_vector, _ = self.build_evaluation_vector(
+                    sample_vector=sample_vector,
+                    baseline_stats=baseline_stats,
+                    observed_features=observed_features,
+                    observed_modalities=observed_modalities,
+                    context_signals=context_signals,
+                    sample_counts=sample_counts
+                )
                 z_vec = self.standardize_vector(eval_vector, baseline_stats)
                 avg_z = float(np.mean(np.abs(z_vec)))
                 # Dampen early false positives: map avg_z into [0.05, 0.35]
@@ -146,18 +217,15 @@ class IsolationForestDetector:
 
         # 3. Established Baseline State (>= 5 samples)
         # Compute Welford statistical distance component if baseline stats exist
-        eval_vector = sample_vector.copy()
+        eval_vector, _ = self.build_evaluation_vector(
+            sample_vector=sample_vector,
+            baseline_stats=baseline_stats,
+            observed_features=observed_features,
+            observed_modalities=observed_modalities,
+            context_signals=context_signals,
+            sample_counts=sample_counts
+        )
         if baseline_stats and "means" in baseline_stats and "stds" in baseline_stats:
-            means_dict = baseline_stats.get("means", {})
-            # Missing modality handling: unobserved modality (0.0) imputed with baseline mean
-            if eval_vector[0] == 0.0 and eval_vector[1] == 0.0 and eval_vector[2] == 0.0 and float(means_dict.get("typing_speed_wpm", 0.0)) > 0:
-                eval_vector[0] = float(means_dict.get("typing_speed_wpm", 0.0))
-                eval_vector[1] = float(means_dict.get("avg_flight_time_ms", 0.0))
-                eval_vector[2] = float(means_dict.get("avg_dwell_time_ms", 0.0))
-            if eval_vector[3] == 0.0 and eval_vector[4] == 0.0 and float(means_dict.get("mouse_velocity_avg", 0.0)) > 0:
-                eval_vector[3] = float(means_dict.get("mouse_velocity_avg", 0.0))
-                eval_vector[4] = float(means_dict.get("mouse_acceleration_avg", 0.0))
-
             z_vec = self.standardize_vector(eval_vector, baseline_stats)
             avg_z = float(np.mean(np.abs(z_vec)))
             stat_distance_score = float(np.clip(1.0 - math.exp(-avg_z / 2.5), 0.0, 1.0))
@@ -166,7 +234,11 @@ class IsolationForestDetector:
 
         # Case A: Isolation Forest is NOT yet fitted (< min_samples_for_training)
         # Gracefully fall back to calibrated Welford statistical distance without fabricating scores
-        if not self.is_fitted:
+        with self._fit_lock:
+            is_fitted_snapshot = self.is_fitted
+            model_snapshot = self.model
+
+        if not is_fitted_snapshot or model_snapshot is None:
             is_anomaly = bool(stat_distance_score >= 0.50)
             return is_anomaly, round(stat_distance_score, 4), "ML_READY"
 
@@ -174,8 +246,8 @@ class IsolationForestDetector:
         scaled_sample = self.standardize_vector(eval_vector, baseline_stats).reshape(1, -1)
 
         # Decision function: positive for in-distribution, negative for outlier
-        decision_val = float(self.model.decision_function(scaled_sample)[0])
-        is_if_outlier = bool(self.model.predict(scaled_sample)[0] == -1)
+        decision_val = float(model_snapshot.decision_function(scaled_sample)[0])
+        is_if_outlier = bool(model_snapshot.predict(scaled_sample)[0] == -1)
 
         # Calibrated Sigmoid Mapping to [0.0, 1.0] deviation score:
         # decision_val >= +0.10 -> if_score ~ 0.10 - 0.25 (Normal)

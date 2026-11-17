@@ -18,6 +18,12 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     created_at: datetime.datetime
+    email_verified: Optional[bool] = None
+    security_enrollment_completed: bool = True
+    email_verification_required: Optional[bool] = None
+    masked_email: Optional[str] = None
+    delivery_status: Optional[str] = None
+    dev_otp: Optional[str] = None
 
     class Config:
         from_attributes = True
