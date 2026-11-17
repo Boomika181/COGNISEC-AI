@@ -5,9 +5,48 @@
  * Captures passive behavioral features (Privacy-safe: NO raw passwords/sensitive keystrokes).
  */
 
-const COGNISEC_API_BASE = (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost')
-  ? 'http://localhost:8000/api'
-  : 'http://127.0.0.1:8000/api';
+function resolveCognisecApiBase(win) {
+  const w = win || (typeof window !== 'undefined' ? window : null);
+  let configured = '';
+  if (w && typeof w.COGNISEC_API_BASE === 'string' && w.COGNISEC_API_BASE.trim()) {
+    configured = w.COGNISEC_API_BASE.trim();
+  } else if (typeof document !== 'undefined' && document.querySelector) {
+    const meta = document.querySelector('meta[name="cognisec-api-base"]');
+    if (meta && meta.content && meta.content.trim()) {
+      configured = meta.content.trim();
+    }
+  }
+
+  if (configured) {
+    let base = configured.replace(/\/+$/, '');
+    if (!base.endsWith('/api')) {
+      base = `${base}/api`;
+    }
+    const isHttpsPage = w && w.location && w.location.protocol === 'https:';
+    const isLocalTarget = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(base);
+    if (isHttpsPage && !isLocalTarget && base.startsWith('http://')) {
+      base = 'https://' + base.slice('http://'.length);
+    }
+    return base;
+  }
+
+  const host = (w && w.location && w.location.hostname) ? String(w.location.hostname).toLowerCase() : '';
+  const proto = (w && w.location && w.location.protocol) ? String(w.location.protocol).toLowerCase() : '';
+  if (host === 'localhost' || host === '127.0.0.1' || proto === 'file:') {
+    return host === 'localhost' ? 'http://localhost:8000/api' : 'http://127.0.0.1:8000/api';
+  }
+
+  if (typeof console !== 'undefined' && console.error) {
+    console.error('[COGNISEC-AI] Production API URL is missing. Set window.COGNISEC_API_BASE in config.js to your HTTPS backend URL.');
+  }
+  return '';
+}
+
+const COGNISEC_API_BASE = resolveCognisecApiBase();
+if (typeof window !== 'undefined') {
+  window.resolveCognisecApiBase = resolveCognisecApiBase;
+  window.COGNISEC_RESOLVED_API_BASE = COGNISEC_API_BASE;
+}
 
 // Configurable observation window duration in seconds (Default 20s as required by policy)
 const COGNISEC_OBSERVATION_SECONDS = 20;

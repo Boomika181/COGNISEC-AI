@@ -253,7 +253,14 @@ def ensure_admin_account_provisioned():
         from app.core.security import get_password_hash, verify_password
 
         admin_email = getattr(settings, "ADMIN_EMAIL", "cognisecai.security@gmail.com").strip().lower()
-        admin_pwd = getattr(settings, "ADMIN_INITIAL_PASSWORD", "cognisecai2026") or "cognisecai2026"
+        admin_pwd = getattr(settings, "ADMIN_INITIAL_PASSWORD", None)
+        env_name = (getattr(settings, "ENVIRONMENT", "") or "").strip().lower()
+        if env_name == "production":
+            if not admin_pwd or admin_pwd == "cognisecai2026":
+                logger.warning("[SchemaSync] Skipping automatic admin password provisioning in production: ADMIN_INITIAL_PASSWORD must be explicitly configured.")
+                return
+        else:
+            admin_pwd = admin_pwd or "cognisecai2026"
 
         db = SessionLocal()
         try:

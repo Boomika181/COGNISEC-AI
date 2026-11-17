@@ -1,7 +1,7 @@
 import os
 import json
 from typing import List, Union, Optional
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Absolute path to backend directory .env file
@@ -160,6 +160,20 @@ class Settings(BaseSettings):
         if not v_clean:
             return None
         return v_clean.lower()
+
+    @model_validator(mode="after")
+    def enforce_production_safety(self):
+        if (self.ENVIRONMENT or "").strip().lower() == "production":
+            dev_secret = "cognisec_super_secret_jwt_key_2026_agentic_zero_trust_defense"
+            if not self.SECRET_KEY or self.SECRET_KEY == dev_secret or len(self.SECRET_KEY.strip()) < 16:
+                raise ValueError("Production SECRET_KEY must be set to a strong non-default secret.")
+            if self.BOOTSTRAP_ADMIN_KEY == "cognisec_dev_bootstrap_secret_2026":
+                raise ValueError("Production BOOTSTRAP_ADMIN_KEY must not use the development default.")
+            # Disable demo mailbox override in production
+            self.EXHIBITION_DEMO_MAILBOX_OVERRIDE = False
+            # Ensure CORS_ORIGINS never contains wildcards when credentials are enabled
+            self.CORS_ORIGINS = [o for o in (self.CORS_ORIGINS or []) if o not in ("*", "null")]
+        return self
 
     model_config = SettingsConfigDict(
         case_sensitive=True,

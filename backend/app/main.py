@@ -1,8 +1,10 @@
 import logging
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from app.core.config import settings
-from app.database.connection import engine
+from app.database.connection import engine, SessionLocal
 from app.database.base import Base
 import app.models  # Ensures all ORM models are registered with Base metadata
 from app.routes import (
@@ -94,4 +96,23 @@ def root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "engine": "Cognisec-ZeroTrust-v1.0"}
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "engine": "Cognisec-ZeroTrust-v1.0",
+        }
+    except Exception:
+        logger.warning("Health check failed: database connectivity unavailable.")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "database": "unavailable",
+                "engine": "Cognisec-ZeroTrust-v1.0",
+            },
+        )
+    finally:
+        db.close()
