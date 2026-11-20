@@ -3,7 +3,7 @@
 **Institution:** Sai Vidya Institute of Technology (SVIT), Bengaluru
 **Department:** Department of Computer Science and Engineering
 **Project Type:** Major Project Evaluation
-**Live Production URL:** [https://cognisec-ai.boomikaram35.workers.dev](https://cognisec-ai.boomikaram35.workers.dev)
+**Live Production URL:** [https://cognisec-ai.cognisecai-agentic-x.workers.dev](https://cognisec-ai.cognisecai-agentic-x.workers.dev)
 **Backend API Documentation:** [https://103.102.46.56.sslip.io/docs](https://103.102.46.56.sslip.io/docs)
 
 ---
